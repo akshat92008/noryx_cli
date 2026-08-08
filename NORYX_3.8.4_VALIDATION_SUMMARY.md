@@ -20,7 +20,8 @@ Date: 2026-08-08
 | Ruff lint | **PASS** |
 | Python bytecode compilation | **PASS** |
 | Architecture/import/complexity gate | **PASS**: 252/252 packaged modules, 277 source paths, 2,383 functions |
-| Installed wheel E2E | **15 passed, 0 failed** |
+| Canonical CLI subprocess E2E in the qualification environment | **15 passed, 0 failed** |
+| Isolated normalized-wheel E2E with source checkout absent from `sys.path` | **14 passed, 1 manifest-fixture skip, 0 failed**; installed architecture gate also passed 252/252 imports |
 | Adversarial stress groups | **4/4 passed**; 77 focused tests passed with 2 expected platform skips |
 | Concurrent stress matrix | **20/20 passed**, 4 workers |
 | Offline reliability benchmark | **5/5 passed**, including 1 real repository repair; 0 model calls and no intelligence claim |
