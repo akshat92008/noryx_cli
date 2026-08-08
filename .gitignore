@@ -1,0 +1,56 @@
+# Environment & secrets
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.whl
+*.zip
+*.egg
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NexusAI internal
+.nexusai/
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+.tox/
+coverage/
+htmlcov/
+verification_evidence/
+benchmarks/results/
+benchmarks/results.json
+tmp_run/
+nexus_cli_v*_release_bundle/
+nexus_cli_v*_release_bundle.zip
+
+# Node (if any)
+node_modules/
+
+# Nexus runtime and qualification outputs
+/.nexus/
+/release_evidence/
+/release-artifacts/

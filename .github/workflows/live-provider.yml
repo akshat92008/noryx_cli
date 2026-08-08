@@ -1,0 +1,33 @@
+name: Live provider qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      allow_cost:
+        description: "Explicitly authorize paid live-provider trials"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: ${{ inputs.allow_cost }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      NEXUS_RUN_LIVE_PROVIDER: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e '.[dev]'
+      - name: Run cost-gated live-provider qualification
+        run: python scripts/run_live_provider_gate.py --allow-cost
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

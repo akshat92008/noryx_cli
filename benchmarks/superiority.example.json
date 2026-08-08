@@ -1,0 +1,112 @@
+{
+  "trials": 3,
+  "timeout_seconds": 1800,
+  "qualification": {
+    "blind": true,
+    "oracle_withheld": true,
+    "private_unseen_tasks": true,
+    "independent_evaluator": true,
+    "equal_budget_policy": true,
+    "task_selection_frozen_before_run": true,
+    "campaign_id": "replace-with-independent-campaign-id",
+    "dataset_revision": "replace-with-private-dataset-revision",
+    "evaluator_id": "unsigned-until-independent-evaluator-signs"
+  },
+  "agents": {
+    "nexus": {
+      "argv": [
+        "nexus",
+        "run",
+        "--working-dir",
+        "{workspace}",
+        "--prompt",
+        "{prompt}"
+      ],
+      "version_argv": [
+        "nexus",
+        "--version"
+      ],
+      "success_markers": [
+        "COMPLETED_VERIFIED",
+        "VERIFIED"
+      ],
+      "metrics_file": ".nexus/benchmark-metrics.json",
+      "product_identity": "nexusai-cli",
+      "model_identity": "replace-with-exact-model-and-version"
+    },
+    "direct_baseline": {
+      "argv": [
+        "replace-with-same-model-baseline",
+        "--workspace",
+        "{workspace}",
+        "--prompt",
+        "{prompt}"
+      ],
+      "version_argv": [
+        "replace-with-same-model-baseline",
+        "--version"
+      ],
+      "success_markers": [
+        "COMPLETED",
+        "SUCCESS"
+      ],
+      "metrics_file": ".benchmark-metrics.json",
+      "product_identity": "direct-model-baseline",
+      "model_identity": "replace-with-exact-model-and-version"
+    },
+    "claude_code": {
+      "argv": [
+        "claude",
+        "-p",
+        "{prompt}"
+      ],
+      "version_argv": [
+        "claude",
+        "--version"
+      ],
+      "success_markers": [
+        "COMPLETED",
+        "SUCCESS"
+      ],
+      "metrics_file": ".claude/benchmark-metrics.json",
+      "product_identity": "anthropic-claude-code",
+      "model_identity": "replace-with-claude-model-and-version"
+    }
+  },
+  "tasks": [
+    {
+      "id": "private-hidden-task-001",
+      "category": "hidden_multi_file_bug",
+      "repository_id": "private-repository-001",
+      "repository": "./private-repository-001",
+      "prompt": "Repair the hidden defect and add regression coverage without changing unrelated behavior.",
+      "oracle_dir": ".oracle",
+      "allowed_paths": [
+        "src/**",
+        "tests/**"
+      ],
+      "verification": [
+        [
+          "python",
+          "-m",
+          "pytest",
+          "-q",
+          ".oracle/test_hidden.py"
+        ]
+      ]
+    }
+  ],
+  "budget_policy": {
+    "maximum_wall_time_seconds_per_run": 1800,
+    "maximum_human_interventions_per_run": 0,
+    "same_repository_revision": true,
+    "same_task_prompt": true,
+    "same_oracle": true,
+    "same_network_policy": true
+  },
+  "environment_manifest": {
+    "runner_image": "replace-with-immutable-image-digest",
+    "operating_system": "replace-with-os-and-version",
+    "hardware_class": "replace-with-equal-hardware-class"
+  }
+}

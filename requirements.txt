@@ -1,0 +1,8 @@
+openai>=1.30.0,<3
+rich>=13.7.0,<16
+prompt_toolkit>=3.0.43,<4
+pygments>=2.17.0,<3
+starlette>=0.37.0,<1
+uvicorn[standard]>=0.29.0,<1
+websockets>=12.0,<17
+httpx[socks]>=0.27.0,<1

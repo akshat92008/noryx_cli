@@ -1,0 +1,22 @@
+# Direct runtime and release-qualification constraints for Nexus CLI 3.8.2.
+# CI still runs `pip check` and validates these against pyproject.toml.
+openai==2.52.0
+rich==15.0.0
+prompt_toolkit==3.0.52
+pygments==2.20.0
+starlette==0.50.0
+uvicorn==0.48.0
+websockets==16.0
+httpx==0.28.1
+
+# Release/dev qualification tooling.
+build==1.5.0
+pytest==9.0.2
+pytest-cov==7.0.0
+pytest-randomly==4.0.1
+pytest-timeout==2.4.0
+cryptography==46.0.4
+ruff==0.14.14
+setuptools==82.0.1
+wheel==0.46.3
+packaging==25.0

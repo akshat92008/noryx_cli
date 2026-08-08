@@ -1,0 +1,21 @@
+include NEXUS_3.6.1_RELIABILITY_HARDENING_REPORT.md
+include NEXUS_3.7.0_COGNITIVE_RELIABILITY_REPORT.md BUILD_PHASES.md
+include NEXUS_3.8.0_REPOSITORY_INTELLIGENCE_REPORT.md
+include NEXUS_3.8.1_LAUNCH_HARDENING_REPORT.md
+include NEXUS_3.8.2_LAUNCH_REMEDIATION_REPORT.md
+include README.md LICENSE SECURITY.md CONTRIBUTING.md CHANGELOG.md ROADMAP.md CAPABILITIES.md CLAUDE_CODE_PARITY.md
+include pyproject.toml requirements.txt release-constraints.txt run.py benchmark-manifest.json
+recursive-include .github *.yml *.yaml
+recursive-include benchmarks *.json *.py *.txt *.md
+recursive-include nexus *.py *.json *.html *.css *.js
+recursive-include scripts *.py *.sh
+recursive-include tests *.py *.json *.md *.txt
+prune build
+prune dist
+prune .venv
+prune .nexus
+prune .nexusai
+prune release_evidence
+prune launch_evidence
+prune __pycache__
+global-exclude *.py[cod] .DS_Store .coverage*

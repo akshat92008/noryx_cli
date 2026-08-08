@@ -1,0 +1,26 @@
+{
+  "schema_version": "nexus.benchmark.v1",
+  "name": "nexus-core-engineering",
+  "tasks": [
+    {
+      "id": "python-calculator-regression",
+      "category": "bug-repair",
+      "repository": "fixtures/calculator",
+      "prompt": "Fix the multiplication regression in this calculator. Preserve add and subtract behavior, add no dependencies, and verify the supplied acceptance script.",
+      "allowed_paths": [
+        "calculator.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "calculator.py"
+      ],
+      "verification": [
+        [
+          "python",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 300
+    }
+  ]
+}

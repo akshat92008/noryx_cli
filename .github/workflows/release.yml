@@ -1,0 +1,106 @@
+name: Release qualification
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  qualify-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install and verify kernel sandbox
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          python - <<'PY'
+          from pathlib import Path
+          from nexus.sandbox import SandboxBackend, SandboxRunner
+          assert SandboxRunner(Path.cwd()).backend() == SandboxBackend.BUBBLEWRAP
+          PY
+      - run: python -m pip install -c release-constraints.txt -e '.[dev]'
+      - name: Verify dependency contract
+        run: |
+          python -m pip check
+          python - <<'PY'
+          from nexus.qualification_environment import qualify_environment
+          report = qualify_environment('.')
+          assert report.passed, report.to_dict()
+          PY
+      - name: Deterministic release gate
+        run: python scripts/run_release_gate.py
+        env:
+          NEXUS_RELEASE_REQUIRE_AUTONOMOUS: "1"
+      - name: Three fresh long-horizon trials
+        run: >-
+          python scripts/run_live_provider_gate.py --allow-cost
+          --manifest benchmarks/release_long_horizon.json
+          --trials 3 --required-pass-rate 1.0
+          --artifact-root verification_evidence/live-provider
+        env:
+          NEXUS_RUN_LIVE_PROVIDER: "1"
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      - name: Build release artifacts and evidence
+        run: |
+          rm -rf dist release-artifacts
+          export SOURCE_DATE_EPOCH="$(git log -1 --pretty=%ct)"
+          python -m build
+          python scripts/normalize_release_artifacts.py --epoch "$SOURCE_DATE_EPOCH" dist/*
+          mkdir -p release-artifacts
+          python -m nexus sandbox qualify --require-autonomous --output release-artifacts/sandbox-qualification.json
+          python -m nexus architecture check --json > release-artifacts/architecture.json
+          python scripts/generate_sbom.py --output release-artifacts/sbom.spdx.json
+          python - <<'PY'
+          from nexus.qualification_environment import write_environment_qualification
+          report = write_environment_qualification('.', 'release-artifacts/qualification-environment.json')
+          assert report.passed, report.to_dict()
+          PY
+          latest_live="$(find verification_evidence/live-provider -name qualification.json -type f -print | sort | tail -1)"
+          test -n "$latest_live"
+          cp "$latest_live" release-artifacts/live-provider-qualification.json
+          python -m pip freeze > release-artifacts/dependencies.txt
+          sha256sum dist/* release-artifacts/* > release-artifacts/SHA256SUMS
+      - name: Upload qualified artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-qualified-${{ github.ref_name }}
+          path: |
+            dist/*
+            release-artifacts/*
+          if-no-files-found: error
+      - name: Attest release provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            dist/*
+            release-artifacts/*
+      - name: Attest release SBOM
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/*
+          sbom-path: release-artifacts/sbom.spdx.json
+  platform-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        python: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -c release-constraints.txt -e '.[dev]'
+      - run: python -m pytest -q tests/test_sandbox_stress.py tests/test_e2e_installed_wheel.py tests/test_truth_integrity_p0.py

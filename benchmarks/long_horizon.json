@@ -1,0 +1,125 @@
+{
+  "schema_version": "nexus.benchmark.v2",
+  "name": "nexus-long-horizon-startup",
+  "profile": "long-horizon",
+  "tasks": [
+    {
+      "id": "startup-control-plane-from-one-prompt",
+      "category": "startup-build",
+      "repository": "fixtures/startup_control_plane",
+      "prompt": "Build the complete production-oriented startup product described in PRODUCT_SPEC.md. This is the only product prompt you will receive. Work through the full architecture, persistence, security, concurrency, HTTP surface, documentation, and tests. Do not modify PRODUCT_SPEC.md or acceptance.py. Keep using tools and deterministic checks until both the project test suite and python acceptance.py pass.",
+      "allowed_paths": [
+        "startup/**",
+        "tests/**",
+        "README.md",
+        "pyproject.toml"
+      ],
+      "expected_changed_files": [
+        "README.md",
+        "pyproject.toml"
+      ],
+      "required_paths": [
+        "startup/service.py",
+        "startup/app.py",
+        "startup/cli.py",
+        "tests/test_*.py",
+        "README.md",
+        "pyproject.toml"
+      ],
+      "forbidden_content": [
+        "NotImplementedError",
+        "TODO: implement",
+        "pass  # placeholder"
+      ],
+      "minimum_changed_files": 9,
+      "minimum_test_files": 3,
+      "max_attempts": 4,
+      "max_turns_per_attempt": 40,
+      "max_hosted_calls_per_attempt": 48,
+      "max_provider_attempts_per_attempt": 72,
+      "verification": [
+        [
+          "python",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests",
+          "-v"
+        ],
+        [
+          "python",
+          "acceptance.py"
+        ],
+        [
+          "python",
+          "-m",
+          "compileall",
+          "-q",
+          "startup",
+          "tests"
+        ]
+      ],
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "operations-erp-from-one-prompt",
+      "category": "long-horizon-system",
+      "repository": "fixtures/operations_erp",
+      "prompt": "Build the complete production-oriented operations ERP described in PRODUCT_SPEC.md. This is the only product prompt you will receive. Work through the full architecture, persistence, authorization, procurement, inventory, accounting workflow, concurrency, WSGI surface, documentation, and tests. Do not modify PRODUCT_SPEC.md or acceptance.py. Keep using tools and deterministic checks until both the project test suite and python acceptance.py pass.",
+      "allowed_paths": [
+        "erp/**",
+        "tests/**",
+        "README.md",
+        "pyproject.toml"
+      ],
+      "expected_changed_files": [
+        "README.md",
+        "pyproject.toml"
+      ],
+      "required_paths": [
+        "erp/service.py",
+        "erp/app.py",
+        "erp/cli.py",
+        "tests/test_*.py",
+        "README.md",
+        "pyproject.toml"
+      ],
+      "forbidden_content": [
+        "NotImplementedError",
+        "TODO: implement",
+        "pass  # placeholder"
+      ],
+      "minimum_changed_files": 9,
+      "minimum_test_files": 3,
+      "max_attempts": 4,
+      "max_turns_per_attempt": 40,
+      "max_hosted_calls_per_attempt": 48,
+      "max_provider_attempts_per_attempt": 72,
+      "verification": [
+        [
+          "python",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests",
+          "-v"
+        ],
+        [
+          "python",
+          "acceptance.py"
+        ],
+        [
+          "python",
+          "-m",
+          "compileall",
+          "-q",
+          "erp",
+          "tests"
+        ]
+      ],
+      "timeout_seconds": 3600
+    }
+  ]
+}

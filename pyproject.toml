@@ -1,0 +1,112 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexusai-cli"
+dynamic = ["version"]
+description = "NexusAI — a model-agnostic, verification-driven software-engineering runtime"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{name = "Akshat"}]
+keywords = ["ai", "coding-agent", "cli", "verification", "ollama"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+]
+dependencies = [
+    "openai>=1.30.0,<3",
+    "rich>=13.7.0,<16",
+    "prompt_toolkit>=3.0.43,<4",
+    "pygments>=2.17.0,<3",
+    "starlette>=0.37.0,<1",
+    "uvicorn[standard]>=0.29.0,<1",
+    "websockets>=12.0,<17",
+    "httpx[socks]>=0.27.0,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2.2",
+    "pytest>=8.3,<10",
+    "pytest-cov>=6,<8",
+    "pytest-randomly>=3.16,<5",
+    "pytest-timeout>=2.4,<3",
+    "cryptography>=43,<48",
+    "ruff>=0.11,<1",
+    "setuptools>=68",
+    "wheel",
+    "packaging>=24,<27",
+]
+browser = [
+    "playwright>=1.50,<2",
+]
+intelligence = [
+    "tree-sitter-language-pack>=0.9,<1",
+]
+qualification = [
+    "cryptography>=43,<48",
+    "packaging>=24,<27",
+]
+
+[project.scripts]
+nexus = "nexus.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/akshat92008/nexus_cli"
+Repository = "https://github.com/akshat92008/nexus_cli"
+Issues = "https://github.com/akshat92008/nexus_cli/issues"
+
+[tool.setuptools.packages.find]
+include = ["nexus*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "nexus.__version__"}
+
+[tool.setuptools.package-data]
+"nexus.webapp" = ["static/**/*"]
+"nexus.resources.benchmarks" = ["*.json"]
+
+[tool.setuptools.data-files]
+# Ship benchmark manifests so pipx-installed users can run dry-run validation
+# without a source checkout. These files are not Python packages.
+"share/nexusai-cli/benchmarks" = [
+    "benchmarks/core.json",
+    "benchmarks/competitive.example.json",
+    "benchmarks/superiority.example.json",
+]
+"share/nexusai-cli" = [
+    "benchmark-manifest.json",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["nexus"]
+omit = ["nexus/webapp/static/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+fail_under = 60
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+exclude = ["build", "dist", "verification_evidence"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]

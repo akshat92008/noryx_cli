@@ -1,0 +1,406 @@
+{
+  "schema_version": "nexus.benchmark.v1",
+  "name": "nexus-generated-eval-suite",
+  "tasks": [
+    {
+      "id": "bug_max_element",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_max_element",
+      "prompt": "Fix the bug in find_max.py so it correctly finds the maximum element even if all numbers are negative.",
+      "allowed_paths": [
+        "find_max.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "find_max.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_palindrome",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_palindrome",
+      "prompt": "Fix is_palindrome.py to properly handle mixed case strings and ignore spaces.",
+      "allowed_paths": [
+        "is_palindrome.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "is_palindrome.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_factorial",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_factorial",
+      "prompt": "Fix factorial.py to return 1 for 0!.",
+      "allowed_paths": [
+        "factorial.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "factorial.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_vowels",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_vowels",
+      "prompt": "Fix count_vowels.py to also count uppercase vowels.",
+      "allowed_paths": [
+        "count_vowels.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "count_vowels.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_fibonacci",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_fibonacci",
+      "prompt": "Fix fibonacci.py. fib(0) should be 0, fib(1) should be 1.",
+      "allowed_paths": [
+        "fibonacci.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "fibonacci.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_binary_search",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_binary_search",
+      "prompt": "Fix binary_search.py so it uses integer division for the mid point calculation.",
+      "allowed_paths": [
+        "binary_search.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "binary_search.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_fizzbuzz",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_fizzbuzz",
+      "prompt": "Fix fizzbuzz.py. The order of conditions is wrong so multiples of 15 return Fizz.",
+      "allowed_paths": [
+        "fizzbuzz.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "fizzbuzz.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_anagram",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_anagram",
+      "prompt": "Fix is_anagram.py to ignore spaces and character casing.",
+      "allowed_paths": [
+        "is_anagram.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "is_anagram.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_gcd",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_gcd",
+      "prompt": "Fix gcd.py. The modulo logic is backwards in the recursive call.",
+      "allowed_paths": [
+        "gcd.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "gcd.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_sum_even",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_sum_even",
+      "prompt": "Fix sum_even.py so it only sums even numbers.",
+      "allowed_paths": [
+        "sum_even.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "sum_even.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_remove_duplicates",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_remove_duplicates",
+      "prompt": "Fix remove_duplicates.py to maintain the original order.",
+      "allowed_paths": [
+        "remove_duplicates.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "remove_duplicates.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_power",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_power",
+      "prompt": "Fix power.py so that power(x, 0) returns 1 instead of 0.",
+      "allowed_paths": [
+        "power.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "power.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_merge_sorted",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_merge_sorted",
+      "prompt": "Fix merge_sorted.py so it handles leftover elements from both arrays.",
+      "allowed_paths": [
+        "merge_sorted.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "merge_sorted.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_first_unique",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_first_unique",
+      "prompt": "Fix first_unique.py so it correctly finds the first non-repeating character.",
+      "allowed_paths": [
+        "first_unique.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "first_unique.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_is_prime",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_is_prime",
+      "prompt": "Fix is_prime.py to correctly identify that 1 is not a prime number.",
+      "allowed_paths": [
+        "is_prime.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "is_prime.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_title_case",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_title_case",
+      "prompt": "Fix title_case.py to capitalize every word, not just the first one.",
+      "allowed_paths": [
+        "title_case.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "title_case.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_list_flatten",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_list_flatten",
+      "prompt": "Fix list_flatten.py so it recursively flattens deeply nested lists.",
+      "allowed_paths": [
+        "list_flatten.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "list_flatten.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_count_words",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_count_words",
+      "prompt": "Fix count_words.py to ignore punctuation.",
+      "allowed_paths": [
+        "count_words.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "count_words.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_find_missing",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_find_missing",
+      "prompt": "Fix find_missing.py. The formula for the expected sum is missing the +1.",
+      "allowed_paths": [
+        "find_missing.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "find_missing.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "bug_array_intersection",
+      "category": "bug-repair",
+      "repository": "fixtures/generated/bug_array_intersection",
+      "prompt": "Fix array_intersection.py to return a list of unique elements present in both arrays.",
+      "allowed_paths": [
+        "array_intersection.py",
+        "verify.py"
+      ],
+      "expected_changed_files": [
+        "array_intersection.py"
+      ],
+      "verification": [
+        [
+          "python3",
+          "verify.py"
+        ]
+      ],
+      "timeout_seconds": 60
+    }
+  ]
+}

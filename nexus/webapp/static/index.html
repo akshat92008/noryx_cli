@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusAI — AI Coding Agent</title>
+    <meta name="description" content="NexusAI — A verifiable, free-first coding agent with 22 tools, guarded Nova routing, git integration, and web search.">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <div class="logo-icon">N</div>
+                    <span class="logo-text">NexusAI</span>
+                    <span class="logo-badge">FREE</span>
+                </div>
+                <button class="new-chat-btn" id="newChatBtn" title="Start a new conversation">
+                    <span>✚</span> New Chat
+                </button>
+            </div>
+
+            <div class="sidebar-section" id="fileTreeSection">
+                <div class="sidebar-section-title">📁 Files</div>
+                <div id="fileTree">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="label">⚡ Model</div>
+                <select class="model-selector" id="modelSelector">
+                    <!-- Populated by JS -->
+                </select>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <button class="topbar-toggle" id="sidebarToggle" title="Toggle sidebar">☰</button>
+                <span class="topbar-title">NexusAI — AI Coding Agent</span>
+                <span class="topbar-tools-count" title="20 agent tools available">🔧 20 Tools</span>
+                <span class="topbar-model" id="topbarModel">Loading...</span>
+            </header>
+
+            <!-- Chat Area -->
+            <div class="chat-area" id="chatArea">
+                <div class="welcome-screen" id="welcomeScreen">
+                    <div class="welcome-icon">⚡</div>
+                    <h1 class="welcome-title">NexusAI</h1>
+                    <p class="welcome-subtitle">
+                        A verifiable coding agent with 22 tools — read, write, edit files, run commands,
+                        search code, manage git, browse the web — all powered by NVIDIA's free API.
+                    </p>
+                    <div class="welcome-suggestions">
+                        <div class="suggestion-card" data-prompt="Build a REST API with Express.js and MongoDB with full CRUD operations">
+                            <div class="suggestion-icon">🚀</div>
+                            Build a REST API with Express.js and MongoDB
+                        </div>
+                        <div class="suggestion-card" data-prompt="Read the project structure and explain the codebase architecture">
+                            <div class="suggestion-icon">🔍</div>
+                            Analyze this project's architecture
+                        </div>
+                        <div class="suggestion-card" data-prompt="Create a Python CLI tool with click, add --verbose flag, config file support, and colorful output">
+                            <div class="suggestion-icon">🐍</div>
+                            Create a Python CLI tool with click
+                        </div>
+                        <div class="suggestion-card" data-prompt="Find any bugs in the codebase, run the tests, and fix any issues you find">
+                            <div class="suggestion-icon">🐛</div>
+                            Find and fix bugs in the codebase
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <textarea 
+                            class="chat-input" 
+                            id="chatInput" 
+                            placeholder="Ask NexusAI to build, edit, debug, or explain anything..."
+                            rows="1"
+                        ></textarea>
+                        <button class="send-btn" id="sendBtn" title="Send message">↑</button>
+                    </div>
+                    <div class="input-hint">
+                        <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line · 22 tools available
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

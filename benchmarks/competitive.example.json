@@ -1,0 +1,26 @@
+{
+  "trials": 1,
+  "timeout_seconds": 900,
+  "agents": {
+    "nexus": {
+      "argv": ["nexus", "run", "--workspace", "{workspace}", "--prompt", "{prompt}"],
+      "version_argv": ["nexus", "--version"],
+      "success_markers": ["COMPLETED_VERIFIED", "VERIFIED"]
+    },
+    "claude-code": {
+      "argv": ["claude", "-p", "{prompt}"],
+      "version_argv": ["claude", "--version"],
+      "success_markers": ["COMPLETED", "SUCCESS"]
+    }
+  },
+  "tasks": [
+    {
+      "id": "replace-with-private-task",
+      "repository": "./private-task-repository",
+      "prompt": "Fix the hidden defect without changing the public API and add regression tests.",
+      "oracle_dir": ".oracle",
+      "allowed_paths": ["src/**", "tests/**"],
+      "verification": [["python", "-m", "pytest", "-q", ".oracle/test_hidden.py"]]
+    }
+  ]
+}
