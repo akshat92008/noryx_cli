@@ -12,6 +12,8 @@ from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
+from nexus.env import noryx_env
+
 
 @dataclass(frozen=True)
 class BackendProbe:
@@ -31,11 +33,7 @@ class BackendProbe:
 
 
 def ollama_base_url() -> str:
-    value = (
-        os.environ.get("NEXUS_OLLAMA_URL")
-        or os.environ.get("OLLAMA_HOST")
-        or "http://127.0.0.1:11434"
-    )
+    value = noryx_env("OLLAMA_URL") or os.environ.get("OLLAMA_HOST") or "http://127.0.0.1:11434"
     if not value.startswith(("http://", "https://")):
         value = f"http://{value}"
     return value.rstrip("/")
@@ -95,18 +93,19 @@ def probe_ollama(model: str = "nova_codex", *, use_cache: bool = True) -> Backen
 
 
 def configured_hosted_credentials() -> list[str]:
-    names = (
-        "NEXUS_OPENAI_API_KEY",
-        "NVIDIA_API_KEY",
-        "GROQ_API_KEY",
-        "OPENROUTER_API_KEY",
-    )
-    return [name for name in names if os.environ.get(name)]
+    names = [
+        name
+        for name in ("NVIDIA_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY")
+        if os.environ.get(name)
+    ]
+    if noryx_env("OPENAI_API_KEY"):
+        names.insert(0, "NORYX_OPENAI_API_KEY")
+    return names
 
 
 def probe_hosted() -> BackendProbe:
     credentials = configured_hosted_credentials()
-    custom_url = os.environ.get("NEXUS_OPENAI_BASE_URL", "").strip()
+    custom_url = str(noryx_env("OPENAI_BASE_URL", "")).strip()
     if custom_url:
         parsed = urlparse(custom_url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname:
@@ -114,16 +113,16 @@ def probe_hosted() -> BackendProbe:
                 ready=False,
                 backend="hosted",
                 code="custom_url_invalid",
-                detail="NEXUS_OPENAI_BASE_URL must be an absolute HTTP(S) URL.",
+                detail="NORYX_OPENAI_BASE_URL must be an absolute HTTP(S) URL.",
                 remediation=("Use a URL such as https://provider.example/v1.",),
             )
-    if custom_url and not os.environ.get("NEXUS_OPENAI_API_KEY"):
+    if custom_url and not noryx_env("OPENAI_API_KEY"):
         return BackendProbe(
             ready=False,
             backend="hosted",
             code="custom_key_missing",
-            detail="NEXUS_OPENAI_BASE_URL is configured, but NEXUS_OPENAI_API_KEY is missing.",
-            remediation=("Set NEXUS_OPENAI_API_KEY for the custom endpoint.",),
+            detail="NORYX_OPENAI_BASE_URL is configured, but NORYX_OPENAI_API_KEY is missing.",
+            remediation=("Set NORYX_OPENAI_API_KEY for the custom endpoint.",),
         )
     if not credentials:
         return BackendProbe(
@@ -133,7 +132,7 @@ def probe_hosted() -> BackendProbe:
             detail="No hosted-provider credential is configured.",
             remediation=(
                 "Set NVIDIA_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY.",
-                "For a custom OpenAI-compatible endpoint, set NEXUS_OPENAI_BASE_URL and NEXUS_OPENAI_API_KEY.",
+                "For a custom OpenAI-compatible endpoint, set NORYX_OPENAI_BASE_URL and NORYX_OPENAI_API_KEY.",
             ),
         )
     return BackendProbe(
@@ -154,6 +153,6 @@ def probe_model(model_cfg: dict[str, Any], *, model_name: str = "") -> BackendPr
             backend="hosted",
             code="model_id_missing",
             detail=f"Custom model '{model_name or 'custom'}' requires a provider model ID.",
-            remediation=("Pass --model-id or set NEXUS_MODEL_ID.",),
+            remediation=("Pass --model-id or set NORYX_MODEL_ID.",),
         )
     return probe_hosted()
