@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nexusai-cli"
+name = "noryx-cli"
 dynamic = ["version"]
-description = "NexusAI — a model-agnostic, verification-driven software-engineering runtime"
+description = "Noryx CLI — a secure, verification-driven software-engineering runtime"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -61,15 +61,17 @@ qualification = [
 ]
 
 [project.scripts]
+noryx = "nexus.cli:main"
+# Backward-compatible command for existing 3.x installations.
 nexus = "nexus.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/akshat92008/nexus_cli"
-Repository = "https://github.com/akshat92008/nexus_cli"
-Issues = "https://github.com/akshat92008/nexus_cli/issues"
+Homepage = "https://github.com/akshat92008/noryx_cli"
+Repository = "https://github.com/akshat92008/noryx_cli"
+Issues = "https://github.com/akshat92008/noryx_cli/issues"
 
 [tool.setuptools.packages.find]
-include = ["nexus*"]
+include = ["noryx*", "nexus*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "nexus.__version__"}
@@ -81,12 +83,13 @@ version = {attr = "nexus.__version__"}
 [tool.setuptools.data-files]
 # Ship benchmark manifests so pipx-installed users can run dry-run validation
 # without a source checkout. These files are not Python packages.
-"share/nexusai-cli/benchmarks" = [
+"share/noryx-cli/benchmarks" = [
     "benchmarks/core.json",
     "benchmarks/competitive.example.json",
     "benchmarks/superiority.example.json",
+    "benchmarks/trust-policy.example.json",
 ]
-"share/nexusai-cli" = [
+"share/noryx-cli" = [
     "benchmark-manifest.json",
 ]
 
@@ -95,7 +98,7 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 
 [tool.coverage.run]
-source = ["nexus"]
+source = ["nexus", "noryx"]
 omit = ["nexus/webapp/static/*", "*/__pycache__/*"]
 
 [tool.coverage.report]
@@ -110,3 +113,14 @@ exclude = ["build", "dist", "verification_evidence"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# These modules intentionally re-export the public compatibility surface.
+"nexus/cli/__init__.py" = ["F401"]
+"nexus/tools/__init__.py" = ["F401"]
+"nexus/intelligence/repository/__init__.py" = ["F401"]
+# Bootstrap scripts insert the source root before importing the package.
+"scripts/*.py" = ["E402"]
+# The canonical tools implementation has a deliberate late import to avoid a
+# circular dependency with its package facade and background supervisor.
+"nexus/tools/tools_impl.py" = ["E402"]

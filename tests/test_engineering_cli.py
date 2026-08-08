@@ -10,7 +10,7 @@ from pathlib import Path
 def _run(*args: str, cwd: Path, home: Path) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
-    env["NEXUS_HOME"] = str(home / ".nexus")
+    env["NEXUS_HOME"] = str(home / ".noryx")
     source_root = str(Path(__file__).resolve().parents[1])
     env["PYTHONPATH"] = source_root + os.pathsep + env.get("PYTHONPATH", "")
     return subprocess.run(
@@ -63,8 +63,22 @@ def test_matched_benchmark_cli_enforces_identical_trial_contract(tmp_path: Path)
             "cost_usd": 0.4,
             "regressions": 0,
         }
-        direct.append(common | {"status": "VERIFIED" if index < 2 else "FAILED", "verified": index < 2, "claimed_success": index < 2})
-        nexus.append(common | {"status": "VERIFIED" if index < 4 else "FAILED", "verified": index < 4, "claimed_success": index < 4})
+        direct.append(
+            common
+            | {
+                "status": "VERIFIED" if index < 2 else "FAILED",
+                "verified": index < 2,
+                "claimed_success": index < 2,
+            }
+        )
+        nexus.append(
+            common
+            | {
+                "status": "VERIFIED" if index < 4 else "FAILED",
+                "verified": index < 4,
+                "claimed_success": index < 4,
+            }
+        )
     direct_path = tmp_path / "direct.json"
     nexus_path = tmp_path / "nexus.json"
     direct_path.write_text(json.dumps({"trials": direct}), encoding="utf-8")

@@ -1,4 +1,4 @@
-"""Reproducible, versioned benchmark runner for Nexus engineering tasks."""
+"""Reproducible, versioned benchmark runner for Noryx engineering tasks."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import json
 import os
 import shutil
 import statistics
-import subprocess
 import sys
 import tempfile
 import time
@@ -17,7 +16,6 @@ from pathlib import Path
 from typing import Any
 
 from nexus import __version__
-from nexus.sandbox import CommandSpec, SandboxRunner
 
 BENCHMARK_SCHEMA_VERSION = "nexus.benchmark.v2"
 SUPPORTED_BENCHMARK_SCHEMAS = {"nexus.benchmark.v1", BENCHMARK_SCHEMA_VERSION}
@@ -202,9 +200,7 @@ class BenchmarkReport:
                 "failed": sum(1 for item in executed if not item.passed),
                 "pass_rate": (round(passed / len(executed), 4) if executed else 0.0),
                 "verified_pass_rate": (
-                    round(verified_passed / len(executed), 4)
-                    if executed
-                    else 0.0
+                    round(verified_passed / len(executed), 4) if executed else 0.0
                 ),
                 "total_duration_ms": sum(item.duration_ms for item in self.results),
                 "total_model_calls": sum(item.model_calls for item in self.results),
@@ -243,9 +239,7 @@ class BenchmarkReport:
                 else 0.0,
                 "completion_rate": (round(passed / len(executed), 4) if executed else 0.0),
                 "verification_rate": (
-                    round(verified_passed / len(executed), 4)
-                    if executed
-                    else 0.0
+                    round(verified_passed / len(executed), 4) if executed else 0.0
                 ),
                 "human_intervention_rate": (
                     round(sum(1 for item in executed if item.human_intervention) / len(executed), 4)
@@ -253,7 +247,15 @@ class BenchmarkReport:
                     else 0.0
                 ),
                 "false_success_rate": (
-                    round(sum(1 for item in executed if item.agent_status == "VERIFIED" and not item.passed) / sum(1 for item in executed if item.agent_status == "VERIFIED"), 4)
+                    round(
+                        sum(
+                            1
+                            for item in executed
+                            if item.agent_status == "VERIFIED" and not item.passed
+                        )
+                        / sum(1 for item in executed if item.agent_status == "VERIFIED"),
+                        4,
+                    )
                     if sum(1 for item in executed if item.agent_status == "VERIFIED") > 0
                     else 0.0
                 ),
@@ -261,7 +263,12 @@ class BenchmarkReport:
                     statistics.median([item.tool_calls for item in executed]) if executed else 0.0
                 ),
                 "median_cost_usd": (
-                    round(statistics.median([(item.estimated_cost_usd or 0.0) for item in executed]), 4) if executed else 0.0
+                    round(
+                        statistics.median([(item.estimated_cost_usd or 0.0) for item in executed]),
+                        4,
+                    )
+                    if executed
+                    else 0.0
                 ),
                 "median_duration_ms": (
                     statistics.median([item.duration_ms for item in executed]) if executed else 0.0
@@ -347,7 +354,7 @@ class BenchmarkRunner:
                 backend="configuration",
                 code="unknown_model",
                 detail=f"Unknown benchmark model: {model}",
-                remediation=("Set NEXUS_MODEL to a key shown by `nexus --list-models`.",),
+                remediation=("Set NEXUS_MODEL to a key shown by `noryx --list-models`.",),
             )
         return probe_model(model_cfg, model_name=model)
 
@@ -392,7 +399,7 @@ class BenchmarkRunner:
             ]
         else:
             # Execute through the production gateway even when local provider
-            # preflight is unavailable.  The spawned Nexus process remains the
+            # preflight is unavailable.  The spawned Noryx process remains the
             # authority for configuration errors, while tests and custom gateway
             # adapters can exercise isolation without requiring real credentials.
             results = [
@@ -472,9 +479,17 @@ class BenchmarkRunner:
                 "NEXUS_HOME": str(state_root),
             }
             allowed_keys = [
-                "NEXUS_MODEL", "NEXUS_OPENAI_API_KEY", "NEXUS_ANTHROPIC_API_KEY",
-                "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "NEXUS_GEMINI_API_KEY",
-                "NEXUS_API_KEY", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"
+                "NEXUS_MODEL",
+                "NEXUS_OPENAI_API_KEY",
+                "NEXUS_ANTHROPIC_API_KEY",
+                "OPENAI_API_KEY",
+                "ANTHROPIC_API_KEY",
+                "GEMINI_API_KEY",
+                "NEXUS_GEMINI_API_KEY",
+                "NEXUS_API_KEY",
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "AWS_REGION",
             ]
             for key in allowed_keys:
                 if key in os.environ:
@@ -495,10 +510,11 @@ class BenchmarkRunner:
                 command = self._agent_command(task, workspace, resume_from=resume_from)
                 attempt_started = time.monotonic()
                 from nexus.process_gateway import ProcessExecutionGateway, ProcessRequest
+
                 request = ProcessRequest.create(
                     purpose="benchmark_agent",
                     command=command,
-                    workspace=Path.cwd(), # Use trusted cwd to prevent module shadowing
+                    workspace=Path.cwd(),  # Use trusted cwd to prevent module shadowing
                     trust_level="trusted",
                     timeout_seconds=task.timeout_seconds,
                     env_additions=env,
@@ -507,7 +523,7 @@ class BenchmarkRunner:
                     allowed_sensitive_env_keys=allowed_keys,
                 )
                 result = ProcessExecutionGateway.run(request)
-                
+
                 if result.timed_out:
                     final_process = {
                         "returncode": None,
@@ -574,6 +590,7 @@ class BenchmarkRunner:
             missing_expected = [path for path in task.expected_changed_files if path not in changed]
             checks = []
             from nexus.process_gateway import ProcessExecutionGateway, ProcessRequest
+
             for argv in task.verification:
                 req = ProcessRequest.create(
                     purpose="benchmark_verification",
@@ -602,9 +619,9 @@ class BenchmarkRunner:
             )
             details = []
             if final_process["timed_out"]:
-                details.append(f"final Nexus attempt timed out after {task.timeout_seconds}s")
+                details.append(f"final Noryx attempt timed out after {task.timeout_seconds}s")
             elif final_process["returncode"]:
-                details.append(f"Nexus exit code {final_process['returncode']}")
+                details.append(f"Noryx exit code {final_process['returncode']}")
             failed_gates = [item["name"] for item in quality_gates if not item["passed"]]
             if failed_gates:
                 details.append(f"failed quality gates: {failed_gates}")
@@ -885,8 +902,10 @@ def _aggregate_attempt_usage(
         report = inspected.get("final_report", {})
         provider_metrics = report.get("provider_metrics", {})
         metadata = report.get("metadata", {}) if isinstance(report, dict) else {}
-        
-        totals["model_calls"] += int(metadata.get("model_calls", provider_metrics.get("hosted_calls", 0)) or 0)
+
+        totals["model_calls"] += int(
+            metadata.get("model_calls", provider_metrics.get("hosted_calls", 0)) or 0
+        )
         totals["prompt_tokens"] += int(provider_metrics.get("prompt_tokens", 0) or 0)
         totals["completion_tokens"] += int(provider_metrics.get("completion_tokens", 0) or 0)
         if provider_metrics.get("cost_usd") is not None:

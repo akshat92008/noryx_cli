@@ -1,4 +1,4 @@
-"""Authoritative PolicyEngine for Nexus CLI.
+"""Authoritative PolicyEngine for Noryx CLI.
 
 Enforces deterministic policy precedence beneath the model layer.
 """
@@ -9,8 +9,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 
 class SecurityAction(str, Enum):
@@ -85,8 +84,8 @@ class PolicyDecision:
 
 
 class PolicyEngine:
-    """Canonical, single-source-of-truth policy evaluation engine for Nexus.
-    
+    """Canonical, single-source-of-truth policy evaluation engine for Noryx.
+
     Evaluates actions against deterministic precedence:
     1. Immutable runtime safety rules (hard deny for dangerous root paths, secret exfiltration)
     2. Organization policy
@@ -95,7 +94,7 @@ class PolicyEngine:
     5. Run-specific execution contract
     6. One-time explicit approvals
     7. Safe defaults
-    
+
     Lower precedence policy layers can NEVER weaken a higher layer DENY.
     """
 
@@ -236,7 +235,9 @@ class PolicyEngine:
         ]
         if any(sub in target_lower for sub in forbidden_substrings):
             return {
-                "reasons": [f"Access to protected credential or system path is forbidden: {target}"],
+                "reasons": [
+                    f"Access to protected credential or system path is forbidden: {target}"
+                ],
                 "risk_level": RiskLevel.CRITICAL,
             }
 

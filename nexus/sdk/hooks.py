@@ -1,5 +1,5 @@
 """
-SDK for extending Nexus with custom hooks.
+SDK for extending Noryx with custom hooks.
 """
 
 from typing import Protocol, runtime_checkable
@@ -11,7 +11,7 @@ from nexus.hooks.base import HookContext, HookEvent
 
 @runtime_checkable
 class HookPlugin(Protocol):
-    """Protocol for a Nexus hook plugin."""
+    """Protocol for a Noryx hook plugin."""
 
     def on_event(self, event: HookEvent, context: HookContext) -> None:
         """Triggered when a hook event fires."""

@@ -13,7 +13,7 @@ Provides:
 from __future__ import annotations
 
 import logging
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Iterator
 
@@ -33,8 +33,8 @@ class DependencyConflictError(Exception):
 @dataclass
 class GraphNode:
     file_change: PlannedFileChange
-    predecessors: list[str] = field(default_factory=list)   # paths that must complete first
-    successors: list[str] = field(default_factory=list)      # paths that depend on this
+    predecessors: list[str] = field(default_factory=list)  # paths that must complete first
+    successors: list[str] = field(default_factory=list)  # paths that depend on this
 
 
 class ChangeDependencyGraph:
@@ -51,9 +51,7 @@ class ChangeDependencyGraph:
     def add_file_change(self, fc: PlannedFileChange) -> None:
         """Register a planned file change as a node in the graph."""
         if fc.path in self._nodes:
-            raise DependencyConflictError(
-                f"Duplicate file change registered for path: {fc.path}"
-            )
+            raise DependencyConflictError(f"Duplicate file change registered for path: {fc.path}")
         self._nodes[fc.path] = GraphNode(file_change=fc)
         # Honour dependencies declared in the PlannedFileChange itself
         for dep_path in fc.depends_on:
@@ -131,18 +129,14 @@ class ChangeDependencyGraph:
         cycles = self.detect_cycles()
         if cycles:
             cycle_strs = [" → ".join(c) for c in cycles]
-            raise DependencyCycleError(
-                f"Circular dependency detected in change set: {cycle_strs}"
-            )
+            raise DependencyCycleError(f"Circular dependency detected in change set: {cycle_strs}")
 
         in_degree: dict[str, int] = {path: 0 for path in self._nodes}
         for dep in self._edges:
             if dep.target_path in in_degree:
                 in_degree[dep.target_path] += 1
 
-        queue: deque[str] = deque(
-            path for path, deg in in_degree.items() if deg == 0
-        )
+        queue: deque[str] = deque(path for path, deg in in_degree.items() if deg == 0)
         order: list[PlannedFileChange] = []
 
         while queue:
@@ -178,9 +172,7 @@ class ChangeDependencyGraph:
         while remaining:
             batch_paths = [p for p, d in remaining.items() if d == 0]
             if not batch_paths:
-                raise DependencyCycleError(
-                    "Cannot resolve parallel groups — cycle detected."
-                )
+                raise DependencyCycleError("Cannot resolve parallel groups — cycle detected.")
             groups.append([self._nodes[p].file_change for p in batch_paths if p in self._nodes])
             for path in batch_paths:
                 del remaining[path]
@@ -200,9 +192,7 @@ class ChangeDependencyGraph:
 
         conflicts = self.detect_conflicts()
         for path1, path2, sym in conflicts:
-            errors.append(
-                f"Symbol conflict: '{sym}' modified in both '{path1}' and '{path2}'"
-            )
+            errors.append(f"Symbol conflict: '{sym}' modified in both '{path1}' and '{path2}'")
 
         # Check that all dependency source paths are registered
         registered = set(self._nodes.keys())
@@ -241,6 +231,6 @@ def build_graph(
     graph = ChangeDependencyGraph()
     for fc in file_changes:
         graph.add_file_change(fc)
-    for dep in (extra_deps or []):
+    for dep in extra_deps or []:
         graph.add_dependency(dep)
     return graph

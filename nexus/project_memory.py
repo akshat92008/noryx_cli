@@ -80,12 +80,12 @@ class ProjectRules:
 
 class ProjectMemory:
     """
-    Reads and enforces per-project rules from NEXUS.md.
+    Reads and enforces per-project rules from NORYX.md.
 
-    Looks for NEXUS.md in:
+    Looks for NORYX.md in:
     1. Current working directory
     2. Parent directories (up to 5 levels)
-    3. ~/.nexusai/global_rules.md (fallback)
+    3. ~/.noryx/global_rules.md (fallback)
 
     Usage:
         pm = ProjectMemory("/path/to/project")
@@ -95,9 +95,12 @@ class ProjectMemory:
     """
 
     RULE_FILENAMES = [
+        "NORYX.md",
+        "noryx.md",
+        ".noryx.md",
         "NEXUS.md",
         "nexus.md",
-        ".nexus.md",
+        ".noryx.md",
         "AGENTS.md",
         "AGENT.md",
         "CLAUDE.md",
@@ -109,7 +112,7 @@ class ProjectMemory:
         self._rules_path: str | None = None
 
     def load_rules(self) -> ProjectRules:
-        """Load and parse project rules from NEXUS.md."""
+        """Load and parse project rules from NORYX.md."""
         if self._rules is not None:
             return self._rules
 
@@ -150,7 +153,7 @@ class ProjectMemory:
         return rules.build_command
 
     def rules_file_exists(self) -> bool:
-        """Check if a NEXUS.md file exists."""
+        """Check if a NORYX.md-compatible instruction file exists."""
         return bool(self.get_rules_paths())
 
     def get_rules_path(self) -> str | None:
@@ -184,12 +187,17 @@ class ProjectMemory:
             if parent == search_dir:
                 break
             search_dir = parent
-        global_rules = Path.home() / ".nexusai" / "global_rules.md"
-        return [str(global_rules.resolve())] if global_rules.is_file() else []
+        for global_rules in (
+            Path.home() / ".noryx" / "global_rules.md",
+            Path.home() / ".nexusai" / "global_rules.md",
+        ):
+            if global_rules.is_file():
+                return [str(global_rules.resolve())]
+        return []
 
     def create_default_rules(self) -> str:
-        """Create a default NEXUS.md file in the project root."""
-        default_content = """# NEXUS.md — Project Rules for NexusAI
+        """Create a default NORYX.md file in the project root."""
+        default_content = """# NORYX.md — Project Rules for Noryx
 
 ## Conventions
 - Follow consistent naming conventions
@@ -212,7 +220,7 @@ class ProjectMemory:
 ## Preferences
 # preferred_model: deepseek-v4
 """
-        filepath = Path(self.working_dir) / "NEXUS.md"
+        filepath = Path(self.working_dir) / "NORYX.md"
         filepath.write_text(default_content, encoding="utf-8")
         self._rules_path = str(filepath)
         return str(filepath)
@@ -226,7 +234,7 @@ class ProjectMemory:
     # ── Private Methods ──────────────────────────────────────────────────
 
     def _find_rules_file(self) -> Path | None:
-        """Search for NEXUS.md in the project and parent directories."""
+        """Search for NORYX.md and compatible legacy instruction files."""
         paths = self.get_rules_paths()
         return Path(paths[0]) if paths else None
 

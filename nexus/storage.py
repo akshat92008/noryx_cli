@@ -1,4 +1,4 @@
-"""Crash-tolerant helpers for append-only Nexus state.
+"""Crash-tolerant helpers for append-only Noryx state.
 
 The run ledger and evidence trail are shared by interactive, web, and
 subagent execution paths.  Keeping the locking and recovery rules here avoids

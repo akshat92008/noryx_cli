@@ -1,10 +1,10 @@
-# Nexus CLI 3.7.0 Cognitive Reliability Report
+# Noryx CLI 3.7.0 Cognitive Reliability Report
 
 Date: 2026-08-06
 
 ## Executive decision
 
-Nexus 3.7.0 converts seven previously qualitative gaps into executable runtime contracts and measurable release gates. It is designed as a supervised verified-repair runtime that can strengthen any compatible coding model while refusing unsupported completion claims.
+Noryx 3.7.0 converts seven previously qualitative gaps into executable runtime contracts and measurable release gates. It is designed as a supervised verified-repair runtime that can strengthen any compatible coding model while refusing unsupported completion claims.
 
 This release does not assert that orchestration can manufacture frontier-model intelligence. It also does not claim Claude Code parity without blind external trials. Instead, it supplies the engineering controls and proof infrastructure required to make those claims testable.
 
@@ -19,7 +19,7 @@ This release does not assert that orchestration can manufacture frontier-model i
 
 ### Boundary
 
-Nexus can enforce disciplined reasoning and reject unsupported output, but the model still determines the quality of novel code synthesis and architectural judgment. That capability must be measured on hidden tasks.
+Noryx can enforce disciplined reasoning and reject unsupported output, but the model still determines the quality of novel code synthesis and architectural judgment. That capability must be measured on hidden tasks.
 
 ## 2. Repository-scale context selection
 
@@ -73,7 +73,7 @@ Equivalent retries without an evidence delta cannot loop indefinitely or be misl
 
 ### Implemented
 
-- `nexus benchmark duel --manifest ... --output ...` executes exactly two agents against matched disposable copies of each repository.
+- `noryx benchmark duel --manifest ... --output ...` executes exactly two agents against matched disposable copies of each repository.
 - Agent order is randomized deterministically.
 - Hidden oracle content is excluded during agent execution and installed only for verification.
 - Both agents receive the same task, repository state, and verification commands.
@@ -88,7 +88,7 @@ A real Claude Code executable and private hidden repository corpus were not avai
 
 ### Implemented
 
-- `nexus sandbox qualify` performs behavioral probes for workspace writes, timeout/process-group termination, outside-workspace reads, outside-workspace writes, and network denial.
+- `noryx sandbox qualify` performs behavioral probes for workspace writes, timeout/process-group termination, outside-workspace reads, outside-workspace writes, and network denial.
 - Native filesystem isolation is reported only for strong OS backends; lexical policy guards are never mislabeled as native isolation.
 - Autonomous readiness requires a strong backend plus process, filesystem, network, and workspace-write probes.
 - `.github/workflows/native-sandbox-matrix.yml` collects Linux, macOS, and Windows evidence.
@@ -109,7 +109,7 @@ The local qualification host uses the restricted-process backend, so it supports
 
 ## Release designation
 
-Nexus 3.7.0 is a cognitive-reliability hardened candidate for supervised, isolated verified-repair workflows with mandatory human diff review.
+Noryx 3.7.0 is a cognitive-reliability hardened candidate for supervised, isolated verified-repair workflows with mandatory human diff review.
 
 It is not yet authorized for unattended production merge or deployment. Promotion requires:
 

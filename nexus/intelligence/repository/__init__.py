@@ -1,4 +1,4 @@
-"""Repository Intelligence package for Nexus CLI — Sprint 5."""
+"""Repository Intelligence package for Noryx CLI — Sprint 5."""
 
 from nexus.intelligence.repository.model import (
     ArchitectureBoundary,

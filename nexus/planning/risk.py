@@ -1,8 +1,9 @@
-"""Risk Assessment Module for Nexus Planning (Sprint 6)."""
+"""Risk Assessment Module for Noryx Planning (Sprint 6)."""
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+
 from nexus.planning.task_contract import RiskLevel, TaskContract, TaskType
 
 
@@ -10,15 +11,29 @@ class RiskAssessor:
     """Evaluates task and plan characteristics to assign risk levels and approval criteria."""
 
     HIGH_RISK_KEYWORDS = [
-        "auth", "login", "password", "secret", "token", "credential", "security",
-        "crypto", "permission", "payment", "database", "migration", "drop", "delete"
+        "auth",
+        "login",
+        "password",
+        "secret",
+        "token",
+        "credential",
+        "security",
+        "crypto",
+        "permission",
+        "payment",
+        "database",
+        "migration",
+        "drop",
+        "delete",
     ]
 
     def assess_task_risk(
         self, task_contract: TaskContract, target_files: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         targets = target_files or []
-        raw_text = (task_contract.raw_user_request + " " + task_contract.normalized_objective).lower()
+        raw_text = (
+            task_contract.raw_user_request + " " + task_contract.normalized_objective
+        ).lower()
 
         score = 0
         factors: List[str] = []

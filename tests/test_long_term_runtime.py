@@ -1,4 +1,4 @@
-"""Regression coverage for the durable Nexus runtime contract."""
+"""Regression coverage for the durable Noryx runtime contract."""
 
 from __future__ import annotations
 
@@ -197,7 +197,7 @@ def test_git_worktree_session_creates_isolated_branch(tmp_path):
         check=True,
     )
     subprocess.run(
-        ["git", "config", "user.name", "Nexus Test"],
+        ["git", "config", "user.name", "Noryx Test"],
         cwd=repository,
         check=True,
     )
@@ -228,7 +228,7 @@ def test_git_worktree_preserves_and_applies_over_dirty_source(tmp_path):
         check=True,
     )
     subprocess.run(
-        ["git", "config", "user.name", "Nexus Test"],
+        ["git", "config", "user.name", "Noryx Test"],
         cwd=repository,
         check=True,
     )

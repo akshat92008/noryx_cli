@@ -21,10 +21,9 @@ from enum import Enum
 from typing import Any
 
 from nexus.multifile.contracts import (
-    EngineeringChangeSet,
-    ImpactCategory,
-    PlannedFileChange,
     ChangeType,
+    EngineeringChangeSet,
+    PlannedFileChange,
 )
 from nexus.multifile.events import (
     ChangeSetRolledBack,
@@ -39,6 +38,7 @@ MAX_SCOPE_EXPANSIONS = 3
 
 class RecoveryDecision(str, Enum):
     """What the handler decided to do after a failure."""
+
     RETRY_STAGE = "RETRY_STAGE"
     ROLLBACK_STAGE = "ROLLBACK_STAGE"
     ROLLBACK_FULL = "ROLLBACK_FULL"
@@ -52,6 +52,7 @@ class RecoveryDecision(str, Enum):
 @dataclass
 class RecoveryContext:
     """Context about a stage failure."""
+
     stage_id: str
     failure_reason: str
     files_partially_modified: list[str] = field(default_factory=list)
@@ -64,6 +65,7 @@ class RecoveryContext:
 @dataclass
 class RecoveryAction:
     """Action to take after a failure."""
+
     decision: RecoveryDecision
     description: str
     new_scope: list[PlannedFileChange] = field(default_factory=list)
@@ -133,14 +135,16 @@ class MultiFileRecoveryHandler:
                         "Partially mutated repository state cannot be trusted. "
                         "Full rollback required."
                     ),
-                    emit_events=[ChangeSetRolledBack(
-                        run_id=cs.run_id,
-                        change_set_id=cs.change_set_id,
-                        scope="FULL_CHANGE_SET",
-                        stage_id=context.stage_id,
-                        files_restored=context.files_partially_modified,
-                        reason="Partially trusted state after stage failure.",
-                    )],
+                    emit_events=[
+                        ChangeSetRolledBack(
+                            run_id=cs.run_id,
+                            change_set_id=cs.change_set_id,
+                            scope="FULL_CHANGE_SET",
+                            stage_id=context.stage_id,
+                            files_restored=context.files_partially_modified,
+                            reason="Partially trusted state after stage failure.",
+                        )
+                    ],
                 )
 
         # Missed callers detected
@@ -228,12 +232,14 @@ class MultiFileRecoveryHandler:
                     f"Expanding scope to include {len(missing_changes)} missing change(s)."
                 ),
                 new_scope=new_changes,
-                emit_events=[ScopeExpansionRequested(
-                    run_id=cs.run_id,
-                    change_set_id=cs.change_set_id,
-                    reason=f"Consistency validator found {len(missing_changes)} missing changes.",
-                    new_paths=[mc.path for mc in missing_changes],
-                )],
+                emit_events=[
+                    ScopeExpansionRequested(
+                        run_id=cs.run_id,
+                        change_set_id=cs.change_set_id,
+                        reason=f"Consistency validator found {len(missing_changes)} missing changes.",
+                        new_paths=[mc.path for mc in missing_changes],
+                    )
+                ],
             )
 
         return RecoveryAction(
@@ -265,15 +271,17 @@ class MultiFileRecoveryHandler:
         self._scope_expansions += 1
         new_paths = context.missed_callers
 
-        events.append(ScopeExpansionRequested(
-            run_id=cs.run_id,
-            change_set_id=cs.change_set_id,
-            reason=(
-                f"Missed caller(s) discovered after stage '{context.stage_id}' failure: "
-                f"{new_paths}"
-            ),
-            new_paths=new_paths,
-        ))
+        events.append(
+            ScopeExpansionRequested(
+                run_id=cs.run_id,
+                change_set_id=cs.change_set_id,
+                reason=(
+                    f"Missed caller(s) discovered after stage '{context.stage_id}' failure: "
+                    f"{new_paths}"
+                ),
+                new_paths=new_paths,
+            )
+        )
 
         new_changes = [
             PlannedFileChange(

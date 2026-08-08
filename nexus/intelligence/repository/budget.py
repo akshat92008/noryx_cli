@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 from nexus.intelligence.repository.model import ContextCandidate, ContextFile, RepositoryFile
 from nexus.intelligence.repository.secrets import SecretProtector
 
@@ -72,7 +73,9 @@ class ContextBudgetManager:
                 omitted_candidates.append(f"{candidate.path} (Insufficient token budget remaining)")
                 continue
 
-            reason_str = "; ".join(candidate.reasons) if candidate.reasons else candidate.relationship
+            reason_str = (
+                "; ".join(candidate.reasons) if candidate.reasons else candidate.relationship
+            )
             if was_redacted:
                 reason_str += " [SECRETS REDACTED]"
 
@@ -111,7 +114,9 @@ class ContextBudgetManager:
         # Find anchor line indices
         anchors: set[int] = {0}
         for symbol in repo_file.symbols:
-            if not search_terms or any(term.lower() in symbol.name.lower() for term in search_terms):
+            if not search_terms or any(
+                term.lower() in symbol.name.lower() for term in search_terms
+            ):
                 anchors.add(max(0, symbol.line - 1))
 
         if search_terms:

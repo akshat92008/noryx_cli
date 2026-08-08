@@ -1,7 +1,7 @@
 # Startup Control Plane — acceptance contract
 
 Build a production-oriented, dependency-free Python service in this repository.
-The initial user request is the only product prompt. Nexus may recover from its
+The initial user request is the only product prompt. Noryx may recover from its
 own checkpoints, but no human clarification or follow-up prompt is allowed.
 
 ## Required package

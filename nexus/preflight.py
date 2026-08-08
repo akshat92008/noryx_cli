@@ -46,7 +46,7 @@ def _probe_ollama_cached(model: str, base_url: str, cache_bucket: int) -> Backen
     del cache_bucket
     request = urllib.request.Request(
         f"{base_url}/api/tags",
-        headers={"Accept": "application/json", "User-Agent": "NexusAI/3.1"},
+        headers={"Accept": "application/json", "User-Agent": "Noryx/3.1"},
     )
     try:
         with urllib.request.urlopen(request, timeout=0.75) as response:

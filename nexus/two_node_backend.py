@@ -1,5 +1,5 @@
 """
-Two-node Nexus execution backend.
+Two-node Noryx execution backend.
 
 Ceiling: selected NVIDIA API model plans/decomposes and handles escalations.
 Intern: local Nova model executes atomic subtasks through the existing Nova
@@ -23,6 +23,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from nexus.code_validation import GeneratedCodeValidator
+from nexus.model_doctor import CapabilityDimension, model_doctor
 from nexus.nova_backend import PROMPT_PATH, NovaPipelineBackend, NovaToolProposal
 from nexus.nova_runtime import (
     CEILING_SYSTEM_PROMPT,
@@ -36,7 +37,6 @@ from nexus.nova_runtime import (
     TestExecutor,
     extract_prompt_paths,
 )
-from nexus.model_doctor import CapabilityDimension, model_doctor
 from nexus.planner import (
     Difficulty,
     ExecutionPlan,
@@ -57,7 +57,7 @@ from nexus.sandbox import SandboxRunner
 
 
 class CeilingCallTimeout(TimeoutError):
-    """Raised when a Ceiling API call exceeds Nexus' hard timeout."""
+    """Raised when a Ceiling API call exceeds Noryx' hard timeout."""
 
 
 @contextlib.contextmanager
@@ -289,7 +289,7 @@ class _NvidiaCompletionsShim:
 
 
 class NvidiaCeilingNode:
-    """Ceiling node backed by the selected Nexus NVIDIA API model."""
+    """Ceiling node backed by the selected Noryx NVIDIA API model."""
 
     def __init__(self, client, model_id: str):
         self.nexus_client = client
@@ -377,7 +377,7 @@ class NvidiaCeilingNode:
         """Run an independent read-only reviewer call over validated candidate changes."""
         timeout = int(os.environ.get("NEXUS_CEILING_CALL_TIMEOUT", "60"))
         system = (
-            "You are the independent Nexus code reviewer. Review only the supplied "
+            "You are the independent Noryx code reviewer. Review only the supplied "
             "request and validated candidate excerpts. Return one JSON object with "
             '{"approved": boolean, "summary": string, "findings": [string]}. '
             "Reject missing requirements, unsafe behavior, architectural inconsistency, "
@@ -413,7 +413,7 @@ class NvidiaCeilingNode:
 
 
 class TwoNodeBackend:
-    """Run a Nexus request through Ceiling decomposition and Nova Intern execution."""
+    """Run a Noryx request through Ceiling decomposition and Nova Intern execution."""
 
     def __init__(
         self,
@@ -587,7 +587,7 @@ class TwoNodeBackend:
                     step = next(item for item in execution_plan.steps if item.id == task.id)
                     execution = SubtaskExecution(
                         task=task,
-                        node="Nexus DAG",
+                        node="Noryx DAG",
                         verdict=step.status.value.upper(),
                         error=step.error or step.result,
                         failure_kind=("dependency" if step.status == TaskStatus.BLOCKED else ""),
@@ -1125,7 +1125,7 @@ class TwoNodeBackend:
         graph_summary = self.repo_graph.summary()
         relevant = self.repo_graph.relevant_files(request, limit=30)
         context = (
-            "Nexus planner analysis:\n"
+            "Noryx planner analysis:\n"
             f"- intent: {val(intent)}\n"
             f"- difficulty: {val(difficulty)}\n"
             f"- plan_type: {val(plan_type)}\n"
@@ -1162,14 +1162,10 @@ class TwoNodeBackend:
         override = self.__dict__.get("_route_task")
         if callable(override):
             return override(task)
-        return type(self)._route_task(
-            task, getattr(self, "intern_capability_profile", None)
-        )
+        return type(self)._route_task(task, getattr(self, "intern_capability_profile", None))
 
     @staticmethod
-    def _route_task(
-        task: AtomicTask, intern_profile: dict | None = None
-    ) -> tuple[str, str]:
+    def _route_task(task: AtomicTask, intern_profile: dict | None = None) -> tuple[str, str]:
         """Make every Intern/Ceiling routing choice explicit and reproducible.
 
         The Intern is intentionally a bounded executor.  It never owns ambiguous,
@@ -1230,6 +1226,8 @@ class TwoNodeBackend:
                 if score < threshold:
                     weak.append(f"{name}={score:.2f}")
             if weak:
-                return "ceiling", "Intern capability profile below safe threshold: " + ", ".join(weak)
+                return "ceiling", "Intern capability profile below safe threshold: " + ", ".join(
+                    weak
+                )
 
         return "nova", "atomic, explicit, single-file task within guarded Intern capability"

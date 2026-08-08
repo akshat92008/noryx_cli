@@ -1,11 +1,10 @@
 """
-Attempt Signatures and Loop Prevention Engine for Nexus CLI Recovery Subsystem.
+Attempt Signatures and Loop Prevention Engine for Noryx CLI Recovery Subsystem.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -30,7 +29,13 @@ class AttemptSignature:
 class LoopDetector:
     """Detects repeated failed strategies, patch oscillations, and infinite retry loops."""
 
-    def __init__(self, max_consecutive_identical: int = 2, max_oscillations: int = 4, max_history: int = 10, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        max_consecutive_identical: int = 2,
+        max_oscillations: int = 4,
+        max_history: int = 10,
+        **kwargs: Any,
+    ) -> None:
         self.max_consecutive_identical = max_consecutive_identical
         self.max_oscillations = max_oscillations
         self.max_history = max_history
@@ -46,7 +51,10 @@ class LoopDetector:
 
         # Check exact repeated signature
         if self._digests.count(current_digest) >= self.max_consecutive_identical:
-            return True, f"Identical recovery attempt strategy '{signature.strategy_type}' repeated {self.max_consecutive_identical} times without new evidence."
+            return (
+                True,
+                f"Identical recovery attempt strategy '{signature.strategy_type}' repeated {self.max_consecutive_identical} times without new evidence.",
+            )
 
         # Check consecutive identical commands on unchanged repo state
         if len(self._history) >= 2:
@@ -57,7 +65,10 @@ class LoopDetector:
                 and last.patch_digest == signature.patch_digest
                 and signature.command != ""
             ):
-                return True, f"Command '{signature.command}' executed again on unchanged repository state."
+                return (
+                    True,
+                    f"Command '{signature.command}' executed again on unchanged repository state.",
+                )
 
         # Check oscillation (A -> B -> A -> B)
         if len(self._digests) >= 3:

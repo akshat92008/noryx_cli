@@ -1,4 +1,4 @@
-"""Performance, memory, cache, and regression utilities for Nexus."""
+"""Performance, memory, cache, and regression utilities for Noryx."""
 
 from nexus.performance.runtime import (
     BoundedEventHistory,

@@ -1,4 +1,4 @@
-"""Secret discovery and redaction layer for Nexus CLI.
+"""Secret discovery and redaction layer for Noryx CLI.
 
 Scans for credentials, API keys, private keys, bearer tokens, and connection strings
 in terminal output, model prompts, tool results, logs, and evidence receipts.
@@ -70,7 +70,11 @@ class SecretScanner:
         # 1. Pattern Matching
         for pattern, name in KNOWN_SECRET_PATTERNS:
             for m in re.finditer(pattern, text):
-                matches.append(SecretMatch(pattern_name=name, matched_text=m.group(0), start=m.start(), end=m.end()))
+                matches.append(
+                    SecretMatch(
+                        pattern_name=name, matched_text=m.group(0), start=m.start(), end=m.end()
+                    )
+                )
 
         return matches
 
@@ -100,7 +104,10 @@ class SecretRedactor:
         elif isinstance(obj, dict):
             new_dict = {}
             for k, v in obj.items():
-                if any(sec_key in str(k).lower() for sec_key in ("secret", "password", "token", "api_key", "key")):
+                if any(
+                    sec_key in str(k).lower()
+                    for sec_key in ("secret", "password", "token", "api_key", "key")
+                ):
                     new_dict[k] = SECRET_REDACTED_TEXT
                 else:
                     new_dict[k] = self.redact_object(v)

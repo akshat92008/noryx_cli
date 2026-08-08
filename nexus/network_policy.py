@@ -7,7 +7,6 @@ Request Forgery (SSRF) and network abuse through the agent's web tools.
 from __future__ import annotations
 
 import ipaddress
-import os
 import queue
 import socket
 import threading
@@ -16,15 +15,12 @@ import urllib.parse
 from dataclasses import dataclass
 from typing import Callable
 
+from nexus.env import noryx_env_flag
+
 
 def network_globally_disabled() -> bool:
     """Return whether the process-level outbound network kill switch is active."""
-    return os.environ.get("NEXUS_DISABLE_NETWORK", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    return noryx_env_flag("DISABLE_NETWORK")
 
 
 @dataclass(frozen=True)
@@ -175,9 +171,7 @@ class NetworkPolicy:
             return None
         return self._check_ip(url, str(literal), hostname)
 
-    def resolve_url(
-        self, url: str
-    ) -> tuple[NetworkViolation | None, ResolvedTarget | None]:
+    def resolve_url(self, url: str) -> tuple[NetworkViolation | None, ResolvedTarget | None]:
         """Validate and resolve a URL, returning the addresses that must be pinned."""
         violation = self.check_url_syntax(url)
         if violation:
@@ -263,9 +257,7 @@ class NetworkPolicy:
             return (), (f"DNS resolution failed for {hostname}: {value}", "dns_error")
         addresses = tuple(
             dict.fromkeys(
-                str(info[4][0])
-                for info in value
-                if len(info) >= 5 and info[4] and info[4][0]
+                str(info[4][0]) for info in value if len(info) >= 5 and info[4] and info[4][0]
             )
         )
         if not addresses:
@@ -331,8 +323,7 @@ class NetworkPolicy:
         # Includes reserved/documentation ranges and shared carrier-grade NAT
         # space. These are never valid public web destinations for agent tools.
         if not addr.is_global and not (
-            (addr.is_loopback and self.allow_localhost)
-            or (addr.is_private and self.allow_private)
+            (addr.is_loopback and self.allow_localhost) or (addr.is_private and self.allow_private)
         ):
             return NetworkViolation(
                 url,

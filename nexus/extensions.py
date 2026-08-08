@@ -1,4 +1,4 @@
-"""Stable extension contracts and entry-point discovery for Nexus."""
+"""Stable extension contracts and entry-point discovery for Noryx."""
 
 from __future__ import annotations
 

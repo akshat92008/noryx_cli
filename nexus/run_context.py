@@ -1,4 +1,4 @@
-"""Immutable execution context for every Nexus operation.
+"""Immutable execution context for every Noryx operation.
 
 An Agent must never depend on process-wide ``os.getcwd()``.  Every file,
 Git, command, verification, hook, plugin, MCP, and history operation must
@@ -40,7 +40,7 @@ class BudgetLimitsSnapshot:
 
 @dataclass(frozen=True)
 class RunContext:
-    """Immutable execution context for a Nexus run.
+    """Immutable execution context for a Noryx run.
 
     Every tool, hook, plugin, and subagent operation derives its workspace,
     permissions, and identity from this object.  It is set as a ContextVar
@@ -137,7 +137,9 @@ class RunContext:
             session_id=session_id or datetime.now().strftime("%Y%m%d_%H%M%S_%f"),
             source_root=src,
             workspace_root=ws,
-            additional_roots=tuple(Path(item).expanduser().resolve() for item in (additional_roots or ())),
+            additional_roots=tuple(
+                Path(item).expanduser().resolve() for item in (additional_roots or ())
+            ),
             permission_policy=PermissionPolicy(
                 mode=permission_mode,
                 allowed_tools=allowed_tools or frozenset(),

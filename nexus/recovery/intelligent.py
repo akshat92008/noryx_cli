@@ -4,6 +4,7 @@ Retries are only useful when the execution state changes.  This state machine
 makes repeated failures consume an escalation ladder and eventually stop,
 instead of allowing a model to loop on cosmetically different attempts.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -70,7 +71,9 @@ class RecoveryStateMachine:
             "kind": cls._value(raw.get("kind")),
             "source_component": raw.get("source_component") or raw.get("tool"),
             "phase": raw.get("phase"),
-            "summary": cls._normalize_text(raw.get("summary") or raw.get("error") or raw.get("raw_output")),
+            "summary": cls._normalize_text(
+                raw.get("summary") or raw.get("error") or raw.get("raw_output")
+            ),
             "file_paths": sorted(map(str, raw.get("file_paths") or raw.get("paths") or [])),
             "failing_tests": sorted(map(str, raw.get("failing_tests") or [])),
             "command": cls._normalize_text(raw.get("command")),
@@ -91,11 +94,15 @@ class RecoveryStateMachine:
             "model_id": context.get("model_id", ""),
             "strategy_evidence": context.get("strategy_evidence", ""),
         }
-        return hashlib.sha256(json.dumps(material, sort_keys=True, default=str).encode()).hexdigest()
+        return hashlib.sha256(
+            json.dumps(material, sort_keys=True, default=str).encode()
+        ).hexdigest()
 
     @staticmethod
     def _normalize_text(value: Any) -> str:
-        text = re.sub(r"\b(?:failure|attempt|run)[-_ ]?[0-9a-f]{4,}\b", "<id>", str(value or ""), flags=re.I)
+        text = re.sub(
+            r"\b(?:failure|attempt|run)[-_ ]?[0-9a-f]{4,}\b", "<id>", str(value or ""), flags=re.I
+        )
         text = re.sub(r"\b\d+(?:\.\d+)?\s*(?:ms|seconds?|s)\b", "<time>", text, flags=re.I)
         return " ".join(text.lower().split())[:2000]
 
@@ -130,15 +137,33 @@ class RecoveryStateMachine:
         capability_mismatch = bool(context.get("model_capability_mismatch"))
 
         if blocked:
-            action, reason, terminal = RecoveryAction.STOP_BLOCKED, "Policy or permission boundary blocks recovery.", True
+            action, reason, terminal = (
+                RecoveryAction.STOP_BLOCKED,
+                "Policy or permission boundary blocks recovery.",
+                True,
+            )
         elif self._attempts > self.max_attempts:
-            action, reason, terminal = RecoveryAction.STOP_FAILED, "Global recovery budget exhausted.", True
+            action, reason, terminal = (
+                RecoveryAction.STOP_FAILED,
+                "Global recovery budget exhausted.",
+                True,
+            )
         elif stagnant > self.max_stagnant_repeats:
-            action, reason, terminal = RecoveryAction.STOP_FAILED, "Stagnation budget exhausted after rollback; stop the loop.", True
+            action, reason, terminal = (
+                RecoveryAction.STOP_FAILED,
+                "Stagnation budget exhausted after rollback; stop the loop.",
+                True,
+            )
         elif changed and hypothesis_invalid:
-            action, reason, terminal = RecoveryAction.REVISE_PLAN, "New evidence contradicts the active root-cause hypothesis.", False
+            action, reason, terminal = (
+                RecoveryAction.REVISE_PLAN,
+                "New evidence contradicts the active root-cause hypothesis.",
+                False,
+            )
         elif changed and (missing_context or systemic_failure):
-            action = RecoveryAction.EXPAND_CONTEXT if missing_context else RecoveryAction.REVISE_PLAN
+            action = (
+                RecoveryAction.EXPAND_CONTEXT if missing_context else RecoveryAction.REVISE_PLAN
+            )
             reason = (
                 "Runtime evidence identifies missing repository context."
                 if missing_context
@@ -146,21 +171,53 @@ class RecoveryStateMachine:
             )
             terminal = False
         elif changed and capability_mismatch:
-            action, reason, terminal = RecoveryAction.SWITCH_MODEL, "The failure is classified as a model capability mismatch.", False
+            action, reason, terminal = (
+                RecoveryAction.SWITCH_MODEL,
+                "The failure is classified as a model capability mismatch.",
+                False,
+            )
         elif changed and partial_patch:
-            action, reason, terminal = RecoveryAction.RETRY_SMALLER_PATCH, "New evidence supports a smaller, isolated corrective patch.", False
+            action, reason, terminal = (
+                RecoveryAction.RETRY_SMALLER_PATCH,
+                "New evidence supports a smaller, isolated corrective patch.",
+                False,
+            )
         elif changed:
-            action, reason, terminal = RecoveryAction.RETRY_SMALLER_PATCH, "New evidence permits one bounded corrective attempt.", False
+            action, reason, terminal = (
+                RecoveryAction.RETRY_SMALLER_PATCH,
+                "New evidence permits one bounded corrective attempt.",
+                False,
+            )
         elif stagnant == 1:
-            action, reason, terminal = RecoveryAction.EXPAND_CONTEXT, "Failure repeated without evidence delta; expand from stack, symbols, callers and tests.", False
+            action, reason, terminal = (
+                RecoveryAction.EXPAND_CONTEXT,
+                "Failure repeated without evidence delta; expand from stack, symbols, callers and tests.",
+                False,
+            )
         elif stagnant == 2:
-            action, reason, terminal = RecoveryAction.REVISE_PLAN, "Expanded evidence did not change the failure; invalidate the current causal plan.", False
+            action, reason, terminal = (
+                RecoveryAction.REVISE_PLAN,
+                "Expanded evidence did not change the failure; invalidate the current causal plan.",
+                False,
+            )
         elif stagnant == 3:
-            action, reason, terminal = RecoveryAction.SWITCH_MODEL, "The revised plan produced no evidence delta; escalate model capability.", False
+            action, reason, terminal = (
+                RecoveryAction.SWITCH_MODEL,
+                "The revised plan produced no evidence delta; escalate model capability.",
+                False,
+            )
         elif stagnant == 4:
-            action, reason, terminal = RecoveryAction.ROLLBACK, "Repeated failure remains unchanged; rollback before further work.", False
+            action, reason, terminal = (
+                RecoveryAction.ROLLBACK,
+                "Repeated failure remains unchanged; rollback before further work.",
+                False,
+            )
         else:
-            action, reason, terminal = RecoveryAction.STOP_FAILED, "Recovery stopped because no new evidence or state transition occurred.", True
+            action, reason, terminal = (
+                RecoveryAction.STOP_FAILED,
+                "Recovery stopped because no new evidence or state transition occurred.",
+                True,
+            )
 
         decision = RecoveryDecision(action, reason, failure, evidence, stagnant, changed, terminal)
         self.history.append(decision)

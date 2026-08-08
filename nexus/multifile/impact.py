@@ -27,9 +27,7 @@ from nexus.multifile.contracts import (
     ImpactCategory,
     ImpactReport,
     ImpactTarget,
-    Reference,
     Risk,
-    SymbolReference,
     TestTarget,
 )
 
@@ -43,7 +41,7 @@ class ImpactAnalyzer:
         self,
         repo_root: str | Path,
         *,
-        repo_intelligence: Any = None,   # nexus.intelligence.repository.engine.RepositoryIntelligence
+        repo_intelligence: Any = None,  # nexus.intelligence.repository.engine.RepositoryIntelligence
     ):
         self.repo_root = Path(repo_root)
         self._ri = repo_intelligence
@@ -72,9 +70,7 @@ class ImpactAnalyzer:
 
         # Confidence degrades when there are unresolved dynamic dependencies
         if report.unresolved_dynamic_dependencies:
-            dynamic_penalty = min(
-                0.3, 0.1 * len(report.unresolved_dynamic_dependencies)
-            )
+            dynamic_penalty = min(0.3, 0.1 * len(report.unresolved_dynamic_dependencies))
             report.confidence = max(0.3, 1.0 - dynamic_penalty)
 
         return report
@@ -85,7 +81,7 @@ class ImpactAnalyzer:
 
         if self._ri and hasattr(self._ri, "files"):
             # Use the Sprint 5 graph
-            for path, repo_file in self._ri.files.items():
+            for path, _repo_file in self._ri.files.items():
                 if path == definition_path:
                     continue
                 content = _read_file_safe(self.repo_root / path)
@@ -251,8 +247,7 @@ class ImpactAnalyzer:
             content = _read_file_safe(py_file)
             # Skip files where the only reference is in comments
             non_comment_lines = [
-                line for line in content.splitlines()
-                if not line.strip().startswith("#")
+                line for line in content.splitlines() if not line.strip().startswith("#")
             ]
             non_comment_content = "\n".join(non_comment_lines)
             if pattern.search(non_comment_content):
@@ -261,7 +256,9 @@ class ImpactAnalyzer:
                     ImpactTarget(
                         path=rel,
                         symbol=symbol,
-                        category=ImpactCategory.UNRESOLVED if dynamic else ImpactCategory.MUST_CHANGE,
+                        category=ImpactCategory.UNRESOLVED
+                        if dynamic
+                        else ImpactCategory.MUST_CHANGE,
                         reason=f"grep: symbol '{symbol}' found",
                         dynamic=dynamic,
                     )
@@ -301,11 +298,11 @@ def _is_dynamic_reference(symbol: str, content: str) -> bool:
     """Heuristic: detect patterns that suggest dynamic/string-based reference."""
     dynamic_patterns = [
         rf'getattr\([^)]*["\']?{re.escape(symbol)}["\']?',
-        rf'__import__\([^)]*{re.escape(symbol)}',
-        rf'importlib\.import_module\([^)]*{re.escape(symbol)}',
+        rf"__import__\([^)]*{re.escape(symbol)}",
+        rf"importlib\.import_module\([^)]*{re.escape(symbol)}",
         rf'globals\(\)\[["\']?{re.escape(symbol)}["\']?\]',
         rf'locals\(\)\[["\']?{re.escape(symbol)}["\']?\]',
-        rf'["\']' + re.escape(symbol) + r'["\']',  # string reference
+        r'["\']' + re.escape(symbol) + r'["\']',  # string reference
     ]
     for pat in dynamic_patterns:
         if re.search(pat, content):
@@ -336,7 +333,9 @@ def _deduplicate(targets: list[ImpactTarget]) -> list[ImpactTarget]:
                 ImpactCategory.UNRESOLVED: 4,
                 ImpactCategory.OUT_OF_SCOPE: 5,
             }
-            if _category_priority.get(t.category, 9) < _category_priority.get(seen[key].category, 9):
+            if _category_priority.get(t.category, 9) < _category_priority.get(
+                seen[key].category, 9
+            ):
                 seen[key] = t
     return list(seen.values())
 

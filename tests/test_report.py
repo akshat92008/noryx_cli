@@ -29,7 +29,7 @@ def test_report_generation(tmp_path: Path):
 
     report_text = FinalReportGenerator.generate(input_file)
 
-    assert "Nexus Run Report" in report_text
+    assert "Noryx Run Report" in report_text
     assert "VERIFIED" in report_text
     assert "Fix the bug in the code" in report_text
     assert "✅ Code compiles" in report_text

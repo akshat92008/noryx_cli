@@ -89,7 +89,7 @@ class ExtensionSDK:
             "version": version,
             "extension_type": extension_type,
             "api_version": EXTENSION_API_VERSION,
-            "description": description or f"A Nexus {extension_type} extension",
+            "description": description or f"A Noryx {extension_type} extension",
             "author": author,
             "entry_point": template["entry_point"],
             "capabilities": capabilities or list(template["capabilities"]),
@@ -114,10 +114,14 @@ class ExtensionSDK:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         manifest = ExtensionSDK.create_manifest(
-            name, extension_type, description=description, author=author,
+            name,
+            extension_type,
+            description=description,
+            author=author,
         )
         (output_dir / "extension.json").write_text(
-            json.dumps(manifest, indent=2) + "\n", encoding="utf-8",
+            json.dumps(manifest, indent=2) + "\n",
+            encoding="utf-8",
         )
 
         template = EXTENSION_TEMPLATES.get(extension_type, EXTENSION_TEMPLATES["tool"])
@@ -139,7 +143,7 @@ class ExtensionSDK:
     def _generate_entry_point(name: str, extension_type: str) -> str:
         if extension_type == "tool":
             return textwrap.dedent(f'''\
-                """{name} — Nexus tool extension."""
+                """{name} — Noryx tool extension."""
 
                 from nexus.plugins.base import BasePlugin
                 from nexus.sdk.tools import FunctionTool
@@ -147,7 +151,7 @@ class ExtensionSDK:
 
                 class {name.title().replace("-", "").replace("_", "")}Plugin(BasePlugin):
                     name = "{name}"
-                    description = "A Nexus tool extension"
+                    description = "A Noryx tool extension"
                     version = "1.0.0"
 
                     def get_tools(self):
@@ -192,14 +196,14 @@ class ExtensionSDK:
                         return {{"{name}_echo": tool.execute}}
             ''')
         return textwrap.dedent(f'''\
-            """{name} — Nexus {extension_type} extension."""
+            """{name} — Noryx {extension_type} extension."""
 
             from nexus.plugins.base import BasePlugin
 
 
             class {name.title().replace("-", "").replace("_", "")}Plugin(BasePlugin):
                 name = "{name}"
-                description = "A Nexus {extension_type} extension"
+                description = "A Noryx {extension_type} extension"
                 version = "1.0.0"
 
                 def setup(self) -> bool:
@@ -237,6 +241,7 @@ class ExtensionSDK:
     def validate_extension(ext_dir: Path) -> tuple[bool, list[str]]:
         """Validate an extension directory."""
         from nexus.platform.verification import PackageVerifier
+
         verifier = PackageVerifier()
         result = verifier.verify_directory(ext_dir)
         return result.valid, result.errors + result.warnings

@@ -1,4 +1,4 @@
-"""Filesystem locations for Nexus user state."""
+"""Filesystem locations for Noryx user state."""
 
 import os
 import tempfile
@@ -17,19 +17,31 @@ def _usable_state_dir(path: Path) -> bool:
         return False
 
 
-def nexus_home() -> Path:
-    """Return the configurable Nexus state directory with safe fallback."""
-    configured = os.environ.get("NEXUS_HOME", "").strip()
+def noryx_home() -> Path:
+    """Return the configurable Noryx state directory with safe fallback."""
+    configured = (
+        os.environ.get("NORYX_HOME", "").strip() or os.environ.get("NEXUS_HOME", "").strip()
+    )
     if configured:
         p = Path(configured).expanduser().resolve()
         if _usable_state_dir(p):
             return p
-    home_dir = Path.home() / ".nexusai"
+    home_dir = Path.home() / ".noryx"
     if _usable_state_dir(home_dir):
         return home_dir
-    fallback = Path(os.getcwd()) / ".nexusai"
+    # Existing installations remain readable during the 3.x rename window.
+    legacy = Path.home() / ".nexusai"
+    if legacy.exists() and _usable_state_dir(legacy):
+        return legacy
+    fallback = Path(os.getcwd()) / ".noryx"
     if _usable_state_dir(fallback):
         return fallback
-    tmp = Path(tempfile.gettempdir()) / f".nexusai-{os.getuid()}"
+    uid = getattr(os, "getuid", lambda: 0)()
+    tmp = Path(tempfile.gettempdir()) / f".noryx-{uid}"
     tmp.mkdir(parents=True, exist_ok=True)
     return tmp
+
+
+def nexus_home() -> Path:
+    """Compatibility alias for integrations written before the Noryx rename."""
+    return noryx_home()

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 from nexus.architecture_health import _check_source_layout
 from nexus.benchmark import BenchmarkRunner, BenchmarkSuite
@@ -60,9 +59,7 @@ def test_bound_release_evidence_matches_exact_artifact(tmp_path):
     wheel.write_bytes(b"wheel")
     source = tmp_path / "nexus.tar.gz"
     source.write_bytes(b"source")
-    supply = build_supply_chain_evidence(
-        secret_scan_passed=True, artifact_paths=(wheel, source)
-    )
+    supply = build_supply_chain_evidence(secret_scan_passed=True, artifact_paths=(wheel, source))
     junit = tmp_path / "junit.xml"
     junit.write_text(
         '<?xml version="1.0"?><testsuites><testsuite tests="3" failures="0" errors="0" skipped="0"/></testsuites>'
@@ -132,7 +129,16 @@ def test_fix_command_translates_to_quality_bounded_workflow(monkeypatch):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["nexus", "fix", "repair refresh token", "--budget-inr", "15", "--model", "auto", "--proof"],
+        [
+            "nexus",
+            "fix",
+            "repair refresh token",
+            "--budget-inr",
+            "15",
+            "--model",
+            "auto",
+            "--proof",
+        ],
     )
     cli._PROOF_REQUEST = None
     cli._prepare_fix_command()
@@ -150,7 +156,7 @@ def test_source_tree_hash_excludes_repository_runtime_state(tmp_path):
     (tmp_path / "nexus" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
     baseline = source_tree_sha256(tmp_path)
 
-    runtime = tmp_path / ".nexus" / "task-memory"
+    runtime = tmp_path / ".noryx" / "task-memory"
     runtime.mkdir(parents=True)
     (runtime / "task.json").write_text('{"runtime": true}\n', encoding="utf-8")
     (tmp_path / ".nexusai").mkdir()

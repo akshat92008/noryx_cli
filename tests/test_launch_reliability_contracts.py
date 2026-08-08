@@ -387,7 +387,7 @@ def test_git_workspace_recovery_diff_includes_untracked_files(tmp_path):
     source.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=source, check=True)
     subprocess.run(["git", "config", "user.email", "nexus@example.test"], cwd=source, check=True)
-    subprocess.run(["git", "config", "user.name", "Nexus Test"], cwd=source, check=True)
+    subprocess.run(["git", "config", "user.name", "Noryx Test"], cwd=source, check=True)
     (source / "tracked.py").write_text("VALUE = 1\n", encoding="utf-8")
     subprocess.run(["git", "add", "tracked.py"], cwd=source, check=True)
     subprocess.run(["git", "commit", "-qm", "initial"], cwd=source, check=True)
@@ -596,7 +596,7 @@ def test_agent_close_stops_owned_background_processes(tmp_path, monkeypatch):
     report = agent.close()
 
     assert report["background_processes_stopped"] == [pid]
-    assert "not a Nexus-managed background process" in tool_process_status(pid)
+    assert "not a Noryx-managed background process" in tool_process_status(pid)
 
 
 def test_workspace_manager_resolves_custom_state_root(tmp_path):

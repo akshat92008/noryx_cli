@@ -17,12 +17,10 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from nexus.multifile.contracts import (
     ChangeType,
     PlannedFileChange,
-    Reference,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 class RenameKind(str):
     """Classification of a rename target."""
+
     CODE_SYMBOL = "CODE_SYMBOL"
     USER_FACING_STRING = "USER_FACING_STRING"
     SERIALIZED_FIELD = "SERIALIZED_FIELD"
@@ -43,6 +42,7 @@ class RenameKind(str):
 @dataclass
 class RenameOccurrence:
     """A single occurrence of a symbol that needs to be renamed."""
+
     path: str
     line: int
     column: int = 0
@@ -56,6 +56,7 @@ class RenameOccurrence:
 @dataclass
 class RenameAnalysis:
     """Complete analysis of a rename operation before execution."""
+
     old_name: str
     new_name: str
     definition_occurrences: list[RenameOccurrence] = field(default_factory=list)
@@ -65,8 +66,12 @@ class RenameAnalysis:
     documentation_occurrences: list[RenameOccurrence] = field(default_factory=list)
     dynamic_occurrences: list[RenameOccurrence] = field(default_factory=list)
     string_occurrences: list[RenameOccurrence] = field(default_factory=list)  # NOT auto-renamed
-    serialized_field_occurrences: list[RenameOccurrence] = field(default_factory=list)  # requires decision
-    config_key_occurrences: list[RenameOccurrence] = field(default_factory=list)  # requires decision
+    serialized_field_occurrences: list[RenameOccurrence] = field(
+        default_factory=list
+    )  # requires decision
+    config_key_occurrences: list[RenameOccurrence] = field(
+        default_factory=list
+    )  # requires decision
     unresolved_warnings: list[str] = field(default_factory=list)
 
     @property
@@ -134,8 +139,7 @@ class SymbolRenameEngine:
 
             if suffix in source_extensions:
                 self._scan_source_file(
-                    path, rel, old_name, analysis,
-                    code_pattern, string_pattern, import_pattern
+                    path, rel, old_name, analysis, code_pattern, string_pattern, import_pattern
                 )
             elif suffix in doc_extensions:
                 self._scan_doc_file(path, rel, old_name, analysis)
@@ -245,7 +249,9 @@ class SymbolRenameEngine:
             if import_pattern.search(line):
                 analysis.import_occurrences.append(
                     RenameOccurrence(
-                        path=rel, line=i, kind=RenameKind.CODE_SYMBOL,
+                        path=rel,
+                        line=i,
+                        kind=RenameKind.CODE_SYMBOL,
                         raw_snippet=line.strip()[:120],
                     )
                 )
@@ -258,8 +264,11 @@ class SymbolRenameEngine:
             if _is_dynamic(old_name, line):
                 analysis.dynamic_occurrences.append(
                     RenameOccurrence(
-                        path=rel, line=i, kind=RenameKind.DYNAMIC_REFERENCE,
-                        dynamic=True, confidence=0.3,
+                        path=rel,
+                        line=i,
+                        kind=RenameKind.DYNAMIC_REFERENCE,
+                        dynamic=True,
+                        confidence=0.3,
                         raw_snippet=line.strip()[:120],
                     )
                 )
@@ -274,8 +283,11 @@ class SymbolRenameEngine:
             ):
                 analysis.string_occurrences.append(
                     RenameOccurrence(
-                        path=rel, line=i, kind=RenameKind.USER_FACING_STRING,
-                        dynamic=False, confidence=0.5,
+                        path=rel,
+                        line=i,
+                        kind=RenameKind.USER_FACING_STRING,
+                        dynamic=False,
+                        confidence=0.5,
                         raw_snippet=line.strip()[:120],
                     )
                 )
@@ -289,28 +301,32 @@ class SymbolRenameEngine:
             if is_test:
                 analysis.test_occurrences.append(
                     RenameOccurrence(
-                        path=rel, line=i, kind=RenameKind.CODE_SYMBOL,
+                        path=rel,
+                        line=i,
+                        kind=RenameKind.CODE_SYMBOL,
                         raw_snippet=line.strip()[:120],
                     )
                 )
             elif re.search(r"(?:def|class)\s+" + re.escape(old_name), line):
                 analysis.definition_occurrences.append(
                     RenameOccurrence(
-                        path=rel, line=i, kind=RenameKind.CODE_SYMBOL,
+                        path=rel,
+                        line=i,
+                        kind=RenameKind.CODE_SYMBOL,
                         raw_snippet=line.strip()[:120],
                     )
                 )
             else:
                 analysis.caller_occurrences.append(
                     RenameOccurrence(
-                        path=rel, line=i, kind=RenameKind.CODE_SYMBOL,
+                        path=rel,
+                        line=i,
+                        kind=RenameKind.CODE_SYMBOL,
                         raw_snippet=line.strip()[:120],
                     )
                 )
 
-    def _scan_doc_file(
-        self, path: Path, rel: str, old_name: str, analysis: RenameAnalysis
-    ) -> None:
+    def _scan_doc_file(self, path: Path, rel: str, old_name: str, analysis: RenameAnalysis) -> None:
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -319,8 +335,11 @@ class SymbolRenameEngine:
             if old_name in line:
                 analysis.documentation_occurrences.append(
                     RenameOccurrence(
-                        path=rel, line=i, kind=RenameKind.DOCUMENTATION_REFERENCE,
-                        confidence=0.8, raw_snippet=line.strip()[:120],
+                        path=rel,
+                        line=i,
+                        kind=RenameKind.DOCUMENTATION_REFERENCE,
+                        confidence=0.8,
+                        raw_snippet=line.strip()[:120],
                     )
                 )
 
@@ -335,8 +354,11 @@ class SymbolRenameEngine:
             if old_name in line:
                 analysis.config_key_occurrences.append(
                     RenameOccurrence(
-                        path=rel, line=i, kind=RenameKind.CONFIGURATION_KEY,
-                        confidence=0.6, raw_snippet=line.strip()[:120],
+                        path=rel,
+                        line=i,
+                        kind=RenameKind.CONFIGURATION_KEY,
+                        confidence=0.6,
+                        raw_snippet=line.strip()[:120],
                     )
                 )
                 analysis.unresolved_warnings.append(
@@ -358,7 +380,7 @@ def _safe_symbol_replace(old: str, new: str, content: str) -> tuple[str, int]:
     def replacer(m: re.Match) -> str:
         # Check if inside a string — crude heuristic: look at surrounding chars
         start = m.start()
-        preceding = content[max(0, start - 1):start]
+        preceding = content[max(0, start - 1) : start]
         if preceding in ('"', "'", "`"):
             return m.group(0)  # Don't replace inside strings
         count[0] += 1

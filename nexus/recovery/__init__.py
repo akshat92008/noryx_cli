@@ -1,5 +1,5 @@
 """
-Recovery & Failure Subsystem for Nexus CLI.
+Recovery & Failure Subsystem for Noryx CLI.
 Exports canonical RecoveryController, RollbackManager, Taxonomy, and Budget primitives.
 """
 
@@ -35,10 +35,10 @@ from nexus.recovery.records import (
     FailureSeverity,
     HypothesisStatus,
 )
+from nexus.recovery.resume import SessionResumptionEngine
 
 # Preserve legacy RollbackManager class & import
 from nexus.recovery.rollback import RollbackDecisionEngine, RollbackManager
-from nexus.recovery.resume import SessionResumptionEngine
 from nexus.recovery.signatures import AttemptSignature, LoopDetector
 from nexus.recovery.strategies import (
     RecoveryStrategy,

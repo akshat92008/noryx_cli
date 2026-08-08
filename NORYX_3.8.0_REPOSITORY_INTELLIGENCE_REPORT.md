@@ -1,4 +1,4 @@
-# Nexus CLI 3.8.0 — Repository Intelligence Offensive
+# Noryx CLI 3.8.0 — Repository Intelligence Offensive
 
 Release date: 2026-08-06
 
@@ -43,7 +43,7 @@ concurrency defects.
 
 ## Competitive proof boundary
 
-The product goal is to outperform Claude Code. Nexus 3.8.0 does not lower that
+The product goal is to outperform Claude Code. Noryx 3.8.0 does not lower that
 goal and does not self-declare it achieved. The superiority gate requires a
 real, sealed, independently evaluated campaign against both the same-model
 direct baseline and real Claude Code. It requires private unseen repositories,
@@ -55,7 +55,7 @@ Local qualification proves the release mechanisms and deterministic runtime. A
 real externally run campaign is still required before publishing a
 better-than-Claude-Code claim. The campaign preflight now verifies content-distinct
 repository hashes, unique repository/prompt fingerprints, exact same-model identity
-for Nexus and its direct baseline, real product/version provenance, withheld oracle
+for Noryx and its direct baseline, real product/version provenance, withheld oracle
 availability, sealed budgets, disclosed runtime environment, and complete cost, token,
 latency, and intervention telemetry before execution.
 

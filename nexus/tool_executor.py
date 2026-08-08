@@ -38,7 +38,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Protocol
 
-
 from nexus.approvals import preview_mutation
 from nexus.capabilities import ToolCapability
 from nexus.code_validation import GeneratedCodeValidator
@@ -49,6 +48,7 @@ from nexus.planner import TaskStatus
 from nexus.policy import PermissionDecision
 from nexus.recovery.controller import RecoveryController
 from nexus.safety import SafetyCheck, SafetyLevel
+from nexus.security.command_policy import CommandPolicy, CommandRisk
 from nexus.security.policy_engine import PolicyEngine
 from nexus.tools import ToolResult, ToolStatus, execute_tool
 from nexus.verification_evidence import analyse_test_command, validate_test_execution
@@ -167,7 +167,9 @@ class ToolExecutionController:
                 len(str(args.get("new_text", "")).splitlines()),
             )
         if name == "patch_file":
-            old_span = max(0, int(args.get("end_line", 0) or 0) - int(args.get("start_line", 0) or 0) + 1)
+            old_span = max(
+                0, int(args.get("end_line", 0) or 0) - int(args.get("start_line", 0) or 0) + 1
+            )
             return max(1, old_span, len(str(args.get("new_content", "")).splitlines()))
         if name == "multi_edit":
             return sum(
@@ -200,8 +202,9 @@ class ToolExecutionController:
         from nexus.run_context import run_context_scope
         from nexus.tools import tool_context
 
-        with run_context_scope(self._agent.run_context), tool_context(
-            self._agent.working_dir, self._agent.history, self._agent.conversation_id
+        with (
+            run_context_scope(self._agent.run_context),
+            tool_context(self._agent.working_dir, self._agent.history, self._agent.conversation_id),
         ):
             result, success = self._execute_impl(
                 name,
@@ -221,6 +224,7 @@ class ToolExecutionController:
         run_ledger = getattr(self._agent, "run_ledger", None)
         if run_ledger and run_ledger.turn_dir:
             from nexus.agent import _redact_runtime_text
+
             safe_args = {
                 key: _redact_runtime_text(value) if isinstance(value, str) else value
                 for key, value in args.items()
@@ -272,10 +276,12 @@ class ToolExecutionController:
                     mutation_paths = [path for path in raw_paths if path]
                     estimated_lines = self._estimated_mutation_lines(name, args)
                     try:
-                        brain.record_changes([
-                            (path, f"verified mutation via {name}", estimated_lines)
-                            for path in mutation_paths
-                        ])
+                        brain.record_changes(
+                            [
+                                (path, f"verified mutation via {name}", estimated_lines)
+                                for path in mutation_paths
+                            ]
+                        )
                     except Exception as exc:
                         self._agent.evidence.append(
                             kind="engineering_state_integrity",
@@ -325,6 +331,7 @@ class ToolExecutionController:
         _edit_confirmed: bool,
         mutation_tools: tuple,
         read_tools: set,
+        command_risk: CommandRisk = CommandRisk.UNKNOWN,
     ) -> tuple[bool, str, tuple[str, bool]]:
         if name in self._agent.disallowed_tools:
             return (
@@ -336,7 +343,11 @@ class ToolExecutionController:
             return False, "", (f"❌ BLOCKED: {name} is not in the active tool allowlist.", False)
         if self._agent._active_plan is not None and self._agent._enforce_plan_tool_contract:
             current = next(
-                (step for step in self._agent._active_plan.steps if step.status == TaskStatus.IN_PROGRESS),
+                (
+                    step
+                    for step in self._agent._active_plan.steps
+                    if step.status == TaskStatus.IN_PROGRESS
+                ),
                 None,
             )
             if current is not None:
@@ -359,10 +370,14 @@ class ToolExecutionController:
                             False,
                         ),
                     )
-        if not self._agent.mode_policy.may_edit and not _user_initiated and (
-            name in mutation_tools
-            or name in ("run_command", "run_process", "process_run")
-            or name.startswith("git_")
+        if (
+            not self._agent.mode_policy.may_edit
+            and not _user_initiated
+            and (
+                name in mutation_tools
+                or name in ("run_command", "run_process", "process_run")
+                or name.startswith("git_")
+            )
         ):
             return (
                 False,
@@ -375,19 +390,16 @@ class ToolExecutionController:
 
         policy_capability = ""
         policy_targets: list[str] = []
+        normalized_command = command.lower()
         if name in mutation_tools:
             policy_capability = "write"
             policy_targets = scope_paths
         elif name in ("run_command", "run_process", "process_run"):
-            normalized_command = command.lower()
-            if re.search(r"\bgit\s+push\b", normalized_command):
-                policy_capability = "git_push"
-            elif re.search(
-                r"\b(?:pip|pip3|uv)\s+(?:pip\s+)?install\b"
-                r"|\b(?:npm|pnpm|yarn)\s+(?:add|install)\b"
-                r"|\bcargo\s+add\b|\bgo\s+get\b",
-                normalized_command,
+            if command_risk == CommandRisk.NETWORK_REQUEST and re.search(
+                r"(?:^|[/\\])git\s+push\b", normalized_command
             ):
+                policy_capability = "git_push"
+            elif command_risk == CommandRisk.PACKAGE_INSTALL:
                 policy_capability = "package_install"
             elif re.search(
                 r"\b(?:kubectl\s+(?:apply|delete)|helm\s+(?:install|upgrade)|"
@@ -668,7 +680,8 @@ class ToolExecutionController:
                 output = str(output_value)
             default_error = (
                 f"Invalid {source} status: {supplied_status}"
-                if supplied_status not in (None, "") and status == ToolStatus.FAILURE
+                if supplied_status not in (None, "")
+                and status == ToolStatus.FAILURE
                 and raw_status not in {item.value for item in ToolStatus}
                 and raw_status not in aliases
                 else (f"{source} error" if is_error else "")
@@ -782,7 +795,6 @@ class ToolExecutionController:
             )
         return tool_result
 
-
     def _enforce_engineering_scope(
         self,
         name: str,
@@ -830,9 +842,10 @@ class ToolExecutionController:
         return True, None
 
     def _current_workspace_revision(self) -> str:
-        """Return the content-addressed source revision, excluding Nexus state."""
+        """Return the content-addressed source revision, excluding Noryx state."""
         try:
             from nexus.intelligence.repository.snapshot import workspace_revision
+
             return workspace_revision(self._agent.working_dir)
         except (OSError, ValueError):
             return ""
@@ -898,9 +911,7 @@ class ToolExecutionController:
                 {
                     "filepath": str(absolute),
                     "tool_name": name,
-                    "snapshot_path": (
-                        old.preimage_path if old and old.kind == "file" else None
-                    ),
+                    "snapshot_path": (old.preimage_path if old and old.kind == "file" else None),
                     "description": f"{mutation.change_type} implicitly by {name}",
                     "is_new_file": old is None,
                     "change_type": mutation.change_type,
@@ -962,7 +973,6 @@ class ToolExecutionController:
             )
         return mutations
 
-
     def _prepare_multi_edit_change_set(self, args: dict[str, Any]):
         """Create and persist the multi-file transaction before disk mutation."""
         from nexus.multifile.contracts import (
@@ -973,11 +983,13 @@ class ToolExecutionController:
         )
         from nexus.multifile.persistence import ChangeSetPersistence
 
-        unique_paths = list(dict.fromkeys(
-            str(edit.get("path", ""))
-            for edit in args.get("edits", [])
-            if isinstance(edit, dict) and edit.get("path")
-        ))
+        unique_paths = list(
+            dict.fromkeys(
+                str(edit.get("path", ""))
+                for edit in args.get("edits", [])
+                if isinstance(edit, dict) and edit.get("path")
+            )
+        )
         file_changes = [
             PlannedFileChange(
                 path=path,
@@ -1018,9 +1030,13 @@ class ToolExecutionController:
         try:
             snapshot = self._snapshot_workspace(store_preimages=True)
         except WorkspaceSnapshotError as exc:
-            return None, "", (
-                f"❌ BLOCKED: Cannot establish command mutation journal: {exc}",
-                False,
+            return (
+                None,
+                "",
+                (
+                    f"❌ BLOCKED: Cannot establish command mutation journal: {exc}",
+                    False,
+                ),
             )
         return snapshot, transaction_id, None
 
@@ -1059,7 +1075,9 @@ class ToolExecutionController:
                 self._agent.evidence.append(
                     kind="post_mutation_integrity",
                     claim="Recover from command reconciliation or evidence failure",
-                    status=("verified" if not rollback_note.startswith("ROLLBACK FAILED") else "failed"),
+                    status=(
+                        "verified" if not rollback_note.startswith("ROLLBACK FAILED") else "failed"
+                    ),
                     tool=name,
                     raw_output=f"{type(exc).__name__}: {exc}; {rollback_note}",
                     metadata={"transaction_id": transaction_id},
@@ -1125,9 +1143,7 @@ class ToolExecutionController:
             },
         )
         result.output += (
-            "\nRollback "
-            + ("succeeded: " if rollback_ok else "FAILED: ")
-            + rollback_output
+            "\nRollback " + ("succeeded: " if rollback_ok else "FAILED: ") + rollback_output
         )
         if not rollback_ok:
             result.status = ToolStatus.FAILURE
@@ -1165,8 +1181,7 @@ class ToolExecutionController:
             logger.exception("Failed to append post-mutation rollback evidence")
         status = "succeeded" if rollback_ok else "FAILED"
         return (
-            f"❌ POST-MUTATION INTEGRITY FAILURE: {reason} "
-            f"Rollback {status}: {rollback_output}",
+            f"❌ POST-MUTATION INTEGRITY FAILURE: {reason} Rollback {status}: {rollback_output}",
             False,
         )
 
@@ -1209,8 +1224,10 @@ class ToolExecutionController:
         else:
             targets = {target.split("::", 1)[0] for target in profile.targets}
             matched = [
-                path for path in related
-                if path in targets or any(path == target or path.endswith("/" + target) for target in targets)
+                path
+                for path in related
+                if path in targets
+                or any(path == target or path.endswith("/" + target) for target in targets)
             ]
         if matched:
             try:
@@ -1224,10 +1241,47 @@ class ToolExecutionController:
             return
         require_isolation = bool(self._agent.mode_policy.require_os_isolation)
         args["require_os_isolation"] = require_isolation
-        args["allow_unisolated_host_process"] = (
-            not require_isolation
-            and bool(getattr(self._agent, "allow_unisolated_host_process", False))
+        args["allow_unisolated_host_process"] = not require_isolation and bool(
+            getattr(self._agent, "allow_unisolated_host_process", False)
         )
+
+    def _assess_command_policy(
+        self, name: str, args: dict, command: str
+    ) -> tuple[CommandRisk, str]:
+        """Validate one command through the runtime's authoritative policy."""
+        if name not in {"run_command", "run_process", "process_run"}:
+            return CommandRisk.UNKNOWN, ""
+        try:
+            command_argv = (
+                [str(item) for item in args.get("argv", [])]
+                if name == "run_process"
+                else shlex.split(str(command))
+            )
+            raw_cwd = Path(str(args.get("cwd") or ".")).expanduser()
+            workspace = Path(self._agent.working_dir).expanduser().resolve()
+            command_cwd = (
+                raw_cwd.resolve() if raw_cwd.is_absolute() else (workspace / raw_cwd).resolve()
+            )
+            command_policy = CommandPolicy(workspace)
+            command_policy.validate_command(command_argv, command_cwd)
+            return command_policy.classify(command_argv), ""
+        except (TypeError, ValueError) as exc:
+            return CommandRisk.UNKNOWN, str(exc)
+
+    @staticmethod
+    def _apply_network_risk(
+        name: str,
+        args: dict,
+        pending_args: dict,
+        command_risk: CommandRisk,
+    ) -> None:
+        needs_network = (
+            name in {"run_command", "run_process", "process_run"}
+            and command_risk in {CommandRisk.NETWORK_REQUEST, CommandRisk.PACKAGE_INSTALL}
+        ) or name == "github_create_pr"
+        if needs_network:
+            args["network"] = True
+            pending_args["network"] = True
 
     def _execute_impl(
         self,
@@ -1243,17 +1297,14 @@ class ToolExecutionController:
 
         Pipeline: Before Hooks → Safety Check → Execute → Context Track → After Hooks → Reflection
         """
+        from nexus.agent import _is_relative_to
         from nexus.tools import normalize_tool_arguments
-        from nexus.agent import _is_relative_to, _redact_runtime_text
 
         args = normalize_tool_arguments(name, args)
         declaration = self._agent._tool_capabilities.get(name)
         if declaration is None:
             return f"❌ BLOCKED: Tool '{name}' has no capability declaration.", False
-        if (
-            declaration.requires(ToolCapability.CONFIRMATION_REQUIRED)
-            and not _user_confirmed
-        ):
+        if declaration.requires(ToolCapability.CONFIRMATION_REQUIRED) and not _user_confirmed:
             capability_check = SafetyCheck(
                 level=SafetyLevel.DANGEROUS,
                 operation=f"external tool: {name}",
@@ -1286,21 +1337,13 @@ class ToolExecutionController:
         if name == "run_process":
             raw_argv = args.get("argv", [])
             command = shlex.join(str(item) for item in raw_argv) if raw_argv else ""
-        if (
-            name in {"run_command", "run_process", "process_run"}
-            and re.search(
-                r"\b(?:curl|wget|ssh|scp|sftp|ftp|rsync|gh)\b"
-                r"|\bgit\s+(?:clone|fetch|pull|push)\b"
-                r"|\b(?:pip|pip3|uv)\s+(?:pip\s+)?install\b"
-                r"|\b(?:npm|pnpm|yarn)\s+(?:add|install|publish)\b"
-                r"|\b(?:docker|podman)\s+(?:pull|push)\b"
-                r"|\bcargo\s+(?:add|install)\b|\bgo\s+get\b",
-                command.lower(),
+        command_risk, command_error = self._assess_command_policy(name, args, command)
+        if command_error:
+            return (
+                f"❌ BLOCKED: authoritative command policy rejected the request: {command_error}",
+                False,
             )
-            or name == "github_create_pr"
-        ):
-            args["network"] = True
-            pending_args["network"] = True
+        self._apply_network_risk(name, args, pending_args, command_risk)
         mutation_tools = ("write_file", "edit_file", "patch_file", "multi_edit")
         read_tools = {
             "read_file",
@@ -1358,6 +1401,7 @@ class ToolExecutionController:
             _edit_confirmed,
             mutation_tools,
             read_tools,
+            command_risk,
         )
         if not ok:
             return err_res
@@ -1381,9 +1425,11 @@ class ToolExecutionController:
         if name in mutation_tools:
             if nova_guardrail is not None and not nova_guardrail.get("passed"):
                 return "❌ BLOCKED: Nova guardrail metadata was present but did not pass.", False
-            if self._agent._is_nova_model() and (not nova_guardrail or not nova_guardrail.get("passed")):
+            if self._agent._is_nova_model() and (
+                not nova_guardrail or not nova_guardrail.get("passed")
+            ):
                 return (
-                    "❌ BLOCKED: Nova file edit reached Nexus without a passing Nova "
+                    "❌ BLOCKED: Nova file edit reached Noryx without a passing Nova "
                     "guardrail verdict (path validation, constraint verification, and disk gate).",
                     False,
                 )
@@ -1405,7 +1451,10 @@ class ToolExecutionController:
             if not resolved_file.is_absolute():
                 resolved_file = Path(self._agent.working_dir) / resolved_file
             resolved_file = resolved_file.resolve()
-            roots = [Path(self._agent.working_dir), *(Path(item) for item in self._agent.additional_dirs)]
+            roots = [
+                Path(self._agent.working_dir),
+                *(Path(item) for item in self._agent.additional_dirs),
+            ]
             if any(_is_relative_to(resolved_file, root) for root in roots):
                 continue
             if not _user_confirmed:
@@ -1482,7 +1531,9 @@ class ToolExecutionController:
             safety_check = self._agent.safety.check_command(command)
         elif name == "multi_edit":
             for edit in args.get("edits", []):
-                check = self._agent.safety.check_file_write(edit.get("path", ""), edit.get("new_text", ""))
+                check = self._agent.safety.check_file_write(
+                    edit.get("path", ""), edit.get("new_text", "")
+                )
                 if check.level in (SafetyLevel.BLOCKED, SafetyLevel.DANGEROUS):
                     safety_check = check
                     break
@@ -1515,8 +1566,8 @@ class ToolExecutionController:
         self._apply_execution_isolation(name, args)
 
         # ── 5. Execute
-        before_snapshot, command_transaction_id, journal_error = (
-            self._begin_command_transaction(name)
+        before_snapshot, command_transaction_id, journal_error = self._begin_command_transaction(
+            name
         )
         if journal_error is not None:
             return journal_error
@@ -1528,15 +1579,14 @@ class ToolExecutionController:
             try:
                 change_set, change_set_persistence = self._prepare_multi_edit_change_set(args)
             except Exception as exc:
-                return f"❌ BLOCKED: Unable to register multi-file transaction before mutation: {exc}", False
+                return (
+                    f"❌ BLOCKED: Unable to register multi-file transaction before mutation: {exc}",
+                    False,
+                )
 
         result = self._dispatch_tool_execution(name, args)
 
-        if (
-            name == "multi_edit"
-            and change_set is not None
-            and result.status == ToolStatus.SUCCESS
-        ):
+        if name == "multi_edit" and change_set is not None and result.status == ToolStatus.SUCCESS:
             try:
                 change_set.applied_file_paths = change_set.file_paths()
                 if change_set_persistence is not None:
@@ -1581,7 +1631,6 @@ class ToolExecutionController:
         if command_integrity_error is not None:
             return command_integrity_error
 
-
         # ── Verified-completion evidence
         if success and name in mutation_tools:
             verified, detail, artifacts = verify_mutation(name, args, self._agent.working_dir)
@@ -1597,6 +1646,7 @@ class ToolExecutionController:
                 for raw_path in raw_paths:
                     try:
                         from nexus.agent import _is_relative_to
+
                         path_obj = Path(raw_path).expanduser()
                         if not path_obj.is_absolute():
                             path_obj = Path(self._agent.working_dir) / path_obj
@@ -1608,7 +1658,9 @@ class ToolExecutionController:
                         candidate_actions.append(SimpleNamespace(path=str(relative)))
                     except ValueError:
                         continue
-                code_checks = GeneratedCodeValidator(self._agent.working_dir).validate(candidate_actions)
+                code_checks = GeneratedCodeValidator(self._agent.working_dir).validate(
+                    candidate_actions
+                )
                 code_failures = [check for check in code_checks if not check.passed]
                 if code_failures:
                     verified = False
@@ -1616,7 +1668,9 @@ class ToolExecutionController:
                         check.format() for check in code_failures
                     )
                     undo_count = len(args.get("edits", [])) if name == "multi_edit" else 1
-                    rollback_ok, rollback_output = self._agent.history.undo_changes(max(1, undo_count))
+                    rollback_ok, rollback_output = self._agent.history.undo_changes(
+                        max(1, undo_count)
+                    )
                     detail += (
                         f" | rollback={'succeeded' if rollback_ok else 'failed'}: {rollback_output}"
                     )
@@ -1643,7 +1697,10 @@ class ToolExecutionController:
                 ),
             )
             if not verified:
-                return f"❌ WRITE VERIFICATION FAILED: {detail}\nRaw tool output:\n{result.output}", False
+                return (
+                    f"❌ WRITE VERIFICATION FAILED: {detail}\nRaw tool output:\n{result.output}",
+                    False,
+                )
             if self._agent.run_ledger.turn_dir and mutation_diff:
                 self._agent.run_ledger.store_artifact(
                     "patches",
@@ -1723,7 +1780,6 @@ class ToolExecutionController:
             )
 
         return result.output, success
-
 
     # ──────────────────────────────────────────────────────────────────────────
     # Introspection helpers (used by tests and the dashboard)

@@ -64,12 +64,21 @@ def test_enterprise_rbac_matrix(tmp_path, role, permission, expected):
 def test_policy_engine_deny_precedence_and_default_deny(tmp_path):
     store = EnterpriseStore(tmp_path)
     engine = PolicyEngine(store)
-    engine.activate_rules([
-        PolicyRule("allow_cloud", "allow", {"provider": "openai"}, reason="provider_allowed"),
-        PolicyRule("deny_sensitive", "deny", {"data_sensitivity": "restricted"}, reason="restricted_data"),
-    ])
+    engine.activate_rules(
+        [
+            PolicyRule("allow_cloud", "allow", {"provider": "openai"}, reason="provider_allowed"),
+            PolicyRule(
+                "deny_sensitive",
+                "deny",
+                {"data_sensitivity": "restricted"},
+                reason="restricted_data",
+            ),
+        ]
+    )
 
-    denied = engine.evaluate({"identity_id": "u1", "provider": "openai", "data_sensitivity": "restricted"})
+    denied = engine.evaluate(
+        {"identity_id": "u1", "provider": "openai", "data_sensitivity": "restricted"}
+    )
     default_denied = engine.evaluate({"identity_id": "u1", "provider": "unknown"})
 
     assert denied.allowed is False
@@ -81,15 +90,17 @@ def test_policy_engine_deny_precedence_and_default_deny(tmp_path):
 
 def test_policy_conditions_support_constraints(tmp_path):
     engine = PolicyEngine(EnterpriseStore(tmp_path))
-    engine.activate_rules([
-        PolicyRule(
-            "sandbox_commands",
-            "allow_with_constraints",
-            {"tool_capability": "execute_commands"},
-            {"require_sandbox": True},
-            "commands_need_sandbox",
-        )
-    ])
+    engine.activate_rules(
+        [
+            PolicyRule(
+                "sandbox_commands",
+                "allow_with_constraints",
+                {"tool_capability": "execute_commands"},
+                {"require_sandbox": True},
+                "commands_need_sandbox",
+            )
+        ]
+    )
 
     decision = engine.evaluate({"identity_id": "dev", "tool_capability": "execute_commands"})
 
@@ -127,7 +138,12 @@ def test_secret_broker_scopes_and_redacts(tmp_path):
     broker = SecretBroker(store, AuthorizationService(identities))
     broker.put("provider_key", "sk-secret", project_id="p1", provider="openai", purpose="model")
 
-    assert broker.request("provider_key", identity_id="admin", project_id="p1", provider="openai", purpose="model") == "sk-secret"
+    assert (
+        broker.request(
+            "provider_key", identity_id="admin", project_id="p1", provider="openai", purpose="model"
+        )
+        == "sk-secret"
+    )
     assert broker.list_redacted("p1")[0]["value"] == "[REDACTED]"
     with pytest.raises(PermissionError):
         broker.request("provider_key", identity_id="admin", project_id="p1", provider="anthropic")
@@ -207,13 +223,19 @@ def test_low_resource_profile_is_conservative():
 
 def test_autonomy_project_create_plan_pause_resume(tmp_path):
     service = ProjectService(AutonomyStore(tmp_path))
-    project = service.create("Modernize auth", requirements=("No regressions",), acceptance_criteria=("Tests pass",))
+    project = service.create(
+        "Modernize auth", requirements=("No regressions",), acceptance_criteria=("Tests pass",)
+    )
 
     assert project.state == ProjectState.PROPOSED
     assert service.plan(project.project_id)["next_milestone"]["milestone_id"] == "m1"
-    assert service.transition(project.project_id, ProjectState.APPROVED).state == ProjectState.APPROVED
+    assert (
+        service.transition(project.project_id, ProjectState.APPROVED).state == ProjectState.APPROVED
+    )
     assert service.transition(project.project_id, ProjectState.PAUSED).state == ProjectState.PAUSED
-    assert service.transition(project.project_id, ProjectState.RUNNING).state == ProjectState.RUNNING
+    assert (
+        service.transition(project.project_id, ProjectState.RUNNING).state == ProjectState.RUNNING
+    )
     assert len(service.checkpoints(project.project_id)) >= 3
 
 
@@ -228,7 +250,9 @@ def test_autonomy_scope_drift_detection_for_unplanned_dependencies(tmp_path):
     service = ProjectService(AutonomyStore(tmp_path))
     project = service.create("Refactor module")
 
-    drift = service.detect_scope_drift(project.project_id, changed_paths=("src/app.py",), new_dependencies=("new-lib",))
+    drift = service.detect_scope_drift(
+        project.project_id, changed_paths=("src/app.py",), new_dependencies=("new-lib",)
+    )
 
     assert drift.detected is True
     assert drift.requires_replan is True
@@ -278,7 +302,9 @@ def run_cli(*args: str, cwd: Path) -> subprocess.CompletedProcess:
 
 
 def test_enterprise_cli_org_policy_budget_audit(tmp_path):
-    result = run_cli("org", "--working-dir", str(tmp_path), "--json", "create", "Acme", cwd=tmp_path)
+    result = run_cli(
+        "org", "--working-dir", str(tmp_path), "--json", "create", "Acme", cwd=tmp_path
+    )
     assert result.returncode == 0, result.stderr
     org = json.loads(result.stdout)
 
@@ -298,18 +324,38 @@ def test_enterprise_cli_org_policy_budget_audit(tmp_path):
     )
     assert result.returncode == 0, result.stderr
 
-    result = run_cli("budgets", "--working-dir", str(tmp_path), "--json", "set", "project", "p1", "5", cwd=tmp_path)
+    result = run_cli(
+        "budgets",
+        "--working-dir",
+        str(tmp_path),
+        "--json",
+        "set",
+        "project",
+        "p1",
+        "5",
+        cwd=tmp_path,
+    )
     assert result.returncode == 0, result.stderr
     result = run_cli("audit", "--working-dir", str(tmp_path), "--json", "verify", cwd=tmp_path)
     assert json.loads(result.stdout)["valid"] is True
 
 
 def test_autonomy_performance_release_cli(tmp_path):
-    result = run_cli("project", "--working-dir", str(tmp_path), "--json", "create", "Ship v1", cwd=tmp_path)
+    result = run_cli(
+        "project", "--working-dir", str(tmp_path), "--json", "create", "Ship v1", cwd=tmp_path
+    )
     assert result.returncode == 0, result.stderr
     project = json.loads(result.stdout)
 
-    result = run_cli("project", "--working-dir", str(tmp_path), "--json", "plan", project["project_id"], cwd=tmp_path)
+    result = run_cli(
+        "project",
+        "--working-dir",
+        str(tmp_path),
+        "--json",
+        "plan",
+        project["project_id"],
+        cwd=tmp_path,
+    )
     assert json.loads(result.stdout)["next_milestone"]["milestone_id"] == "m1"
 
     result = run_cli("performance", "--json", "low-resource", cwd=tmp_path)

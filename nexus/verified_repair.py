@@ -1,4 +1,5 @@
-"""Flagship Nexus Verified Repair workflow contract."""
+"""Flagship Noryx Verified Repair workflow contract."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -101,8 +102,7 @@ def build_verified_repair_prompt(task: str) -> str:
         "coherent patch in an isolated workspace. Run targeted checks first, then relevant "
         "regression, security, and integration checks. Never use the model's own completion "
         "claim as evidence. Stop as PARTIALLY_VERIFIED, BLOCKED, or FAILED when the evidence "
-        "is incomplete.\n\nTask: "
-        + task.strip()
+        "is incomplete.\n\nTask: " + task.strip()
     )
 
 

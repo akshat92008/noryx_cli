@@ -1,7 +1,7 @@
 """
 nexus/collaboration/__init__.py
 
-Public API for the Nexus multi-agent collaboration subsystem.
+Public API for the Noryx multi-agent collaboration subsystem.
 """
 
 from nexus.collaboration.assignments import AssignmentGraph
@@ -9,9 +9,9 @@ from nexus.collaboration.capabilities import AgentCapabilityRegistry
 from nexus.collaboration.conflicts import ScopeReservationRegistry
 from nexus.collaboration.coordination import CoordinationBlackboard, CoordinationBus
 from nexus.collaboration.delegation import DelegationPlanner, TaskCharacteristics
-from nexus.collaboration.lifecycle import WorkerLifecycleManager
 from nexus.collaboration.integration import IntegrationCoordinator
 from nexus.collaboration.lead_orchestrator import LeadOrchestrator
+from nexus.collaboration.lifecycle import WorkerLifecycleManager
 from nexus.collaboration.models import (
     AgentAssignment,
     AgentRole,
@@ -28,7 +28,6 @@ from nexus.collaboration.models import (
     IntegrationResult,
     IntegrationStatus,
     MutationPolicy,
-
     ReviewDecision,
     RiskLevel,
     RoutingConstraints,

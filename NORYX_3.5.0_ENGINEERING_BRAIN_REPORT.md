@@ -1,10 +1,10 @@
-# Nexus CLI 3.5.0 Engineering Brain — Technical Release Report
+# Noryx CLI 3.5.0 Engineering Brain — Technical Release Report
 
 ## Executive verdict
 
-Nexus 3.5.0 converts several previously disconnected intelligence features into an enforced engineering control plane. Repository understanding, task memory, scope authority, phase state, failure lessons, semantic verification, and matched evaluation now participate in the active runtime rather than existing only as optional utilities.
+Noryx 3.5.0 converts several previously disconnected intelligence features into an enforced engineering control plane. Repository understanding, task memory, scope authority, phase state, failure lessons, semantic verification, and matched evaluation now participate in the active runtime rather than existing only as optional utilities.
 
-This release is suitable for controlled-beta, supervised repository-repair evaluation after its attached artifact-bound qualification passes. It is not evidence that Nexus matches Claude Code's proprietary model intelligence, and it is not a guarantee of perfect outcomes on every repository.
+This release is suitable for controlled-beta, supervised repository-repair evaluation after its attached artifact-bound qualification passes. It is not evidence that Noryx matches Claude Code's proprietary model intelligence, and it is not a guarantee of perfect outcomes on every repository.
 
 ## Intelligence architecture
 
@@ -30,7 +30,7 @@ External Verification + Independent Review
      v
 Semantic Acceptance
      v
-Nexus Proof or honest BLOCKED / FAILED / PARTIALLY_VERIFIED
+Noryx Proof or honest BLOCKED / FAILED / PARTIALLY_VERIFIED
 ```
 
 ## Reliability controls
@@ -53,7 +53,7 @@ File and line budgets, forbidden path patterns, explicit prohibitions, and bound
 
 ### Semantic completion
 
-Nexus distinguishes “tests passed” from “the requirement is supported by evidence.” Production behavior cannot be called verified when only tests changed, when independent review is absent, when scope expanded without authorization, or when acceptance criteria remain unmapped.
+Noryx distinguishes “tests passed” from “the requirement is supported by evidence.” Production behavior cannot be called verified when only tests changed, when independent review is absent, when scope expanded without authorization, or when acceptance criteria remain unmapped.
 
 ### Failure learning
 
@@ -61,11 +61,11 @@ Repeated failures create redacted, hash-chained lessons. The strategy escalates 
 
 ### Matched evaluation
 
-The comparison gate prevents misleading model comparisons. Direct and Nexus trials must share task ID, model, source revision, and budget. Promotion gates can then evaluate verified uplift, false completion, regressions, and budget compliance.
+The comparison gate prevents misleading model comparisons. Direct and Noryx trials must share task ID, model, source revision, and budget. Promotion gates can then evaluate verified uplift, false completion, regressions, and budget compliance.
 
 ## Deployment boundary
 
-`nexus deploy check` validates local architecture, doctor readiness, and installed benchmark availability while explicitly refusing to convert local readiness into a production or parity claim. Real-provider long-horizon and cross-platform evidence remain separate promotion requirements.
+`noryx deploy check` validates local architecture, doctor readiness, and installed benchmark availability while explicitly refusing to convert local readiness into a production or parity claim. Real-provider long-horizon and cross-platform evidence remain separate promotion requirements.
 
 ## Remaining work
 

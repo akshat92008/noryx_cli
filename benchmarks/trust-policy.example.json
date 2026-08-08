@@ -1,0 +1,12 @@
+{
+  "trusted_evaluators": {
+    "independent-lab": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "campaign": {
+    "campaign_id": "replace-with-sealed-campaign-id",
+    "dataset_revision": "replace-with-private-dataset-revision",
+    "manifest_sha256": "replace-with-64-character-sha256",
+    "oracle_bundle_sha256": "replace-with-64-character-sha256",
+    "evaluator_id": "independent-lab"
+  }
+}

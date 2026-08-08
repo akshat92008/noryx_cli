@@ -1,6 +1,6 @@
 # NEXUS CLI and `nova_codex` capability report
 
-## Nexus 3.8.2 launch and repository-intelligence boundary
+## Noryx 3.8.4 launch and repository-intelligence boundary
 
 - Engineering deliberation compiles falsifiable hypotheses, evidence requirements, invariants, alternatives, and stop conditions before high-risk mutation.
 - Failure evidence drives repository context expansion through stack paths, failing tests, symbols, imports, reverse dependencies, callers, configuration, migration surfaces, and concurrency signals under risk-scaled file/token/graph-hop budgets.
@@ -8,15 +8,15 @@
 - Test evidence is fail-closed: only a recognized runner with observable execution, exact scope, revision binding, and content-addressed provenance can satisfy completion; narrow passes cannot erase broad failures.
 - Recovery extracts stack paths, symbols, test nodes, missing modules, migration signals, and concurrency symptoms directly from raw runtime failures; it then requires evidence delta and structural plan mutation, so duplicate evidence cannot masquerade as replanning or loop indefinitely.
 - Model routing distinguishes measured capability evidence from conservative priors and blocks autonomous high-risk certification when evidence is missing.
-- `nexus benchmark duel` supports Nexus, a same-model direct baseline, and real Claude Code on blind matched repositories; `nexus benchmark superiority-gate` refuses a claim without private unseen tasks, withheld oracles, distinct provenance, repeated trials, per-category wins, cost, latency, intervention evidence, and a valid independent Ed25519 evaluator signature.
-- `nexus sandbox qualify` behaviorally attests process containment, filesystem isolation, network isolation, and the supported execution mode for the current host.
+- `noryx benchmark duel` supports Noryx, a same-model direct baseline, and real Claude Code on blind matched repositories; `noryx benchmark superiority-gate` refuses a claim without private unseen tasks, withheld oracles, distinct provenance, repeated trials, per-category wins, cost, latency, intervention evidence, and a valid independent Ed25519 evaluator signature.
+- `noryx sandbox qualify` behaviorally attests process containment, filesystem isolation, network isolation, and the supported execution mode for the current host.
 - Release qualification now requires both per-module process isolation and the entire suite in one interpreter.
 
 The product objective is to outperform Claude Code. The runtime now contains a strict empirical gate for that claim; until real private benchmark evidence passes it, the software reports the goal as unproven rather than lowering the goal.
 
-Updated on 2026-07-29. The local Nova model used by Nexus is the Ollama model named **`nova_codex`**. Nexus exposes it through the model key `nova3b` and aliases including `nova_codex`, `nova`, and `local`.
+Updated on 2026-07-29. The local Nova model used by Noryx is the Ollama model named **`nova_codex`**. Noryx exposes it through the model key `nova3b` and aliases including `nova_codex`, `nova`, and `local`.
 
-This report separates model generation ability from Nexus enforcement. “Guarded” means Nexus can detect and stop a bad result; it does not mean `nova_codex` always generates the right result on its first attempt.
+This report separates model generation ability from Noryx enforcement. “Guarded” means Noryx can detect and stop a bad result; it does not mean `nova_codex` always generates the right result on its first attempt.
 
 ## `nova_codex` model
 
@@ -24,11 +24,11 @@ This report separates model generation ability from Nexus enforcement. “Guarde
 
 - Executes narrow, explicit, single-file create and modify tasks locally.
 - Produced independently verified Python entrypoints, Python surgical fixes, C++ programs, and valid JSON manifests in recorded runs.
-- Uses the trained `<<THINKING>>` / `<<FILES>>` protocol with exact file/action metadata when it complies; Nexus also accepts the versioned `nova.patch.v1` JSON protocol.
+- Uses the trained `<<THINKING>>` / `<<FILES>>` protocol with exact file/action metadata when it complies; Noryx also accepts the versioned `nova.patch.v1` JSON protocol.
 - Can repair some protocol, syntax, entrypoint, boundary-condition, and recursive-code failures after receiving concrete verifier output.
 - Runs fully locally through Ollama, with no hosted inference charge.
 
-### Nexus-enforced model safeguards
+### Noryx-enforced model safeguards
 
 - Exact requested path matching; invented `src/` prefixes and version-like fake paths are rejected.
 - Strict `CREATE` versus `MODIFY` semantics; nonexistent modify targets and existing create targets fail.
@@ -44,11 +44,11 @@ This report separates model generation ability from Nexus enforcement. “Guarde
 ### Current limitations
 
 - It is a small local model and remains nondeterministic on exact multi-constraint generation. Repeated runs exposed wrong paths, missing imports, malformed fences, changed boundary behavior, missing entrypoint calls, and subtly wrong relative paths.
-- Compiler success is not proof of behavior. Nexus labels completion unverified until a real test/build command or independent behavior assertion passes.
-- Complex, ambiguous, multi-file, concurrency, security, database, and architecture tasks should use the two-node mode; Nexus routes known weak spots directly to the Ceiling or escalates after bounded Nova retries.
+- Compiler success is not proof of behavior. Noryx labels completion unverified until a real test/build command or independent behavior assertion passes.
+- Complex, ambiguous, multi-file, concurrency, security, database, and architecture tasks should use the two-node mode; Noryx routes known weak spots directly to the Ceiling or escalates after bounded Nova retries.
 - It is not honestly equivalent to a frontier hosted coding model. Its practical role is a fast, free Intern behind strict gates.
 
-## Nexus CLI
+## Noryx CLI
 
 ### Agent and workflow
 
@@ -67,7 +67,7 @@ This report separates model generation ability from Nexus enforcement. “Guarde
   relevance, symbols, callers, reverse dependencies, impacted tests, API
   routes, database models, ownership, Git changes, LSP, and Tree-sitter.
 - Shell: shell-free argv commands, reviewed compatibility commands, and
-  Nexus-owned background start, status/full logs, and stop.
+  Noryx-owned background start, status/full logs, and stop.
 - Git: status, diff, commit, log, and branch operations.
 - Web: fetch and search.
 - Verification: API contracts, browser workflows, SQLite integrity, migration
@@ -110,7 +110,7 @@ This report separates model generation ability from Nexus enforcement. “Guarde
   policy-only.
 - Durable runs contain separate model/tool call logs, costs, patch/test
   artifacts, checkpoints, and the canonical `final_report.json`.
-- `nexus runs`, `inspect`, `replay`, `resume`, and `rollback` provide
+- `noryx runs`, `inspect`, `replay`, `resume`, and `rollback` provide
   command-line lifecycle management and interrupted-task continuation.
 
 ### Extensibility and interfaces
@@ -119,8 +119,8 @@ This report separates model generation ability from Nexus enforcement. “Guarde
 - Stable versioned provider, tool, and policy protocols discovered through
   Python entry points.
 - Terminal CLI and Starlette/WebSocket browser UI.
-- Project instruction support for `NEXUS.md`, `AGENTS.md`, and `CLAUDE.md`
-  after explicit digest approval, plus `.nexus/policies.yml`.
+- Project instruction support for `NORYX.md`, `AGENTS.md`, and `CLAUDE.md`
+  after explicit digest approval, plus `.noryx/policies.yml`.
 - Headless operational presets for plan, review, workspace, autonomous,
   local-only, maximum-quality, budget, and CI execution.
 - Versioned public benchmark manifests with disposable repository copies,
@@ -128,7 +128,7 @@ This report separates model generation ability from Nexus enforcement. “Guarde
 
 ## Current Claude Code parity boundary
 
-Nexus 3.5.0 covers the open runtime described in its product
+Noryx 3.5.0 covers the open runtime described in its product
 specification: guarded model orchestration, persistent repository
 intelligence, typed task contracts and tools, automatic workspaces, optional
 native sandboxing, bounded repair and review, behavioral verification,
@@ -139,9 +139,9 @@ This is a capability boundary, not a claim that every provider/model will
 solve every broad product prompt. Browser verification requires the optional
 Playwright runtime; precise language navigation requires an installed language
 server or Tree-sitter extra; compiler, service, database, and deployment checks
-require those local systems. Nexus reports unavailable checks and remaining
+require those local systems. Noryx reports unavailable checks and remaining
 risk rather than converting them into success. Anthropic-specific managed
-cloud, mobile, IDE, and Remote Control services are not Nexus features.
+cloud, mobile, IDE, and Remote Control services are not Noryx features.
 
 ## Raw verification record
 
@@ -149,7 +149,7 @@ cloud, mobile, IDE, and Remote Control services are not Nexus features.
   by the tagged CI run and benchmark JSON rather than hard-coded before CI.
 - The release gate also runs Ruff, byte-compilation, sdist/wheel builds, an
   isolated wheel-target install, packaged Nova and web backend imports,
-  `nexus --version`, and `nexus --doctor`.
+  `noryx --version`, and `noryx --doctor`.
 - Historical scenario matrices are published as tagged CI artifacts rather than
   asserted from files that are not shipped in the source distribution. Failed
   scenarios remain failures; they are not relabeled as passes.
@@ -174,13 +174,13 @@ These controls improve runtime reliability and eliminate the audit findings. Mod
 
 ## 3.6.0 truth-integrity boundary
 
-Nexus now guarantees the following deterministic invariants in the active Verified Repair path:
+Noryx now guarantees the following deterministic invariants in the active Verified Repair path:
 
 - repository cache reuse requires a matching content hash, not matching timestamps or sizes;
 - planning, editing, verification, and recovery evidence carry repository revision identities;
 - explicit prohibitions compile into tool-level and semantic policies;
 - model prose is never acceptance evidence;
-- scope expansion requires Nexus-registered dependency/compiler/test evidence or explicit human authority;
+- scope expansion requires Noryx-registered dependency/compiler/test evidence or explicit human authority;
 - writes use optimistic concurrency checks;
 - persistent engineering state is HMAC-authenticated with external key material;
 - the installed wheel must execute a real bounded repair and adversarial integrity suite;

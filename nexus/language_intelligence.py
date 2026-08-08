@@ -72,6 +72,7 @@ class LSPClient:
         if self.process and self.process.poll() is None:
             return
         from nexus.process_gateway import ProcessExecutionGateway, ProcessRequest
+
         request = ProcessRequest.create(
             purpose="language_server",
             command=list(self.command),
@@ -350,28 +351,40 @@ def type_check(path: str = ".") -> str:
         request = ProcessRequest.create(
             purpose="type_check",
             command=["pyright", path],
-            workspace=Path(path).expanduser().resolve() if Path(path).is_dir() else Path(path).parent.resolve(),
-            timeout_seconds=30
+            workspace=Path(path).expanduser().resolve()
+            if Path(path).is_dir()
+            else Path(path).parent.resolve(),
+            timeout_seconds=30,
         )
         result = ProcessExecutionGateway.run(request)
         if result.timed_out:
             return "❌ Type check timed out after 30 seconds."
         if result.success or (result.exit_code is not None):
-            return result.stdout if result.stdout else (result.stderr or "✅ No type errors found (pyright).")
+            return (
+                result.stdout
+                if result.stdout
+                else (result.stderr or "✅ No type errors found (pyright).")
+            )
         raise FileNotFoundError()
     except FileNotFoundError:
         try:
             req2 = ProcessRequest.create(
                 purpose="type_check",
                 command=["mypy", path],
-                workspace=Path(path).expanduser().resolve() if Path(path).is_dir() else Path(path).parent.resolve(),
-                timeout_seconds=30
+                workspace=Path(path).expanduser().resolve()
+                if Path(path).is_dir()
+                else Path(path).parent.resolve(),
+                timeout_seconds=30,
             )
             result = ProcessExecutionGateway.run(req2)
             if result.timed_out:
                 return "❌ Type check timed out after 30 seconds."
             if result.success or (result.exit_code is not None):
-                return result.stdout if result.stdout else (result.stderr or "✅ No type errors found (mypy).")
+                return (
+                    result.stdout
+                    if result.stdout
+                    else (result.stderr or "✅ No type errors found (mypy).")
+                )
             raise FileNotFoundError()
         except FileNotFoundError:
             return "❌ No type checker found (pyright or mypy not installed)."

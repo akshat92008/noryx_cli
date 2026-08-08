@@ -1,4 +1,4 @@
-"""Persistent, incremental repository intelligence for Nexus CLI — Sprint 5.
+"""Persistent, incremental repository intelligence for Noryx CLI — Sprint 5.
 
 Unified with nexus.intelligence.repository.engine.RepositoryIntelligence.
 """
@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from nexus.intelligence.repository.engine import RepositoryIntelligence
-from nexus.intelligence.repository.model import RepositorySymbol, RepositoryFile, RiskLevel
 
 
 @dataclass
@@ -114,7 +113,13 @@ class RepoGraph:
     def find_symbols(self, query: str, *, limit: int = 50) -> list[SymbolRecord]:
         symbols = self.engine.find_symbols(query, limit=limit)
         return [
-            SymbolRecord(name=s.name, kind=s.kind, path=s.file_path, line=s.line, qualified_name=s.qualified_name)
+            SymbolRecord(
+                name=s.name,
+                kind=s.kind,
+                path=s.file_path,
+                line=s.line,
+                qualified_name=s.qualified_name,
+            )
             for s in symbols
         ]
 
@@ -126,8 +131,10 @@ class RepoGraph:
         rf = self.engine.files.get(rel)
         imports = list(rf.imports) if rf else []
         imported_by = [
-            other.path for other in self.engine.files.values()
-            if other.path != rel and any(rel in imp or Path(rel).stem in imp for imp in other.imports)
+            other.path
+            for other in self.engine.files.values()
+            if other.path != rel
+            and any(rel in imp or Path(rel).stem in imp for imp in other.imports)
         ]
         return {"imports": sorted(set(imports)), "imported_by": sorted(set(imported_by))}
 
@@ -137,8 +144,7 @@ class RepoGraph:
     def relevant_files(self, query: str, *, limit: int = 40) -> list[dict[str, Any]]:
         bundle = self.engine.context_bundle(query, max_files=limit)
         return [
-            {"path": f.path, "score": 0.9, "reasons": [f.selection_reason]}
-            for f in bundle.files
+            {"path": f.path, "score": 0.9, "reasons": [f.selection_reason]} for f in bundle.files
         ]
 
     def routes(self, query: str = "") -> list[dict[str, Any]]:

@@ -181,9 +181,7 @@ def test_custom_endpoint_preflight_rejects_unsafe_scheme(monkeypatch):
     assert result.code == "custom_url_invalid"
 
 
-def test_direct_nova_executes_declared_test_and_reaches_verified_status(
-    tmp_path, monkeypatch
-):
+def test_direct_nova_executes_declared_test_and_reaches_verified_status(tmp_path, monkeypatch):
     test_policy = get_mode_policy("autonomous")
     test_policy.require_os_isolation = False
     test_policy.allow_shell_command = True
@@ -383,11 +381,11 @@ def test_macos_profile_has_no_global_file_read_grant(tmp_path):
         # Create a readable file inside the workspace
         inside_file = tmp_path / "inside.txt"
         inside_file.write_text("hello", encoding="utf-8")
-        
+
         # Create a secret file outside the workspace (the host-wide temp tree is not permitted)
         outside_file = Path.home() / ".nexus_test_sandbox_escape.txt"
         outside_file.write_text("secret", encoding="utf-8")
-        
+
         try:
             import subprocess
 
@@ -417,7 +415,9 @@ def test_macos_profile_has_no_global_file_read_grant(tmp_path):
             assert "Operation not permitted" in stderr or "No such file" in stderr
 
             # 4. Network check for network-disabled execution
-            code, stdout, stderr = _run_raw_sandbox(["curl", "-s", "--max-time", "1", "http://1.1.1.1"], network=False)
+            code, stdout, stderr = _run_raw_sandbox(
+                ["curl", "-s", "--max-time", "1", "http://1.1.1.1"], network=False
+            )
             assert code != 0
             # Network drops often result in timeout or specific curl errors
             assert "Operation not permitted" in stderr or code in (6, 7, 28)
@@ -431,20 +431,20 @@ def test_sandbox_runner_blocks_relative_symlink_escape(tmp_path):
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    
+
     outside = tmp_path / "outside.txt"
     outside.write_text("secret", encoding="utf-8")
-    
+
     link = workspace / "escape.txt"
     try:
         link.symlink_to(outside)
     except (OSError, NotImplementedError):
         pytest.skip("symlinks are unavailable on this platform")
-        
+
     runner = SandboxRunner(workspace)
     # Using relative path to the symlink
     result = runner.run(CommandSpec.create(["cat", "escape.txt"], workspace))
-    
+
     assert result.success is False
     assert result.backend.value == "blocked"
     assert "escapes the authorized workspace" in result.blocked_reason

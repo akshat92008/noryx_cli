@@ -1,4 +1,5 @@
 """Shared-process lifecycle registry and deterministic reset boundary."""
+
 from __future__ import annotations
 
 import atexit
@@ -6,7 +7,6 @@ import os
 import signal
 import subprocess
 import threading
-import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Iterator
@@ -19,7 +19,7 @@ class CleanupFailure:
 
 
 class ProcessStateRegistry:
-    """Own cleanup callbacks and child processes created by Nexus subsystems."""
+    """Own cleanup callbacks and child processes created by Noryx subsystems."""
 
     _lock = threading.RLock()
     _callbacks: dict[str, Callable[[], Any]] = {}
@@ -76,7 +76,9 @@ class ProcessStateRegistry:
                             process.kill()
                         process.wait(timeout=1.0)
             except Exception as exc:  # cleanup must aggregate all failures
-                failures.append(CleanupFailure(f"process:{getattr(process, 'pid', '?')}", repr(exc)))
+                failures.append(
+                    CleanupFailure(f"process:{getattr(process, 'pid', '?')}", repr(exc))
+                )
         for name, callback in callbacks:
             try:
                 callback()
@@ -93,21 +95,34 @@ class ProcessStateRegistry:
         resets: list[tuple[str, Callable[[], Any]]] = []
         try:
             from nexus.sandbox import SandboxRunner
-            resets.append(("sandbox-backend-cache", lambda: setattr(SandboxRunner, "_backend_cache", None)))
+
+            resets.append(
+                ("sandbox-backend-cache", lambda: setattr(SandboxRunner, "_backend_cache", None))
+            )
         except ImportError:
             pass
         try:
             from nexus.events import EventBus, EventType
-            resets.append(("event-bus", lambda: setattr(EventBus, "_subscribers", {item: [] for item in EventType})))
+
+            resets.append(
+                (
+                    "event-bus",
+                    lambda: setattr(EventBus, "_subscribers", {item: [] for item in EventType}),
+                )
+            )
         except ImportError:
             pass
         try:
             import nexus.config.core as config_core
-            resets.append(("config-singleton", lambda: setattr(config_core, "_config_instance", None)))
+
+            resets.append(
+                ("config-singleton", lambda: setattr(config_core, "_config_instance", None))
+            )
         except ImportError:
             pass
         try:
             from nexus.routine import RoutineOrchestrator
+
             def stop_routines() -> None:
                 instance = RoutineOrchestrator._instance
                 if instance is not None:
@@ -118,21 +133,28 @@ class ProcessStateRegistry:
                     instance.routines.clear()
                     instance.peers.clear()
                 RoutineOrchestrator._instance = None
+
             resets.append(("routine-orchestrator", stop_routines))
         except ImportError:
             pass
         try:
             import nexus.tools as tools
+
             def reset_tools() -> None:
                 for pool in list(getattr(tools, "_language_service_pools", {}).values()):
                     close = getattr(pool, "close", None) or getattr(pool, "shutdown", None)
                     if callable(close):
                         close()
                 getattr(tools, "_language_service_pools", {}).clear()
-                for var, value in (("_tool_working_dir", None), ("_tool_history", None), ("_tool_owner", "")):
+                for var, value in (
+                    ("_tool_working_dir", None),
+                    ("_tool_history", None),
+                    ("_tool_owner", ""),
+                ):
                     context_var = getattr(tools, var, None)
                     if context_var is not None:
                         context_var.set(value)
+
             resets.append(("tool-runtime", reset_tools))
         except ImportError:
             pass

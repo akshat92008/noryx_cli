@@ -203,6 +203,7 @@ class SubagentOrchestrator:
 
         if read_only:
             import threading
+
             cancel_event = threading.Event()
             executor = ThreadPoolExecutor(max_workers=min(self.max_workers, len(read_only)))
             future_to_subagent = {
@@ -218,7 +219,7 @@ class SubagentOrchestrator:
                         by_agent[id(subagent)] = self._failed_result(subagent, exc)
             except FuturesTimeoutError:
                 cancel_event.set()
-                for future, subagent in future_to_subagent.items():
+                for _future, subagent in future_to_subagent.items():
                     if id(subagent) not in by_agent:
                         # Wait for them to exit cooperatively, or just record them as timed out.
                         # We don't block here.
@@ -316,9 +317,13 @@ class SubagentOrchestrator:
             # Register as peer
             try:
                 from nexus.routine import RoutineOrchestrator
+
                 def handle_peer_message(msg: str):
-                    agent.messages.append({"role": "user", "content": f"[PEER MESSAGE from network]:\n{msg}"})
+                    agent.messages.append(
+                        {"role": "user", "content": f"[PEER MESSAGE from network]:\n{msg}"}
+                    )
                     return "✅ Message delivered"
+
                 RoutineOrchestrator().register_peer(subagent.name, handle_peer_message)
             except ImportError:
                 pass
@@ -329,6 +334,7 @@ class SubagentOrchestrator:
             # Deregister peer
             try:
                 from nexus.routine import RoutineOrchestrator
+
                 RoutineOrchestrator().register_peer(subagent.name, None)
             except ImportError:
                 pass

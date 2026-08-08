@@ -1,4 +1,5 @@
 """Deterministic static triage for state and concurrency defects."""
+
 from __future__ import annotations
 
 import ast
@@ -25,11 +26,36 @@ class ConcurrencyAnalyzer:
     """Find shared-state and lifecycle patterns that require explicit proof."""
 
     _TEXT_PATTERNS = (
-        (re.compile(r"\b(?:threading\.)?Lock\s*\("), "lock_boundary", "medium", "Run lock-order and repeated contention tests."),
-        (re.compile(r"\b(?:asyncio\.)?(?:Lock|Semaphore|Queue)\s*\("), "async_synchronization", "medium", "Run cancellation and concurrent-task cleanup tests."),
-        (re.compile(r"\b(?:BEGIN|COMMIT|ROLLBACK|transaction|isolation_level)\b", re.I), "transaction_boundary", "high", "Run concurrent writer and rollback-integrity tests."),
-        (re.compile(r"\b(?:Popen|create_subprocess|ThreadPoolExecutor|ProcessPoolExecutor)\b"), "process_or_worker_lifecycle", "high", "Verify termination, joins, descriptor cleanup and repeated lifecycle runs."),
-        (re.compile(r"if\s+.+\s+not\s+in\s+.+:\s*$"), "check_then_act", "high", "Prove the check-and-mutate sequence is atomic under contention."),
+        (
+            re.compile(r"\b(?:threading\.)?Lock\s*\("),
+            "lock_boundary",
+            "medium",
+            "Run lock-order and repeated contention tests.",
+        ),
+        (
+            re.compile(r"\b(?:asyncio\.)?(?:Lock|Semaphore|Queue)\s*\("),
+            "async_synchronization",
+            "medium",
+            "Run cancellation and concurrent-task cleanup tests.",
+        ),
+        (
+            re.compile(r"\b(?:BEGIN|COMMIT|ROLLBACK|transaction|isolation_level)\b", re.I),
+            "transaction_boundary",
+            "high",
+            "Run concurrent writer and rollback-integrity tests.",
+        ),
+        (
+            re.compile(r"\b(?:Popen|create_subprocess|ThreadPoolExecutor|ProcessPoolExecutor)\b"),
+            "process_or_worker_lifecycle",
+            "high",
+            "Verify termination, joins, descriptor cleanup and repeated lifecycle runs.",
+        ),
+        (
+            re.compile(r"if\s+.+\s+not\s+in\s+.+:\s*$"),
+            "check_then_act",
+            "high",
+            "Prove the check-and-mutate sequence is atomic under contention.",
+        ),
     )
 
     @classmethod
@@ -42,7 +68,17 @@ class ConcurrencyAnalyzer:
                 relative = path.relative_to(repository).as_posix()
             except ValueError:
                 continue
-            if not path.is_file() or path.suffix not in {".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".rs", ".java", ".kt"}:
+            if not path.is_file() or path.suffix not in {
+                ".py",
+                ".js",
+                ".jsx",
+                ".ts",
+                ".tsx",
+                ".go",
+                ".rs",
+                ".java",
+                ".kt",
+            }:
                 continue
             try:
                 content = path.read_text(encoding="utf-8", errors="replace")
@@ -51,7 +87,11 @@ class ConcurrencyAnalyzer:
             for number, line in enumerate(content.splitlines(), 1):
                 for pattern, kind, severity, check in cls._TEXT_PATTERNS:
                     if pattern.search(line):
-                        findings.append(ConcurrencyFinding(relative, number, severity, kind, line.strip()[:300], check))
+                        findings.append(
+                            ConcurrencyFinding(
+                                relative, number, severity, kind, line.strip()[:300], check
+                            )
+                        )
             if path.suffix == ".py":
                 findings.extend(cls._python_globals(relative, content))
         unique: dict[tuple[str, int, str], ConcurrencyFinding] = {}

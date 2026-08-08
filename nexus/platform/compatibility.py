@@ -31,14 +31,14 @@ def _parse_version(version: str) -> tuple[int, int, int]:
 
 
 class CompatibilityManager:
-    """Check extension compatibility with current Nexus version."""
+    """Check extension compatibility with current Noryx version."""
 
     def __init__(self, nexus_version: str = NEXUS_VERSION):
         self.nexus_version = nexus_version
         self._nexus_tuple = _parse_version(nexus_version)
 
     def check(self, manifest: ExtensionManifest) -> CompatibilityResult:
-        """Check if an extension is compatible with the current Nexus version."""
+        """Check if an extension is compatible with the current Noryx version."""
         min_tuple = _parse_version(manifest.min_nexus_version)
         ext_version = manifest.version
 
@@ -46,7 +46,7 @@ class CompatibilityManager:
             return CompatibilityResult(
                 compatible=False,
                 reason=(
-                    f"Nexus {self.nexus_version} is below minimum required "
+                    f"Noryx {self.nexus_version} is below minimum required "
                     f"{manifest.min_nexus_version}"
                 ),
                 nexus_version=self.nexus_version,
@@ -60,7 +60,7 @@ class CompatibilityManager:
                 return CompatibilityResult(
                     compatible=False,
                     reason=(
-                        f"Nexus {self.nexus_version} exceeds maximum supported "
+                        f"Noryx {self.nexus_version} exceeds maximum supported "
                         f"{manifest.max_nexus_version}"
                     ),
                     nexus_version=self.nexus_version,

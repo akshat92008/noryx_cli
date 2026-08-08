@@ -1,4 +1,5 @@
 """Behavioral qualification for the host's native sandbox boundary."""
+
 from __future__ import annotations
 
 import hashlib
@@ -85,10 +86,17 @@ class NativeSandboxQualifier:
         lookup = {item.name: item.passed for item in probes}
         process_containment = lookup["timeout_terminates_process_group"]
         strong_backend = backend in {SandboxBackend.BUBBLEWRAP, SandboxBackend.MACOS}
-        filesystem_isolation = strong_backend and lookup["outside_read_denied"] and lookup["outside_write_denied"]
+        filesystem_isolation = (
+            strong_backend and lookup["outside_read_denied"] and lookup["outside_write_denied"]
+        )
         network_isolation = strong_backend and lookup["network_denied"]
         autonomous = strong_backend and all(
-            (process_containment, filesystem_isolation, network_isolation, lookup["workspace_write_allowed"])
+            (
+                process_containment,
+                filesystem_isolation,
+                network_isolation,
+                lookup["workspace_write_allowed"],
+            )
         )
         mode = "autonomous" if autonomous else "analysis-only"
         qualification = SandboxQualification(
@@ -129,16 +137,26 @@ class NativeSandboxQualifier:
         )
 
     def _workspace_write(self, backend: SandboxBackend) -> SandboxProbeResult:
-        target = self.workspace / ".nexus-sandbox-probe"
+        target = self.workspace / ".noryx-sandbox-probe"
         target.unlink(missing_ok=True)
-        result = self._run("from pathlib import Path; Path('.nexus-sandbox-probe').write_text('ok')")
+        result = self._run(
+            "from pathlib import Path; Path('.noryx-sandbox-probe').write_text('ok')"
+        )
         passed = result.success and target.exists() and target.read_text() == "ok"
         target.unlink(missing_ok=True)
-        return self._probe("workspace_write_allowed", passed, "write succeeds inside workspace", result, backend)
+        return self._probe(
+            "workspace_write_allowed", passed, "write succeeds inside workspace", result, backend
+        )
 
     def _timeout(self, backend: SandboxBackend) -> SandboxProbeResult:
         result = self._run("import time; time.sleep(30)", timeout=0.2)
-        return self._probe("timeout_terminates_process_group", result.timed_out, "process group is terminated at deadline", result, backend)
+        return self._probe(
+            "timeout_terminates_process_group",
+            result.timed_out,
+            "process group is terminated at deadline",
+            result,
+            backend,
+        )
 
     def _outside_read(self, backend: SandboxBackend) -> SandboxProbeResult:
         with tempfile.NamedTemporaryFile("w", delete=False) as handle:
@@ -148,18 +166,32 @@ class NativeSandboxQualifier:
             code = "import os; from pathlib import Path; print(Path(os.environ['NEXUS_PROBE_PATH']).read_text())"
             result = self._run(code, env={"NEXUS_PROBE_PATH": str(outside)})
             passed = not result.success and "outside-secret" not in result.stdout
-            return self._probe("outside_read_denied", passed, "runtime-derived read outside workspace is denied", result, backend)
+            return self._probe(
+                "outside_read_denied",
+                passed,
+                "runtime-derived read outside workspace is denied",
+                result,
+                backend,
+            )
         finally:
             outside.unlink(missing_ok=True)
 
     def _outside_write(self, backend: SandboxBackend) -> SandboxProbeResult:
-        outside = Path(tempfile.gettempdir()) / f"nexus-outside-{os.getpid()}-{os.urandom(4).hex()}.txt"
+        outside = (
+            Path(tempfile.gettempdir()) / f"nexus-outside-{os.getpid()}-{os.urandom(4).hex()}.txt"
+        )
         outside.unlink(missing_ok=True)
         try:
             code = "import os; from pathlib import Path; Path(os.environ['NEXUS_PROBE_PATH']).write_text('escape')"
             result = self._run(code, env={"NEXUS_PROBE_PATH": str(outside)})
             passed = not outside.exists()
-            return self._probe("outside_write_denied", passed, "runtime-derived write outside workspace is denied", result, backend)
+            return self._probe(
+                "outside_write_denied",
+                passed,
+                "runtime-derived write outside workspace is denied",
+                result,
+                backend,
+            )
         finally:
             outside.unlink(missing_ok=True)
 
@@ -186,10 +218,18 @@ class NativeSandboxQualifier:
             "s.connect(('127.0.0.1', int(os.environ['NEXUS_PROBE_PORT'])))"
         )
         try:
-            result = self._run(code, timeout=2.0, network=False, env={"NEXUS_PROBE_PORT": str(port)})
+            result = self._run(
+                code, timeout=2.0, network=False, env={"NEXUS_PROBE_PORT": str(port)}
+            )
             thread.join(timeout=2.2)
             passed = result.network_enforced and not result.success and not accepted["value"]
-            return self._probe("network_denied", passed, "controlled loopback connection is denied when network=False", result, backend)
+            return self._probe(
+                "network_denied",
+                passed,
+                "controlled loopback connection is denied when network=False",
+                result,
+                backend,
+            )
         finally:
             listener.close()
 
@@ -197,7 +237,7 @@ class NativeSandboxQualifier:
         digest = hashlib.sha256()
         for path in sorted(item for item in self.workspace.rglob("*") if item.is_file()):
             relative = path.relative_to(self.workspace).as_posix()
-            if relative.startswith(".git/") or relative.startswith(".nexus/"):
+            if relative.startswith(".git/") or relative.startswith(".noryx/"):
                 continue
             digest.update(relative.encode())
             try:
@@ -207,12 +247,16 @@ class NativeSandboxQualifier:
         return digest.hexdigest()
 
     @staticmethod
-    def _probe(name: str, passed: bool, expected: str, result: Any, backend: SandboxBackend) -> SandboxProbeResult:
+    def _probe(
+        name: str, passed: bool, expected: str, result: Any, backend: SandboxBackend
+    ) -> SandboxProbeResult:
         observed = (
             f"success={result.success} exit={result.exit_code} timed_out={result.timed_out} "
             f"network_enforced={result.network_enforced}"
         )
-        return SandboxProbeResult(name, bool(passed), expected, observed, backend.value, result.to_dict())
+        return SandboxProbeResult(
+            name, bool(passed), expected, observed, backend.value, result.to_dict()
+        )
 
 
 def qualify_native_sandbox(

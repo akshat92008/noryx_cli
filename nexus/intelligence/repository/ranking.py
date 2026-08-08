@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from typing import Any
 
 from nexus.intelligence.repository.model import ContextCandidate, RiskLevel, TaskIntent
@@ -15,7 +14,10 @@ class TaskIntentClassifier:
     @staticmethod
     def classify(task_description: str) -> TaskIntent:
         desc = task_description.lower()
-        if any(w in desc for w in ("fix", "bug", "crash", "error", "fail", "broken", "issue", "exception")):
+        if any(
+            w in desc
+            for w in ("fix", "bug", "crash", "error", "fail", "broken", "issue", "exception")
+        ):
             if "test" in desc:
                 return TaskIntent.TEST_REPAIR
             return TaskIntent.BUG_REPAIR
@@ -23,13 +25,18 @@ class TaskIntentClassifier:
             if "test" in desc:
                 return TaskIntent.TEST_CREATION
             return TaskIntent.FEATURE_IMPLEMENTATION
-        elif any(w in desc for w in ("refactor", "consolidate", "cleanup", "reorganize", "decouple")):
+        elif any(
+            w in desc for w in ("refactor", "consolidate", "cleanup", "reorganize", "decouple")
+        ):
             return TaskIntent.REFACTOR
         elif any(w in desc for w in ("migrate", "migration", "upgrade version")):
             return TaskIntent.MIGRATION
         elif any(w in desc for w in ("test", "pytest", "spec")):
             return TaskIntent.TEST_CREATION
-        elif any(w in desc for w in ("security", "auth", "permission", "secret", "token", "vulnerability")):
+        elif any(
+            w in desc
+            for w in ("security", "auth", "permission", "secret", "token", "vulnerability")
+        ):
             return TaskIntent.SECURITY_FIX
         elif any(w in desc for w in ("config", "setting", "setup", "env")):
             return TaskIntent.CONFIGURATION_CHANGE
@@ -54,8 +61,23 @@ class ExplainableContextRanker:
     ) -> list[ContextCandidate]:
         intent = TaskIntentClassifier.classify(task_description)
         terms = {
-            t.lower() for t in re.findall(r"[A-Za-z_][A-Za-z0-9_-]{2,}", task_description)
-            if t.lower() not in {"add", "build", "create", "fix", "make", "implement", "with", "from", "this", "that", "the", "and"}
+            t.lower()
+            for t in re.findall(r"[A-Za-z_][A-Za-z0-9_-]{2,}", task_description)
+            if t.lower()
+            not in {
+                "add",
+                "build",
+                "create",
+                "fix",
+                "make",
+                "implement",
+                "with",
+                "from",
+                "this",
+                "that",
+                "the",
+                "and",
+            }
         }
 
         explicit_set = set(explicit_user_files or [])
@@ -119,7 +141,9 @@ class ExplainableContextRanker:
                         score += 6.0
 
             if matched_symbols:
-                reasons.append(f"Contains matching symbols: {', '.join(list(dict.fromkeys(matched_symbols))[:4])}")
+                reasons.append(
+                    f"Contains matching symbols: {', '.join(list(dict.fromkeys(matched_symbols))[:4])}"
+                )
                 if source_signal == "text_search":
                     source_signal = "exact_symbol"
 
@@ -135,7 +159,9 @@ class ExplainableContextRanker:
 
             # 6. Task Intent Specific Adjustments
             if intent in (TaskIntent.BUG_REPAIR, TaskIntent.TEST_REPAIR):
-                if repo_file.is_test and any(t in task_description.lower() for t in ("test", "bug", "fail", "regression")):
+                if repo_file.is_test and any(
+                    t in task_description.lower() for t in ("test", "bug", "fail", "regression")
+                ):
                     score += 15.0
                     reasons.append("Test file prioritized for bug repair task")
             elif intent == TaskIntent.CONFIGURATION_CHANGE:

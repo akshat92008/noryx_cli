@@ -1,4 +1,4 @@
-"""Behavioural, database, and security verification adapters for Nexus."""
+"""Behavioural, database, and security verification adapters for Noryx."""
 
 from __future__ import annotations
 

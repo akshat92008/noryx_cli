@@ -1,8 +1,10 @@
 """Tests for MultiFilePatchManager (Sprint 8)."""
+
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from nexus.multifile.contracts import ChangeType, EngineeringChangeSet, PlannedFileChange
 from nexus.multifile.patch import MultiFilePatchManager, PatchApplicationStatus
@@ -106,8 +108,6 @@ def test_partial_application_rolled_back(repo, monkeypatch):
     cs = _cs(("nexus/a.py", ChangeType.MODIFY), ("nexus/b.py", ChangeType.MODIFY))
     manager = MultiFilePatchManager(repo)
 
-    original_a = (repo / "nexus" / "a.py").read_text()
-
     # Patch the write to fail on b.py
     write_count = {"n": 0}
     original_write = Path.write_text
@@ -126,7 +126,8 @@ def test_partial_application_rolled_back(repo, monkeypatch):
     )
 
     assert result.rolled_back or result.status in (
-        PatchApplicationStatus.FAILED, PatchApplicationStatus.ROLLED_BACK
+        PatchApplicationStatus.FAILED,
+        PatchApplicationStatus.ROLLED_BACK,
     )
 
 

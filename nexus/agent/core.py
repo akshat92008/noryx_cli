@@ -1,7 +1,7 @@
 """
 Agent — the core agentic loop upgraded to a full Agent Operating System.
 
-Integrates Planning, Reflection, Context Management, Safety, project rules (NEXUS.md),
+Integrates Planning, Reflection, Context Management, Safety, project rules (NORYX.md),
 user preferences, skills, subagents, hooks, MCP, and plugins.
 """
 
@@ -29,12 +29,12 @@ from nexus.context_manager import ContextManager
 from nexus.evidence import EvidenceTrail, command_exit_code
 from nexus.extensions import ExtensionRegistry
 from nexus.history import FileHistory
-from nexus.intelligence.engineering import EngineeringBrain
 from nexus.hooks.base import HookContext, HookEvent
 from nexus.hooks.builtin import create_builtin_hooks
 
 # Phase 3: Hooks, MCP & Plugins
 from nexus.hooks.runner import HookRunner
+from nexus.intelligence.engineering import EngineeringBrain
 from nexus.mcp.client import MCPClient
 from nexus.memory import ConversationMemory, compact_messages
 from nexus.models import DEFAULT_MODEL, MODELS, resolve_model, resolve_model_key
@@ -48,8 +48,8 @@ from nexus.policy import ModePolicy, PolicyLoader, get_mode_policy
 from nexus.project_memory import ProjectMemory
 from nexus.providers.hosted import HostedProvider
 from nexus.providers.nova import NovaProvider
-from nexus.reflection import ReflectionEngine, ReflectionVerdict
 from nexus.recovery.controller import RecoveryController
+from nexus.reflection import ReflectionEngine, ReflectionVerdict
 from nexus.repo_graph import RepoGraph
 from nexus.run_catalog import RunCatalog
 from nexus.run_finalizer import RunFinalizer
@@ -57,12 +57,12 @@ from nexus.run_state import RunLedger, RunStatus
 from nexus.runtime.events import EventType
 from nexus.runtime.session import ExecutionSession
 from nexus.safety import SafetyCheck, SafetyLayer
-from nexus.tool_executor import ToolExecutionController
 
 # Phase 2: Skills & Subagents
 from nexus.skills.loader import SkillLoader, SkillRegistry
 from nexus.subagents.orchestrator import SubagentOrchestrator
 from nexus.subagents.templates import create_subagent
+from nexus.tool_executor import ToolExecutionController
 from nexus.tools import (
     RAW_TOOL_DEFINITIONS,
     tool_get_project_structure,
@@ -134,14 +134,14 @@ def _effective_evidence(evidence: list[dict[str, Any]], kind: str) -> list[dict[
 
 # ── System Prompt ────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are NexusAI, a coding agent with scoped access to the user's current workspace.
+SYSTEM_PROMPT = """You are Noryx, a coding agent with scoped access to the user's current workspace.
 You use tool calls to inspect, edit, search, execute, and manage code while respecting the safety layer and user confirmation boundaries.
 
 ## CORE IDENTITY
 - You are decisive and action-oriented. When asked to build something, you BUILD it — completely, production-ready, no shortcuts.
 - You proactively explore the codebase before making changes. Read first, understand, then act.
 - You fix errors automatically. If your code fails, you diagnose and fix it without being asked.
-- You never claim success from your own prose. Completion requires literal tool output and a Nexus evidence record.
+- You never claim success from your own prose. Completion requires literal tool output and a Noryx evidence record.
 - File edits may be held as diff previews. If a tool returns PENDING_EDIT, tell the user which approval ID is waiting; do not claim the change was applied.
 
 ## YOUR ENGINEERING TOOLS
@@ -301,7 +301,9 @@ class Agent:
             self.model_cfg["id"] = model_id_override.strip()
             if self.model_key == "custom":
                 self.model_cfg["name"] = f"Custom Hosted Model ({model_id_override.strip()})"
-        if self.model_key == "custom" and (self.model_cfg.get("id") == "custom" or not self.model_cfg.get("id")):
+        if self.model_key == "custom" and (
+            self.model_cfg.get("id") == "custom" or not self.model_cfg.get("id")
+        ):
             raise ValueError("Custom hosted models require --model-id or NEXUS_MODEL_ID.")
         if not tools_enabled:
             self.model_cfg["supports_tools"] = False
@@ -421,9 +423,7 @@ class Agent:
         self.package_guard = PackageGuard()
         # Capability declarations are copied per Agent so concurrent sessions
         # cannot overwrite each other's dynamic plugin/MCP/extension contracts.
-        self._tool_capabilities: dict[str, ToolCapabilityDeclaration] = dict(
-            TOOL_CAPABILITIES
-        )
+        self._tool_capabilities: dict[str, ToolCapabilityDeclaration] = dict(TOOL_CAPABILITIES)
         self._external_tool_path_arguments: dict[str, tuple[str, ...]] = {}
         self.trust = TrustStore(self.working_dir)
         self.policy = PolicyLoader(self.working_dir, is_trusted=self.trust.is_approved).load()
@@ -516,7 +516,6 @@ class Agent:
         # Build the full system prompt
         self._update_system_prompt()
 
-
         # Fire session start hook
         self.hooks.fire(HookEvent.ON_SESSION_START, HookContext(event=HookEvent.ON_SESSION_START))
         self._run_finalizer = RunFinalizer(self)
@@ -581,7 +580,9 @@ class Agent:
             manifest = getattr(plugin, "_manifest", None)
             declared = self._coerce_capabilities(getattr(manifest, "capabilities", ()))
             for definition in plugin.get_tools():
-                function = definition.get("function", definition) if isinstance(definition, dict) else {}
+                function = (
+                    definition.get("function", definition) if isinstance(definition, dict) else {}
+                )
                 name = str(function.get("name", "")) if isinstance(function, dict) else ""
                 if not name:
                     continue
@@ -678,7 +679,7 @@ class Agent:
         """Combine base prompt with project memory, user preferences, and active skills."""
         prompt = self.base_system_prompt
 
-        # Project memory (NEXUS.md rules)
+        # Project memory (NORYX.md rules)
         try:
             rules_paths = self.project_mem.get_rules_paths()
             addon = (
@@ -853,7 +854,7 @@ class Agent:
                     "status": "UNVERIFIED",
                     "error": "final_report.json is not a valid JSON object",
                 }
-            
+
             # Inject provider metrics from BudgetController
             report_data["provider_metrics"] = {
                 "prompt_tokens": self.budget.usage.prompt_tokens,
@@ -862,7 +863,7 @@ class Agent:
                 "provider_attempts": self.budget.usage.provider_attempts,
                 "hosted_calls": self.budget.usage.hosted_calls,
             }
-            
+
             return report_data
         except (TypeError, ValueError) as exc:
             return {
@@ -913,7 +914,7 @@ class Agent:
     def _applicable_verification(self, intent: IntentType, skills: list[str]) -> list[str]:
         """Generate checks that this repository can actually execute.
 
-        Exact evidence matching remains strict; this only prevents Nexus from
+        Exact evidence matching remains strict; this only prevents Noryx from
         inventing a mandatory lint/type contract when the repository has no
         configured or installed linter/type checker.
         """
@@ -1124,10 +1125,7 @@ class Agent:
                 if self.model_cfg["id"] != "qwen/qwen3.5-397b-a17b"
                 else "meta/llama-3.3-70b-instruct"
             )
-        if (
-            self.mode_policy.require_distinct_reviewer
-            and reviewer_model == self.model_cfg["id"]
-        ):
+        if self.mode_policy.require_distinct_reviewer and reviewer_model == self.model_cfg["id"]:
             message = (
                 "Independent review failed closed: quality mode requires a reviewer model "
                 "different from the executor. Set NEXUS_REVIEW_MODEL_ID accordingly."
@@ -1215,9 +1213,11 @@ class Agent:
                 )
 
         import hashlib
+
         diff_sha256 = hashlib.sha256(diff.encode("utf-8")).hexdigest()
         try:
             from nexus.intelligence.repository.snapshot import workspace_revision
+
             review_revision = workspace_revision(self.working_dir)
         except (OSError, ValueError):
             review_revision = ""
@@ -1241,7 +1241,6 @@ class Agent:
             },
         )
         return all_approved, summary
-
 
     # ── Message Building ─────────────────────────────────────────────────
 
@@ -2055,7 +2054,7 @@ class Agent:
                 or "too many requests" in error_msg.lower()
             )
             if (
-                (is_rate_limit or "Nexus AI Provider Failover Error" in error_msg)
+                (is_rate_limit or "Noryx AI Provider Failover Error" in error_msg)
                 and self.enable_nova_fallback
                 and self.local_intern_enabled
             ):
@@ -2068,7 +2067,9 @@ class Agent:
                 if getattr(self.planner, "current_plan", None):
                     step = getattr(self.planner.current_plan, "next_step", None)
                     if step:
-                        self.planner.advance_step(step.id, TaskStatus.COMPLETED, "Completed via local Nova fallback")
+                        self.planner.advance_step(
+                            step.id, TaskStatus.COMPLETED, "Completed via local Nova fallback"
+                        )
                 return self._run_nova_turn(user_input, emit_ui=emit_ui)
 
             if emit_ui:
@@ -2249,12 +2250,18 @@ class Agent:
         }
         return self.run_non_interactive(resume_prompt)
 
-    def _run_two_node_turn(self, user_input: str, analysis: dict | None = None, emit_ui: bool = True) -> tuple[str, list[dict]]:
+    def _run_two_node_turn(
+        self, user_input: str, analysis: dict | None = None, emit_ui: bool = True
+    ) -> tuple[str, list[dict]]:
         from nexus.pipeline import ExecutionPipeline
-        return ExecutionPipeline(self)._run_two_node_turn(user_input, analysis or {}, emit_ui=emit_ui)
+
+        return ExecutionPipeline(self)._run_two_node_turn(
+            user_input, analysis or {}, emit_ui=emit_ui
+        )
 
     def _run_nova_turn(self, user_input: str, emit_ui: bool = True) -> tuple[str, list[dict]]:
         from nexus.pipeline import ExecutionPipeline
+
         return ExecutionPipeline(self)._run_nova_turn(user_input, emit_ui=emit_ui)
 
     def spawn_subagent(self, template_name: str, task: str) -> str:
@@ -2355,6 +2362,7 @@ class Agent:
 
         try:
             from nexus.intelligence.repository.snapshot import workspace_revision
+
             current_revision = workspace_revision(self.working_dir)
         except (OSError, ValueError):
             current_revision = ""
@@ -2434,6 +2442,7 @@ class Agent:
         """Mirror deterministic checks into the trail with structured provenance."""
         try:
             from nexus.intelligence.repository.snapshot import workspace_revision
+
             current_revision = workspace_revision(self.working_dir)
         except (OSError, ValueError):
             current_revision = ""
@@ -2442,7 +2451,9 @@ class Agent:
 
         for index, check in enumerate(report.checks, 1):
             is_test = check.check_type.value in {"test", "tests"}
-            profile = analyse_test_command(check.command, root=self.working_dir) if is_test else None
+            profile = (
+                analyse_test_command(check.command, root=self.working_dir) if is_test else None
+            )
             inherited = check.status.value == "inherited_failure"
             if is_test and profile is not None:
                 verification_valid, validation_detail, observed_count = validate_test_execution(
@@ -2473,15 +2484,17 @@ class Agent:
                 "command_fingerprint": command_fingerprint(check.command),
             }
             if profile is not None:
-                metadata.update({
-                    "runner_valid": profile.valid,
-                    "test_runner": profile.runner,
-                    "verification_scope": profile.scope,
-                    "test_targets": list(profile.targets),
-                    "project_gate": profile.project_gate,
-                    "observed_test_count": observed_count,
-                    "validation_detail": validation_detail,
-                })
+                metadata.update(
+                    {
+                        "runner_valid": profile.valid,
+                        "test_runner": profile.runner,
+                        "verification_scope": profile.scope,
+                        "test_targets": list(profile.targets),
+                        "project_gate": profile.project_gate,
+                        "observed_test_count": observed_count,
+                        "validation_detail": validation_detail,
+                    }
+                )
 
             self.evidence.append(
                 kind="verification_check",
@@ -2587,7 +2600,7 @@ class Agent:
         return "\n".join(lines)
 
     def _guard_completion_claims(self, content: str) -> str:
-        """Prevent unsupported success prose from becoming Nexus' final status."""
+        """Prevent unsupported success prose from becoming Noryx' final status."""
         start = getattr(self, "_turn_evidence_start", 0)
         records = self.evidence.records()[start:]
         warnings = []

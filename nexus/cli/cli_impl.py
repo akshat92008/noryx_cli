@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-NexusAI — Hosted + Local Coding Agent CLI
+Noryx — Hosted + Local Coding Agent CLI
 
 Usage:
     nexus                          Start interactive mode with default model
-    nexus --model kimi             Start with a specific model
-    nexus --web                    Start the web interface
+    noryx --model kimi             Start with a specific model
+    noryx --web                    Start the web interface
     nexus "build a flask app"      Run a single prompt and exit
-    nexus --list-models            Show all available models
+    noryx --list-models            Show all available models
 """
 
 import argparse
@@ -18,16 +18,17 @@ import shlex
 import sys
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 from nexus import __version__, ui
 from nexus.agent import Agent
 from nexus.doctor import run_doctor
+from nexus.env import noryx_env
 from nexus.memory import ConversationMemory
 from nexus.models import DEFAULT_MODEL, resolve_model
 from nexus.policy import get_mode_policy
 from nexus.run_catalog import RunCatalog
 from nexus.tools import get_history, tool_get_project_structure
-
 
 _PROOF_REQUEST: dict | None = None
 
@@ -38,8 +39,8 @@ def _prepare_fix_command() -> None:
     if len(sys.argv) < 2 or sys.argv[1] != "fix":
         return
     parser = argparse.ArgumentParser(
-        prog="nexus fix",
-        description="Reproduce, repair, externally verify, and emit a Nexus Proof receipt.",
+        prog="noryx fix",
+        description="Reproduce, repair, externally verify, and emit a Noryx Proof receipt.",
     )
     parser.add_argument("prompt")
     parser.add_argument("--budget-inr", type=float, default=20.0)
@@ -82,6 +83,7 @@ def _prepare_fix_command() -> None:
         "routing_decision": plan.routing_decision,
     }
 
+
 def _emit_requested_proof(agent, final_report):
     if not _PROOF_REQUEST or not _PROOF_REQUEST.get("enabled"):
         return None
@@ -92,9 +94,9 @@ def _emit_requested_proof(agent, final_report):
         Path(output)
         if output
         else Path(agent.source_working_dir)
-        / ".nexus"
+        / ".noryx"
         / "proofs"
-        / f"{agent.conversation_id}.nexus-proof.json"
+        / f"{agent.conversation_id}.noryx-proof.json"
     )
     if not path.is_absolute():
         path = Path(agent.source_working_dir) / path
@@ -107,26 +109,27 @@ def _emit_requested_proof(agent, final_report):
         routing_decision=_PROOF_REQUEST.get("routing_decision") or {},
     )
     written = write_proof_receipt(receipt, path)
-    print(f"Nexus Proof: {written}")
+    print(f"Noryx Proof: {written}")
     print(f"Proof status: {receipt['status']}")
     print(f"Proof SHA-256: {receipt['receipt_hash']}")
     return written
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
-        prog="nexus",
-        description="NexusAI — Hosted NVIDIA + Local Nova Coding Agent",
+        prog="noryx",
+        description="Noryx — Hosted NVIDIA + Local Nova Coding Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   nexus                              Interactive mode (default: GLM 5.2)
-  nexus --model glm-5.2              Use GLM 5.2
-  nexus --model kimi                 Use Kimi as Ceiling, Nova Codex v11 as Intern
-  nexus --model nova_codex           Use local Nova Codex v11 directly with automatic guardrails
-  nexus --web                        Launch web interface (Cursor-like UI)
-  nexus --web --port 8080            Web interface on custom port
+  noryx --model glm-5.2              Use GLM 5.2
+  noryx --model kimi                 Use Kimi as Ceiling, Nova Codex v11 as Intern
+  noryx --model nova_codex           Use local Nova Codex v11 directly with automatic guardrails
+  noryx --web                        Launch web interface (Cursor-like UI)
+  noryx --web --port 8080            Web interface on custom port
   nexus "create a REST API in Go"    Single prompt mode
-  nexus --list-models                List all available models
+  noryx --list-models                List all available models
 
 Environment:
   NVIDIA_API_KEY                     Your NVIDIA API key (from build.nvidia.com)
@@ -143,7 +146,7 @@ Environment:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"NexusAI {__version__}",
+        version=f"Noryx {__version__}",
     )
     parser.add_argument(
         "--doctor",
@@ -154,12 +157,12 @@ Environment:
     parser.add_argument(
         "--model",
         "-m",
-        default=os.environ.get("NEXUS_MODEL", DEFAULT_MODEL),
+        default=noryx_env("MODEL", DEFAULT_MODEL),
         help=f"Model to use (default: {DEFAULT_MODEL}). Use --list-models to see all.",
     )
     parser.add_argument(
         "--model-id",
-        default=os.environ.get("NEXUS_MODEL_ID"),
+        default=noryx_env("MODEL_ID"),
         help="Override the provider model ID; required for --model custom",
     )
     parser.add_argument(
@@ -169,7 +172,7 @@ Environment:
     )
     parser.add_argument(
         "--base-url",
-        default=os.environ.get("NEXUS_OPENAI_BASE_URL"),
+        default=noryx_env("OPENAI_BASE_URL"),
         help="Custom OpenAI-compatible base URL",
     )
     parser.add_argument(
@@ -191,7 +194,7 @@ Environment:
     parser.add_argument(
         "--local-intern",
         choices=("off", "auto", "required"),
-        default=os.environ.get("NEXUS_LOCAL_INTERN", "off"),
+        default=noryx_env("LOCAL_INTERN", "off"),
         help=(
             "Use Nova as an optional local intern for hosted coding tasks: "
             "off, auto when available, or required (default: off)"
@@ -291,7 +294,7 @@ Environment:
             "quality — maximum verification, native sandbox required; "
             "budget — cost-capped autonomous, native sandbox required; "
             "ci — non-interactive JSON output, native sandbox required. "
-            "Run 'nexus --doctor' to check your sandbox status."
+            "Run 'noryx --doctor' to check your sandbox status."
         ),
     )
     parser.add_argument(
@@ -322,7 +325,7 @@ Environment:
     parser.add_argument(
         "--keep-workspace",
         action="store_true",
-        help="Retain the isolated workspace after Nexus exits for inspection or manual apply",
+        help="Retain the isolated workspace after Noryx exits for inspection or manual apply",
     )
     parser.add_argument(
         "--no-workspace",
@@ -369,21 +372,55 @@ Environment:
     return parser.parse_args()
 
 
-_KNOWN_TOP_LEVEL_COMMANDS = frozenset({
-    "admin", "approvals", "architecture", "audit", "benchmark", "budget",
-    "budgets", "change", "collaborate", "collaboration", "compliance",
-    "cost", "deploy", "extensions", "fix", "generate-dashboard", "inspect",
-    "intelligence", "mcp", "members", "model", "models", "org",
-    "performance", "plan", "policy", "project", "proof", "release",
-    "replay", "resume", "roles", "rollback", "run", "runs", "sandbox",
-    "secrets", "solve-issue", "workspace",
-})
+_KNOWN_TOP_LEVEL_COMMANDS = frozenset(
+    {
+        "admin",
+        "approvals",
+        "architecture",
+        "audit",
+        "benchmark",
+        "budget",
+        "budgets",
+        "change",
+        "collaborate",
+        "collaboration",
+        "compliance",
+        "cost",
+        "deploy",
+        "extensions",
+        "fix",
+        "generate-dashboard",
+        "inspect",
+        "intelligence",
+        "mcp",
+        "members",
+        "model",
+        "models",
+        "org",
+        "performance",
+        "plan",
+        "policy",
+        "project",
+        "proof",
+        "release",
+        "replay",
+        "resume",
+        "roles",
+        "rollback",
+        "run",
+        "runs",
+        "sandbox",
+        "secrets",
+        "solve-issue",
+        "workspace",
+    }
+)
 
 
 def _reject_unknown_subcommand() -> None:
     """Fail fast for command-shaped tokens instead of invoking a provider.
 
-    Nexus also supports a legacy one-shot positional prompt.  A single
+    Noryx also supports a legacy one-shot positional prompt. A single
     hyphenated token is command-shaped and historically caused an expensive
     provider invocation for typos such as ``nexus deploy-chek``.  Reject that
     unambiguously; natural-language prompts remain supported and can always be
@@ -401,12 +438,10 @@ def _reject_unknown_subcommand() -> None:
     ):
         return
     print(
-        f"nexus: unknown command '{token}'. "
-        "Use 'nexus --help' or 'nexus run --prompt <goal>'.",
+        f"nexus: unknown command '{token}'. Use 'noryx --help' or 'nexus run --prompt <goal>'.",
         file=sys.stderr,
     )
     raise SystemExit(2)
-
 
 
 def _normalize_subcommand_argv() -> None:
@@ -442,9 +477,9 @@ def _normalize_subcommand_argv() -> None:
                 "  --max-turns N       Maximum agent turns (default: 50)\n"
                 "  --output-format F   text|json|jsonl|stream-json (default: text)\n"
                 "  --confirm-danger    Confirm dangerous operations without prompting\n"
-                "  --model <key>       Model to use (see nexus --list-models)\n"
+                "  --model <key>       Model to use (see noryx --list-models)\n"
                 "  --working-dir DIR   Working directory (default: cwd)\n\n"
-                "Run 'nexus --help' for the full option reference."
+                "Run 'noryx --help' for the full option reference."
             )
             raise SystemExit(0)
         if "--print" not in rest and "-p" not in rest:
@@ -545,7 +580,7 @@ def _handle_run_management() -> bool:
         if "--json" in sys.argv[2:]:
             print(json.dumps([item.__dict__ for item in records], indent=2))
         elif not records:
-            print("No durable Nexus runs exist for this directory.")
+            print("No durable Noryx runs exist for this directory.")
         else:
             for item in records:
                 print(f"{item.session_id}/{item.turn_id}  {item.status:<20} {item.request[:80]}")
@@ -577,7 +612,7 @@ def _handle_generate_dashboard() -> bool:
         return False
     import argparse
 
-    parser = argparse.ArgumentParser(prog="nexus generate-dashboard")
+    parser = argparse.ArgumentParser(prog="noryx generate-dashboard")
     parser.add_argument("--input", required=True, help="Path to benchmark-result JSON")
     parser.add_argument("--output", required=True, help="Path to write the HTML dashboard")
     args = parser.parse_args(sys.argv[2:])
@@ -602,9 +637,7 @@ def _handle_benchmark() -> bool:
     if len(sys.argv) < 2 or sys.argv[1] != "benchmark":
         return False
     if len(sys.argv) >= 3 and sys.argv[2] == "superiority-preflight":
-        parser = argparse.ArgumentParser(
-            prog="nexus benchmark superiority-preflight"
-        )
+        parser = argparse.ArgumentParser(prog="noryx benchmark superiority-preflight")
         parser.add_argument("--manifest", required=True)
         parser.add_argument("--output", default="")
         parser.add_argument("--minimum-tasks", type=int, default=50)
@@ -635,13 +668,14 @@ def _handle_benchmark() -> bool:
             raise SystemExit(2)
         return True
     if len(sys.argv) >= 3 and sys.argv[2] == "duel":
-        parser = argparse.ArgumentParser(prog="nexus benchmark duel")
+        parser = argparse.ArgumentParser(prog="noryx benchmark duel")
         parser.add_argument("--manifest", required=True)
         parser.add_argument("--output", required=True)
         parser.add_argument("--seed", type=int, default=370)
         parser.add_argument("--dry-run", action="store_true")
         args = parser.parse_args(sys.argv[3:])
         from nexus.competitive_benchmark import CompetitiveDuelRunner
+
         try:
             report = CompetitiveDuelRunner(args.manifest, seed=args.seed).run(
                 output=args.output, dry_run=args.dry_run
@@ -654,16 +688,15 @@ def _handle_benchmark() -> bool:
             raise SystemExit(2)
         return True
     if len(sys.argv) >= 3 and sys.argv[2] == "offline-reliability":
-        parser = argparse.ArgumentParser(prog="nexus benchmark offline-reliability")
+        parser = argparse.ArgumentParser(prog="noryx benchmark offline-reliability")
         parser.add_argument("--output", default="")
         parser.add_argument("--artifact-dir", default="")
         args = parser.parse_args(sys.argv[3:])
         from nexus.offline_reliability_benchmark import (
             run_offline_reliability_benchmark,
         )
-        report = run_offline_reliability_benchmark(
-            artifact_root=args.artifact_dir or None
-        )
+
+        report = run_offline_reliability_benchmark(artifact_root=args.artifact_dir or None)
         rendered = json.dumps(report.to_dict(), indent=2, sort_keys=True)
         if args.output:
             output = Path(args.output).expanduser().resolve()
@@ -674,8 +707,9 @@ def _handle_benchmark() -> bool:
             raise SystemExit(2)
         return True
     if len(sys.argv) >= 3 and sys.argv[2] == "superiority-gate":
-        parser = argparse.ArgumentParser(prog="nexus benchmark superiority-gate")
+        parser = argparse.ArgumentParser(prog="noryx benchmark superiority-gate")
         parser.add_argument("--report", required=True)
+        parser.add_argument("--trust-policy", required=True)
         parser.add_argument("--output", default="")
         parser.add_argument("--minimum-tasks", type=int, default=50)
         parser.add_argument("--minimum-repositories", type=int, default=10)
@@ -685,8 +719,12 @@ def _handle_benchmark() -> bool:
             SuperiorityThresholds,
             evaluate_superiority_report,
         )
+
         try:
             payload = json.loads(Path(args.report).expanduser().read_text(encoding="utf-8"))
+            from nexus.competitive_attestation import load_trust_policy
+
+            trusted_keys, trusted_campaign = load_trust_policy(args.trust_policy)
             evaluation = evaluate_superiority_report(
                 payload,
                 thresholds=SuperiorityThresholds(
@@ -694,6 +732,8 @@ def _handle_benchmark() -> bool:
                     minimum_unique_repositories=max(1, args.minimum_repositories),
                     minimum_trials_per_task=max(1, args.trials),
                 ),
+                trusted_evaluator_keys=trusted_keys,
+                trusted_campaign=trusted_campaign,
             )
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             print(f"Error: {exc}", file=sys.stderr)
@@ -708,9 +748,15 @@ def _handle_benchmark() -> bool:
             raise SystemExit(2)
         return True
     if len(sys.argv) >= 3 and sys.argv[2] == "compare-matched":
-        compare_parser = argparse.ArgumentParser(prog="nexus benchmark compare-matched")
+        compare_parser = argparse.ArgumentParser(prog="noryx benchmark compare-matched")
         compare_parser.add_argument("--direct", required=True)
-        compare_parser.add_argument("--nexus", required=True)
+        compare_parser.add_argument(
+            "--noryx",
+            "--nexus",
+            dest="noryx",
+            required=True,
+            help="Noryx trial JSON (the legacy --nexus spelling remains accepted)",
+        )
         compare_parser.add_argument("--output", default="")
         compare_parser.add_argument("--minimum-trials", type=int, default=6)
         compare_parser.add_argument("--minimum-uplift", type=float, default=1.5)
@@ -723,16 +769,21 @@ def _handle_benchmark() -> bool:
             compare_matched,
             load_trials,
         )
+
         try:
             report = compare_matched(
                 load_trials(compare_args.direct),
-                load_trials(compare_args.nexus),
+                load_trials(compare_args.noryx),
                 thresholds=ComparisonThresholds(
                     minimum_trials=max(1, compare_args.minimum_trials),
                     minimum_uplift=max(0.0, compare_args.minimum_uplift),
-                    maximum_false_completion_rate=max(0.0, compare_args.maximum_false_completion_rate),
+                    maximum_false_completion_rate=max(
+                        0.0, compare_args.maximum_false_completion_rate
+                    ),
                     maximum_regression_rate=max(0.0, compare_args.maximum_regression_rate),
-                    minimum_budget_compliance=min(1.0, max(0.0, compare_args.minimum_budget_compliance)),
+                    minimum_budget_compliance=min(
+                        1.0, max(0.0, compare_args.minimum_budget_compliance)
+                    ),
                 ),
             )
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
@@ -748,8 +799,8 @@ def _handle_benchmark() -> bool:
             raise SystemExit(2)
         return True
     benchmark_parser = argparse.ArgumentParser(
-        prog="nexus benchmark",
-        description="Run reproducible Nexus tasks in disposable repository copies.",
+        prog="noryx benchmark",
+        description="Run reproducible Noryx tasks in disposable repository copies.",
     )
     benchmark_parser.add_argument(
         "--manifest",
@@ -782,12 +833,21 @@ def _handle_benchmark() -> bool:
             raise ValueError("Choose either --manifest or --installed-core")
         if benchmark_args.manifest:
             suite = BenchmarkSuite.load(benchmark_args.manifest)
-            report = BenchmarkRunner(suite, artifact_root=benchmark_args.artifact_dir, keep_workspaces=benchmark_args.keep_workspaces).run(dry_run=benchmark_args.dry_run)
+            report = BenchmarkRunner(
+                suite,
+                artifact_root=benchmark_args.artifact_dir,
+                keep_workspaces=benchmark_args.keep_workspaces,
+            ).run(dry_run=benchmark_args.dry_run)
         else:
             from nexus.benchmark_resources import installed_core_manifest
+
             with installed_core_manifest() as manifest:
                 suite = BenchmarkSuite.load(manifest)
-                report = BenchmarkRunner(suite, artifact_root=benchmark_args.artifact_dir, keep_workspaces=benchmark_args.keep_workspaces).run(dry_run=benchmark_args.dry_run)
+                report = BenchmarkRunner(
+                    suite,
+                    artifact_root=benchmark_args.artifact_dir,
+                    keep_workspaces=benchmark_args.keep_workspaces,
+                ).run(dry_run=benchmark_args.dry_run)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
@@ -809,12 +869,13 @@ def _handle_sandbox_qualification() -> bool:
     """Behaviorally qualify the host sandbox instead of trusting its name."""
     if len(sys.argv) < 3 or sys.argv[1:3] != ["sandbox", "qualify"]:
         return False
-    parser = argparse.ArgumentParser(prog="nexus sandbox qualify")
+    parser = argparse.ArgumentParser(prog="noryx sandbox qualify")
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--output", default="sandbox-qualification.json")
     parser.add_argument("--require-autonomous", action="store_true")
     args = parser.parse_args(sys.argv[3:])
     from nexus.platform.sandbox_qualification import qualify_native_sandbox
+
     try:
         qualification = qualify_native_sandbox(args.workspace, args.output)
     except (OSError, ValueError) as exc:
@@ -830,7 +891,7 @@ def _extension_state_dir(working_dir: str = "") -> Path | None:
     """Return an optional command-local extension state directory."""
     if not working_dir:
         return None
-    path = Path(working_dir).expanduser().resolve() / ".nexus" / "extensions"
+    path = Path(working_dir).expanduser().resolve() / ".noryx" / "extensions"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -850,7 +911,7 @@ def _handle_extensions() -> bool:
     if len(sys.argv) < 2 or sys.argv[1] != "extensions":
         return False
 
-    parser = argparse.ArgumentParser(prog="nexus extensions")
+    parser = argparse.ArgumentParser(prog="noryx extensions")
     parser.add_argument("--working-dir", "-d", default="")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -888,7 +949,9 @@ def _handle_extensions() -> bool:
     permissions.add_argument("action", choices=("list", "grant", "revoke"))
     permissions.add_argument("name", nargs="?")
     permissions.add_argument("capability", nargs="?")
-    permissions.add_argument("--scope", choices=("once", "run", "repository", "global"), default="once")
+    permissions.add_argument(
+        "--scope", choices=("once", "run", "repository", "global"), default="once"
+    )
     permissions.add_argument("--repository", default="")
     permissions.add_argument("--json", action="store_true")
 
@@ -922,7 +985,9 @@ def _handle_extensions() -> bool:
     audit_logger = AuditLogger(state_dir)
 
     if args.command == "install":
-        ok, message, record = manager.install(Path(args.source), enable=args.enable, force=args.force)
+        ok, message, record = manager.install(
+            Path(args.source), enable=args.enable, force=args.force
+        )
         audit_logger.log(
             AuditAction.INSTALL,
             record.manifest.name if record else Path(args.source).name,
@@ -930,7 +995,16 @@ def _handle_extensions() -> bool:
             error="" if ok else message,
         )
         if args.json:
-            print(json.dumps({"success": ok, "message": message, "extension": record.to_dict() if record else None}, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "success": ok,
+                        "message": message,
+                        "extension": record.to_dict() if record else None,
+                    },
+                    indent=2,
+                )
+            )
         else:
             print(message)
         raise SystemExit(0 if ok else 2)
@@ -967,7 +1041,9 @@ def _handle_extensions() -> bool:
         else:
             for record in records:
                 enabled = "enabled" if record.enabled else "disabled"
-                print(f"{record.manifest.name} {record.manifest.version} {record.manifest.extension_type} {enabled}")
+                print(
+                    f"{record.manifest.name} {record.manifest.version} {record.manifest.extension_type} {enabled}"
+                )
         return True
 
     if args.command == "inspect":
@@ -1000,7 +1076,9 @@ def _handle_extensions() -> bool:
         else:
             for record in records:
                 status = "ok" if record.success else "failed"
-                print(f"{record.timestamp:.0f} {record.action.value} {record.extension_name} {status}")
+                print(
+                    f"{record.timestamp:.0f} {record.action.value} {record.extension_name} {status}"
+                )
         return True
 
     if args.command == "permissions":
@@ -1054,7 +1132,9 @@ def _handle_extensions() -> bool:
 
     if args.command == "package":
         ok, message = ExtensionSDK.package_extension(Path(args.path), Path(args.output))
-        audit_logger.log(AuditAction.PACKAGE, Path(args.path).name, success=ok, error="" if ok else message)
+        audit_logger.log(
+            AuditAction.PACKAGE, Path(args.path).name, success=ok, error="" if ok else message
+        )
         print(message)
         raise SystemExit(0 if ok else 2)
 
@@ -1066,7 +1146,7 @@ def _handle_mcp() -> bool:
     if len(sys.argv) < 2 or sys.argv[1] != "mcp":
         return False
 
-    parser = argparse.ArgumentParser(prog="nexus mcp")
+    parser = argparse.ArgumentParser(prog="noryx mcp")
     parser.add_argument("--working-dir", "-d", default="")
     sub = parser.add_subparsers(dest="command", required=True)
     add = sub.add_parser("add")
@@ -1091,7 +1171,11 @@ def _handle_mcp() -> bool:
 
     from nexus.platform.mcp_gateway import MCPGateway
 
-    state_dir = Path(args.working_dir).expanduser().resolve() / ".nexus" / "mcp" if args.working_dir else None
+    state_dir = (
+        Path(args.working_dir).expanduser().resolve() / ".noryx" / "mcp"
+        if args.working_dir
+        else None
+    )
     gateway = MCPGateway(working_dir=args.working_dir, state_dir=state_dir)
 
     if args.command == "add":
@@ -1159,7 +1243,7 @@ def _handle_mcp() -> bool:
 def _state_dir_from_working_dir(working_dir: str, name: str) -> Path | None:
     if not working_dir:
         return None
-    path = Path(working_dir).expanduser().resolve() / ".nexus" / name
+    path = Path(working_dir).expanduser().resolve() / ".noryx" / name
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -1347,7 +1431,13 @@ def _handle_enterprise() -> bool:
     if top == "secrets":
         broker = SecretBroker(store, AuthorizationService(IdentityService(store)))
         if args.command == "put":
-            broker.put(args.name, args.value, project_id=args.project, provider=args.provider, purpose=args.purpose)
+            broker.put(
+                args.name,
+                args.value,
+                project_id=args.project,
+                provider=args.provider,
+                purpose=args.purpose,
+            )
             audit.append("secret.put", "cli", project_id=args.project, details={"name": args.name})
             emit({"stored": True, "name": args.name})
         elif args.command == "get":
@@ -1358,7 +1448,9 @@ def _handle_enterprise() -> bool:
                 provider=args.provider,
                 purpose=args.purpose,
             )
-            audit.append("secret.get", args.identity_id, project_id=args.project, details={"name": args.name})
+            audit.append(
+                "secret.get", args.identity_id, project_id=args.project, details={"name": args.name}
+            )
             emit({"name": args.name, "value": value})
         else:
             emit(broker.list_redacted(args.project))
@@ -1374,7 +1466,14 @@ def _handle_enterprise() -> bool:
     if top == "budgets":
         service = BudgetGovernanceService(store)
         if args.command == "set":
-            service.set_limit(BudgetLimit(args.subject_type, args.subject_id, args.limit_usd, approval_threshold_usd=args.threshold))
+            service.set_limit(
+                BudgetLimit(
+                    args.subject_type,
+                    args.subject_id,
+                    args.limit_usd,
+                    approval_threshold_usd=args.threshold,
+                )
+            )
             emit({"stored": True})
         else:
             emit(asdict(service.charge(args.subject_type, args.subject_id, args.amount_usd)))
@@ -1383,7 +1482,9 @@ def _handle_enterprise() -> bool:
     if top == "compliance":
         payload = ComplianceExportService(store).export()
         if args.output:
-            Path(args.output).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+            Path(args.output).write_text(
+                json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+            )
         emit(payload)
         return True
 
@@ -1399,7 +1500,7 @@ def _handle_autonomy_project() -> bool:
     if len(sys.argv) < 2 or sys.argv[1] != "project":
         return False
 
-    parser = argparse.ArgumentParser(prog="nexus project")
+    parser = argparse.ArgumentParser(prog="noryx project")
     parser.add_argument("--working-dir", "-d", default="")
     parser.add_argument("--json", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1407,7 +1508,19 @@ def _handle_autonomy_project() -> bool:
     create.add_argument("objective")
     create.add_argument("--requirement", action="append", default=[])
     create.add_argument("--acceptance", action="append", default=[])
-    for name in ("plan", "approve", "run", "status", "pause", "resume", "milestones", "evidence", "risks", "cancel", "archive"):
+    for name in (
+        "plan",
+        "approve",
+        "run",
+        "status",
+        "pause",
+        "resume",
+        "milestones",
+        "evidence",
+        "risks",
+        "cancel",
+        "archive",
+    ):
         cmd = sub.add_parser(name)
         cmd.add_argument("project_id")
 
@@ -1419,10 +1532,16 @@ def _handle_autonomy_project() -> bool:
     if args.working_dir:
         from nexus.autonomy.projects import AutonomyStore
 
-        service = ProjectService(AutonomyStore(_state_dir_from_working_dir(args.working_dir, "autonomy")))
+        service = ProjectService(
+            AutonomyStore(_state_dir_from_working_dir(args.working_dir, "autonomy"))
+        )
 
     def emit(payload):
-        print(json.dumps(payload, indent=2, default=str) if args.json or not isinstance(payload, str) else payload)
+        print(
+            json.dumps(payload, indent=2, default=str)
+            if args.json or not isinstance(payload, str)
+            else payload
+        )
 
     if args.command == "create":
         project = service.create(
@@ -1472,11 +1591,19 @@ def _handle_autonomy_project() -> bool:
 
 
 def _handle_proof() -> bool:
-    if len(sys.argv)<2 or sys.argv[1]!="proof": return False
-    parser=argparse.ArgumentParser(prog="nexus proof"); sub=parser.add_subparsers(dest="command",required=True); verify=sub.add_parser("verify"); verify.add_argument("path"); args=parser.parse_args(sys.argv[2:])
+    if len(sys.argv) < 2 or sys.argv[1] != "proof":
+        return False
+    parser = argparse.ArgumentParser(prog="noryx proof")
+    sub = parser.add_subparsers(dest="command", required=True)
+    verify = sub.add_parser("verify")
+    verify.add_argument("path")
+    args = parser.parse_args(sys.argv[2:])
     from nexus.proof import verify_proof_receipt
-    valid,detail=verify_proof_receipt(args.path); print(json.dumps({"valid":valid,"detail":detail},indent=2))
-    if not valid: raise SystemExit(2)
+
+    valid, detail = verify_proof_receipt(args.path)
+    print(json.dumps({"valid": valid, "detail": detail}, indent=2))
+    if not valid:
+        raise SystemExit(2)
     return True
 
 
@@ -1484,7 +1611,7 @@ def _handle_engineering_intelligence() -> bool:
     """Inspect the repository-aware engineering contract without invoking a model."""
     if len(sys.argv) < 2 or sys.argv[1] != "intelligence":
         return False
-    parser = argparse.ArgumentParser(prog="nexus intelligence")
+    parser = argparse.ArgumentParser(prog="noryx intelligence")
     sub = parser.add_subparsers(dest="command", required=True)
     inspect_cmd = sub.add_parser("inspect")
     inspect_cmd.add_argument("objective")
@@ -1532,7 +1659,9 @@ def _require_autonomous_host_qualification(working_dir: str | Path):
     root = Path(working_dir or os.getcwd()).expanduser().resolve()
     qualification = qualify_native_sandbox(root)
     if not qualification.autonomous_ready:
-        failed = ", ".join(item.name for item in qualification.probes if not item.passed) or "unknown"
+        failed = (
+            ", ".join(item.name for item in qualification.probes if not item.passed) or "unknown"
+        )
         raise RuntimeError(
             "Autonomous mode blocked: native sandbox behavioral qualification failed "
             f"on backend {qualification.backend!r} (failed probes: {failed}). "
@@ -1546,7 +1675,7 @@ def _handle_deploy_check() -> bool:
     """Check artifact integrity and host readiness for a selected execution mode."""
     if len(sys.argv) < 2 or sys.argv[1] != "deploy":
         return False
-    parser = argparse.ArgumentParser(prog="nexus deploy")
+    parser = argparse.ArgumentParser(prog="noryx deploy")
     sub = parser.add_subparsers(dest="command", required=True)
     check = sub.add_parser("check")
     check.add_argument("--working-dir", "-d", default=".")
@@ -1562,8 +1691,14 @@ def _handle_deploy_check() -> bool:
     )
     check.add_argument("--output", default="")
     check.add_argument(
-        "--competitive-report", default="",
-        help="sealed Nexus-vs-Claude Code duel report required for an autonomous production claim",
+        "--competitive-report",
+        default="",
+        help="sealed Noryx-vs-Claude Code duel report required for an autonomous production claim",
+    )
+    check.add_argument(
+        "--competitive-trust-policy",
+        default="",
+        help="out-of-band evaluator keys and sealed campaign identity",
     )
     check.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(sys.argv[2:])
@@ -1614,18 +1749,17 @@ def _handle_deploy_check() -> bool:
         )
 
     ready = (
-        architecture.passed
-        and doctor_ready
-        and benchmark_ready
-        and state_ready
-        and offline_ready
+        architecture.passed and doctor_ready and benchmark_ready and state_ready and offline_ready
     )
-    supervised_ready = bool(ready and args.deep and args.mode in {"review", "quality", "ci", "autonomous"})
+    supervised_ready = bool(
+        ready and args.deep and args.mode in {"review", "quality", "ci", "autonomous"}
+    )
 
     sandbox_payload: dict[str, Any] = {}
     sandbox_ready = False
     if args.mode == "autonomous":
         from nexus.platform.sandbox_qualification import qualify_native_sandbox
+
         try:
             sandbox_qualification = qualify_native_sandbox(root)
             sandbox_payload = sandbox_qualification.to_dict()
@@ -1637,10 +1771,20 @@ def _handle_deploy_check() -> bool:
     superiority_ready = False
     if args.competitive_report:
         from nexus.competitive_qualification import evaluate_superiority_report
+
         try:
             report_path = Path(args.competitive_report).expanduser().resolve()
             report_payload = json.loads(report_path.read_text(encoding="utf-8"))
-            superiority = evaluate_superiority_report(report_payload)
+            from nexus.competitive_attestation import load_trust_policy
+
+            if not args.competitive_trust_policy:
+                raise ValueError("--competitive-trust-policy is required with --competitive-report")
+            trusted_keys, trusted_campaign = load_trust_policy(args.competitive_trust_policy)
+            superiority = evaluate_superiority_report(
+                report_payload,
+                trusted_evaluator_keys=trusted_keys,
+                trusted_campaign=trusted_campaign,
+            )
             superiority_payload = superiority.to_dict()
             superiority_ready = bool(superiority.qualified)
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
@@ -1656,7 +1800,9 @@ def _handle_deploy_check() -> bool:
         if not sandbox_ready:
             autonomous_blockers.append("target-host native sandbox behavioral qualification")
         if not superiority_ready:
-            autonomous_blockers.append("sealed private Nexus-vs-Claude Code superiority qualification")
+            autonomous_blockers.append(
+                "sealed private Noryx-vs-Claude Code superiority qualification"
+            )
 
     deployment_ready = autonomous_ready if args.mode == "autonomous" else ready
     payload = {
@@ -1710,7 +1856,7 @@ def _handle_architecture_health() -> bool:
     """Run the machine-enforced canonical-runtime and package-integrity gate."""
     if len(sys.argv) < 2 or sys.argv[1] != "architecture":
         return False
-    parser = argparse.ArgumentParser(prog="nexus architecture")
+    parser = argparse.ArgumentParser(prog="noryx architecture")
     sub = parser.add_subparsers(dest="command", required=True)
     check = sub.add_parser("check", help="validate canonical runtime and package imports")
     check.add_argument("--json", action="store_true", dest="as_json")
@@ -1723,7 +1869,7 @@ def _handle_architecture_health() -> bool:
     if args.as_json:
         print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
     else:
-        print("Nexus Architecture Health")
+        print("Noryx Architecture Health")
         print(f"status: {'PASS' if report.passed else 'FAIL'}")
         print(f"imports: {report.imported_modules}/{report.package_modules}")
         for item in report.checks:
@@ -1739,7 +1885,7 @@ def _handle_performance_and_release() -> bool:
     if len(sys.argv) < 2 or sys.argv[1] not in {"performance", "release"}:
         return False
     top = sys.argv[1]
-    parser = argparse.ArgumentParser(prog=f"nexus {top}")
+    parser = argparse.ArgumentParser(prog=f"noryx {top}")
     parser.add_argument("--json", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
     if top == "performance":
@@ -1817,9 +1963,13 @@ def _handle_performance_and_release() -> bool:
             evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             print(json.dumps({"status": "fail", "failures": [f"invalid_evidence:{exc}"]}, indent=2))
-            raise SystemExit(2)
+            raise SystemExit(2) from exc
         if not isinstance(evidence, dict):
-            print(json.dumps({"status": "fail", "failures": ["invalid_evidence:not_an_object"]}, indent=2))
+            print(
+                json.dumps(
+                    {"status": "fail", "failures": ["invalid_evidence:not_an_object"]}, indent=2
+                )
+            )
             raise SystemExit(2)
 
     architecture = run_architecture_health(root)
@@ -1832,7 +1982,9 @@ def _handle_performance_and_release() -> bool:
 
     rollback_evidence = evidence.get("rollback_plan") or {}
     rollback_version = args.rollback_version or str(rollback_evidence.get("safe_version") or "")
-    downgrade_tested = bool(args.downgrade_tested or rollback_evidence.get("downgrade_tested", False))
+    downgrade_tested = bool(
+        args.downgrade_tested or rollback_evidence.get("downgrade_tested", False)
+    )
     instructions = tuple(str(item) for item in rollback_evidence.get("instructions", ()))
 
     policies = {
@@ -1927,13 +2079,17 @@ def _handle_performance_and_release() -> bool:
         channel_policy=policies[args.channel],
         evidence_binding=dict(evidence.get("provenance") or {}),
         expected_source_sha256=source_tree_sha256(root),
-        evidence_root=str(Path(args.evidence).expanduser().resolve().parent) if args.evidence else "",
+        evidence_root=str(Path(args.evidence).expanduser().resolve().parent)
+        if args.evidence
+        else "",
     )
     payload = qualification.to_dict()
     payload["architecture_health"] = architecture.to_dict()
     payload["secret_scan_findings"] = list(secret_findings)
     if args.output:
-        Path(args.output).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        Path(args.output).write_text(
+            json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
     print(json.dumps(payload, indent=2, sort_keys=True))
     if payload["evaluation"]["status"] != "pass":
         raise SystemExit(2)
@@ -2221,10 +2377,17 @@ def handle_slash_command(cmd: str, agent: Agent) -> bool:
         elif len(trust_parts) == 2 and trust_parts[0] in ("approve", "reject"):
             target_path = Path(trust_parts[1]).expanduser().resolve()
             expected_digest = None
-            if target_path.name == "plugin.json" or (target_path.is_dir() and (target_path / "plugin.json").is_file()):
+            if target_path.name == "plugin.json" or (
+                target_path.is_dir() and (target_path / "plugin.json").is_file()
+            ):
                 from nexus.plugins.manifest import PluginManifest
                 from nexus.plugins.worker import compute_plugin_hash
-                manifest_file = target_path if target_path.name == "plugin.json" else target_path / "plugin.json"
+
+                manifest_file = (
+                    target_path
+                    if target_path.name == "plugin.json"
+                    else target_path / "plugin.json"
+                )
                 try:
                     manifest = PluginManifest.from_file(manifest_file)
                     expected_digest = compute_plugin_hash(manifest_file.parent, manifest)
@@ -2249,7 +2412,7 @@ def handle_slash_command(cmd: str, agent: Agent) -> bool:
     elif command == "/init":
         path = agent.project_mem.create_default_rules()
         ui.print_info(
-            f"Created {path}. Review it, then run /trust approve {path} before Nexus loads it."
+            f"Created {path}. Review it, then run /trust approve {path} before Noryx loads it."
         )
 
     elif command == "/context":
@@ -2290,7 +2453,9 @@ def handle_slash_command(cmd: str, agent: Agent) -> bool:
                 ui.console.print(f"  • {rule}")
 
     elif command == "/login":
-        ui.print_info("Nexus uses API keys directly (e.g., NVIDIA_API_KEY, GROQ_API_KEY). No login required.")
+        ui.print_info(
+            "Noryx uses API keys directly (e.g., NVIDIA_API_KEY, GROQ_API_KEY). No login required."
+        )
 
     elif command == "/logout":
         ui.print_info("Clear your API key environment variables to logout.")
@@ -2299,11 +2464,14 @@ def handle_slash_command(cmd: str, agent: Agent) -> bool:
         ui.print_info("To report a bug, please open an issue on the project repository.")
 
     elif command == "/terminal":
-        ui.print_info("Use '!<command>' to run terminal commands directly from Nexus (e.g., '!ls -la').")
-        
+        ui.print_info(
+            "Use '!<command>' to run terminal commands directly from Noryx (e.g., '!ls -la')."
+        )
+
     elif command == "/pr_comments":
         try:
             from nexus.github import GitHubIntegration
+
             pr_data = GitHubIntegration.view_pr(arg.strip())
             if not pr_data:
                 ui.print_error("No PR found for the current branch or invalid PR number.")
@@ -2312,11 +2480,13 @@ def handle_slash_command(cmd: str, agent: Agent) -> bool:
                 if not comments:
                     ui.print_info(f"No comments on PR #{pr_data.get('number')}.")
                 else:
-                    ui.console.print(f"💬 Comments for PR #{pr_data.get('number')} ({pr_data.get('title')}):")
+                    ui.console.print(
+                        f"💬 Comments for PR #{pr_data.get('number')} ({pr_data.get('title')}):"
+                    )
                     for c in comments:
-                        author = c.get('author', {}).get('login', 'Unknown')
+                        author = c.get("author", {}).get("login", "Unknown")
                         ui.console.print(f"\n[bold]{author}[/] said:")
-                        ui.console.print(c.get('body', ''))
+                        ui.console.print(c.get("body", ""))
         except Exception as e:
             ui.print_error(f"Failed to fetch PR comments: {e}")
 
@@ -2356,9 +2526,7 @@ def run_interactive(agent: Agent):
                     ui.print_error(f"Invalid command: {e}")
                     continue
                 result, success = agent._execute_tool_with_safety(
-                    "run_process", 
-                    {"argv": argv, "cwd": agent.working_dir},
-                    _user_initiated=True
+                    "run_process", {"argv": argv, "cwd": agent.working_dir}, _user_initiated=True
                 )
                 ui.print_tool_result(result, success)
                 continue
@@ -2537,13 +2705,11 @@ def _handle_plan_commands() -> bool:
             issues = engine.validate_canonical_plan_payload(data)
         except (OSError, ValueError, TypeError, KeyError) as exc:
             print(f"Error: invalid plan artifact: {exc}")
-            raise SystemExit(1)
+            raise SystemExit(1) from exc
         print(f"Validation completed with {len(issues)} issues:")
         for issue in issues:
             print(f"  [{issue['severity']}] {issue['code']}: {issue['message']}")
-        raise SystemExit(
-            1 if any(issue["severity"] == "ERROR" for issue in issues) else 0
-        )
+        raise SystemExit(1 if any(issue["severity"] == "ERROR" for issue in issues) else 0)
 
     task = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else "Task plan generation"
     output = engine.create_canonical_bundle(task)
@@ -2562,15 +2728,24 @@ def _handle_recovery_commands() -> bool:
 
     import json
     from pathlib import Path
+
     from nexus.recovery import (
         RollbackDecisionEngine,
         SessionResumptionEngine,
     )
 
     if subcmd == "status":
-        runs_dir = Path(os.getcwd()) / ".nexus" / "runs" / run_id
+        runs_dir = Path(os.getcwd()) / ".noryx" / "runs" / run_id
         if not runs_dir.exists():
-            print(json.dumps({"run_id": run_id, "status": "NOT_FOUND", "message": f"Run '{run_id}' not found."}))
+            print(
+                json.dumps(
+                    {
+                        "run_id": run_id,
+                        "status": "NOT_FOUND",
+                        "message": f"Run '{run_id}' not found.",
+                    }
+                )
+            )
             sys.exit(1)
         failures = list((runs_dir / "failures").glob("*.json"))
         diagnoses = list((runs_dir / "diagnoses").glob("*.json"))
@@ -2586,7 +2761,7 @@ def _handle_recovery_commands() -> bool:
         sys.exit(0)
 
     elif subcmd == "failures":
-        runs_dir = Path(os.getcwd()) / ".nexus" / "runs" / run_id / "failures"
+        runs_dir = Path(os.getcwd()) / ".noryx" / "runs" / run_id / "failures"
         if not runs_dir.exists():
             print(json.dumps([]))
             sys.exit(0)
@@ -2601,12 +2776,17 @@ def _handle_recovery_commands() -> bool:
 
     elif subcmd == "resume":
         status = SessionResumptionEngine.prepare_resume(run_id, os.getcwd())
-        print(json.dumps({
-            "run_id": status.run_id,
-            "can_resume": status.can_resume,
-            "last_checkpoint": status.last_checkpoint,
-            "summary": status.summary,
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "run_id": status.run_id,
+                    "can_resume": status.can_resume,
+                    "last_checkpoint": status.last_checkpoint,
+                    "summary": status.summary,
+                },
+                indent=2,
+            )
+        )
         sys.exit(0 if status.can_resume else 1)
 
     elif subcmd == "rollback":
@@ -2614,14 +2794,16 @@ def _handle_recovery_commands() -> bool:
         print(json.dumps({"run_id": run_id, "success": success, "detail": msg}, indent=2))
         sys.exit(0 if success else 1)
 
+
 def _handle_change_commands():
     if len(sys.argv) < 2 or sys.argv[1] != "change":
         return False
 
     import argparse
-    from nexus.cli_change import handle_change_command, add_change_subparsers
 
-    parser = argparse.ArgumentParser(prog="nexus")
+    from nexus.cli_change import add_change_subparsers, handle_change_command
+
+    parser = argparse.ArgumentParser(prog="noryx")
     subparsers = parser.add_subparsers(dest="subcommand")
     add_change_subparsers(subparsers)
 
@@ -2637,16 +2819,17 @@ def _handle_collaboration_commands() -> bool:
     if sub not in ("collaborate", "collaboration"):
         return False
 
+    import asyncio
     import json
     import uuid
-    import asyncio
     from pathlib import Path
+
     from nexus.collaboration import (
-        LeadOrchestrator,
         AgentAssignment,
         AgentRole,
-        CollaborationPolicyProfile,
         AssignmentScope,
+        CollaborationPolicyProfile,
+        LeadOrchestrator,
         WorkerBudget,
     )
     from nexus.collaboration.persistence import CollaborationPersistence
@@ -2655,7 +2838,7 @@ def _handle_collaboration_commands() -> bool:
 
     if sub == "collaborate":
         task_desc = sys.argv[2] if len(sys.argv) >= 3 else "Collaborative feature implementation"
-        print(f"\n[Nexus Collaboration Engine] Task: {task_desc}")
+        print(f"\n[Noryx Collaboration Engine] Task: {task_desc}")
 
         a1 = AgentAssignment(
             assignment_id="asgn-impl-01",
@@ -2685,7 +2868,7 @@ def _handle_collaboration_commands() -> bool:
             policy=CollaborationPolicyProfile.CONTROLLED_PARALLEL,
             lead_workspace_root=Path.cwd(),
             current_revision="main",
-            persistence_dir=Path.cwd() / ".nexus" / "runs" / run_id / "collaboration",
+            persistence_dir=Path.cwd() / ".noryx" / "runs" / run_id / "collaboration",
         )
 
         final_state = asyncio.run(orchestrator.run_collaboration([a1, a2]))
@@ -2696,8 +2879,12 @@ def _handle_collaboration_commands() -> bool:
             "mode": final_state.mode.value,
             "state": final_state.state.value,
             "assignments_count": len(final_state.assignments),
-            "integrated": list(final_state.integration_result.integrated_assignments) if final_state.integration_result else [],
-            "integrated_tree": final_state.integration_result.integrated_tree if final_state.integration_result else None,
+            "integrated": list(final_state.integration_result.integrated_assignments)
+            if final_state.integration_result
+            else [],
+            "integrated_tree": final_state.integration_result.integrated_tree
+            if final_state.integration_result
+            else None,
             "verification_passed": final_state.state.value == "completed",
         }
         print("\nCollaboration Summary:")
@@ -2708,19 +2895,24 @@ def _handle_collaboration_commands() -> bool:
         action = sys.argv[2].lower()
         target_run_id = sys.argv[3] if len(sys.argv) >= 4 else "latest"
 
-        pdir = Path.cwd() / ".nexus" / "runs" / target_run_id / "collaboration"
+        pdir = Path.cwd() / ".noryx" / "runs" / target_run_id / "collaboration"
         persistence = CollaborationPersistence(pdir)
 
         if action == "status":
             state = persistence.load()
             if state:
-                print(json.dumps({
-                    "run_id": state.run_id,
-                    "collaboration_id": state.collaboration_id,
-                    "state": state.state.value,
-                    "mode": state.mode.value,
-                    "assignments": list(state.assignments.keys()),
-                }, indent=2))
+                print(
+                    json.dumps(
+                        {
+                            "run_id": state.run_id,
+                            "collaboration_id": state.collaboration_id,
+                            "state": state.state.value,
+                            "mode": state.mode.value,
+                            "assignments": list(state.assignments.keys()),
+                        },
+                        indent=2,
+                    )
+                )
             else:
                 print(json.dumps({"run_id": target_run_id, "status": "NO_RECORD_FOUND"}, indent=2))
             sys.exit(0)
@@ -2728,75 +2920,77 @@ def _handle_collaboration_commands() -> bool:
         elif action == "assignments":
             state = persistence.load()
             if state:
-                print(json.dumps({
-                    "run_id": state.run_id,
-                    "assignments": [
+                print(
+                    json.dumps(
                         {
-                            "id": a.assignment_id,
-                            "role": a.role.value,
-                            "objective": a.objective,
-                            "dependencies": list(a.dependencies),
-                        }
-                        for a in state.assignments.values()
-                    ],
-                }, indent=2))
+                            "run_id": state.run_id,
+                            "assignments": [
+                                {
+                                    "id": a.assignment_id,
+                                    "role": a.role.value,
+                                    "objective": a.objective,
+                                    "dependencies": list(a.dependencies),
+                                }
+                                for a in state.assignments.values()
+                            ],
+                        },
+                        indent=2,
+                    )
+                )
             else:
                 print(json.dumps({"run_id": target_run_id, "assignments": []}, indent=2))
             sys.exit(0)
 
         elif action == "conflicts":
             state = persistence.load()
-            conflicts = list(state.integration_result.conflicts) if (state and state.integration_result) else []
+            conflicts = (
+                list(state.integration_result.conflicts)
+                if (state and state.integration_result)
+                else []
+            )
             print(json.dumps({"run_id": target_run_id, "conflicts": conflicts}, indent=2))
             sys.exit(0)
 
         elif action in ("resume", "cancel"):
-            print(json.dumps({"run_id": target_run_id, "action": action, "status": "COMPLETED"}, indent=2))
+            print(
+                json.dumps(
+                    {"run_id": target_run_id, "action": action, "status": "COMPLETED"}, indent=2
+                )
+            )
             sys.exit(0)
 
     return False
 
 
+def _dispatch_preparse_commands() -> bool:
+    """Run exact subcommands before the general interactive parser."""
+    handlers = (
+        _handle_collaboration_commands,
+        _handle_change_commands,
+        _handle_workspace_commands,
+        _handle_recovery_commands,
+        _handle_plan_commands,
+        _handle_extensions,
+        _handle_mcp,
+        _handle_enterprise,
+        _handle_autonomy_project,
+        _handle_proof,
+        _handle_engineering_intelligence,
+        _handle_deploy_check,
+        _handle_architecture_health,
+        _handle_performance_and_release,
+        _handle_run_management,
+        _handle_generate_dashboard,
+        _handle_sandbox_qualification,
+        _handle_benchmark,
+    )
+    return any(handler() for handler in handlers)
+
+
 def main():
     _configure_output_streams()
     _prepare_fix_command()
-    if _handle_collaboration_commands():
-        return
-    if _handle_change_commands():
-        return
-    if _handle_workspace_commands():
-        return
-    if _handle_recovery_commands():
-        return
-    if _handle_plan_commands():
-        return
-    if _handle_extensions():
-        return
-    if _handle_mcp():
-        return
-    if _handle_enterprise():
-        return
-    if _handle_autonomy_project():
-        return
-    if _handle_proof():
-        return
-    if _handle_engineering_intelligence():
-        return
-    if _handle_deploy_check():
-        return
-    if _handle_architecture_health():
-        return
-    if _handle_performance_and_release():
-        return
-    if _handle_run_management():
-        return
-    if _handle_workspace_commands():
-        return
-    if _handle_generate_dashboard():
-        return
-    if _handle_sandbox_qualification():
-        return
-    if _handle_benchmark():
+    if _dispatch_preparse_commands():
         return
     _solve_issue_prompt()
     _reject_unknown_subcommand()
@@ -2878,14 +3072,16 @@ def main():
     # Sprint 9 Subcommands: nexus models, nexus model ..., nexus budget ..., nexus cost ...
     if len(sys.argv) >= 2 and sys.argv[1].lower() in ("models", "model", "budget", "cost"):
         sub = sys.argv[1].lower()
-        from nexus.models import model_registry
-        from nexus.model_doctor import model_doctor
         from nexus.cost_accounting import cost_ledger
+        from nexus.model_doctor import model_doctor
+        from nexus.models import model_registry
 
         if sub == "models":
             descriptors = model_registry.list_all()
             print("\nRegistered Model Intelligence Matrix:")
-            print(f"{'Key/ID':<25} {'Name':<28} {'Tier':<12} {'Privacy':<15} {'Context':<10} {'Cost (USD/1M)':<16} {'Cost (INR/1M)':<16}")
+            print(
+                f"{'Key/ID':<25} {'Name':<28} {'Tier':<12} {'Privacy':<15} {'Context':<10} {'Cost (USD/1M)':<16} {'Cost (INR/1M)':<16}"
+            )
             print("-" * 125)
             for d in descriptors:
                 in_usd = d.input_cost if d.input_cost is not None else 0.0
@@ -2895,7 +3091,9 @@ def main():
                 cost_str = f"${in_usd:.2f} / ${out_usd:.2f}"
                 inr_str = f"₹{in_inr:.1f} / ₹{out_inr:.1f}"
                 key_name = model_registry.resolve_key(d.model_id) or d.model_id
-                print(f"{key_name:<25} {d.display_name:<28} {d.tier.value:<12} {d.privacy_class.value:<15} {d.context_window or 0:<10} {cost_str:<16} {inr_str:<16}")
+                print(
+                    f"{key_name:<25} {d.display_name:<28} {d.tier.value:<12} {d.privacy_class.value:<15} {d.context_window or 0:<10} {cost_str:<16} {inr_str:<16}"
+                )
             sys.exit(0)
 
         elif sub == "model" and len(sys.argv) >= 3:
@@ -2907,7 +3105,15 @@ def main():
                     print(f"Model '{target}' not found in registry.")
                     sys.exit(1)
                 profile = model_doctor.get_profile(target)
-                print(json.dumps({"descriptor": desc.to_dict(), "capability_profile": profile.to_dict() if profile else None}, indent=2))
+                print(
+                    json.dumps(
+                        {
+                            "descriptor": desc.to_dict(),
+                            "capability_profile": profile.to_dict() if profile else None,
+                        },
+                        indent=2,
+                    )
+                )
                 sys.exit(0)
             elif action == "doctor" and len(sys.argv) >= 4:
                 target = sys.argv[3]
@@ -2923,15 +3129,35 @@ def main():
                 sys.exit(0)
 
         elif sub == "budget":
-            run_id = sys.argv[3] if len(sys.argv) >= 4 and sys.argv[2].lower() == "show" else (sys.argv[2] if len(sys.argv) >= 3 and sys.argv[2].lower() != "show" else None)
+            run_id = (
+                sys.argv[3]
+                if len(sys.argv) >= 4 and sys.argv[2].lower() == "show"
+                else (sys.argv[2] if len(sys.argv) >= 3 and sys.argv[2].lower() != "show" else None)
+            )
             snap = cost_ledger.snapshot(run_id)
             print(json.dumps({"budget_summary": snap}, indent=2))
             sys.exit(0)
 
         elif sub == "cost":
-            run_id = sys.argv[3] if len(sys.argv) >= 4 and sys.argv[2].lower() == "show" else (sys.argv[2] if len(sys.argv) >= 3 and sys.argv[2].lower() != "show" else None)
+            run_id = (
+                sys.argv[3]
+                if len(sys.argv) >= 4 and sys.argv[2].lower() == "show"
+                else (sys.argv[2] if len(sys.argv) >= 3 and sys.argv[2].lower() != "show" else None)
+            )
             snap = cost_ledger.snapshot(run_id)
-            print(json.dumps({"cost_ledger": snap, "entries": [e.to_dict() for e in cost_ledger.entries if run_id is None or e.run_id == run_id]}, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "cost_ledger": snap,
+                        "entries": [
+                            e.to_dict()
+                            for e in cost_ledger.entries
+                            if run_id is None or e.run_id == run_id
+                        ],
+                    },
+                    indent=2,
+                )
+            )
             sys.exit(0)
 
     # List models and exit
@@ -2968,9 +3194,10 @@ def main():
                 allow_unisolated_host_process=True,
             )
             result, success = agent._execute_tool_with_safety(
-                "run_process", {"argv": argv, "cwd": agent.working_dir},
+                "run_process",
+                {"argv": argv, "cwd": agent.working_dir},
                 _user_initiated=True,
-                _user_confirmed=args.confirm_danger
+                _user_confirmed=args.confirm_danger,
             )
             if not args.confirm_danger and "⏸️ PENDING_CONFIRMATION" in result:
                 result = (
@@ -2995,8 +3222,6 @@ def main():
             ui.print_error(str(exc))
             sys.exit(2)
 
-
-
     # Validate model
     model_cfg = resolve_model(args.model)
     if not model_cfg:
@@ -3011,7 +3236,7 @@ def main():
     api_key = args.api_key or os.environ.get("NVIDIA_API_KEY")
     has_hosted_key = bool(
         api_key
-        or os.environ.get("NEXUS_OPENAI_API_KEY")
+        or noryx_env("OPENAI_API_KEY")
         or os.environ.get("GROQ_API_KEY")
         or os.environ.get("OPENROUTER_API_KEY")
     )
@@ -3027,9 +3252,9 @@ def main():
             f"\n    [bold {ui.GREEN}]export GROQ_API_KEY=gsk-your-key-here[/]"
             f"\n    [bold {ui.GREEN}]export OPENROUTER_API_KEY=sk-or-your-key-here[/]"
             f"\n\n  [{ui.WHITE}]For a custom OpenAI-compatible endpoint:[/]"
-            f"\n    [bold {ui.GREEN}]export NEXUS_OPENAI_BASE_URL=https://provider.example/v1[/]"
-            f"\n    [bold {ui.GREEN}]export NEXUS_OPENAI_API_KEY=your-key[/]"
-            f"\n    [bold {ui.GREEN}]nexus --model custom --model-id provider/model[/]\n"
+            f"\n    [bold {ui.GREEN}]export NORYX_OPENAI_BASE_URL=https://provider.example/v1[/]"
+            f"\n    [bold {ui.GREEN}]export NORYX_OPENAI_API_KEY=your-key[/]"
+            f"\n    [bold {ui.GREEN}]noryx --model custom --model-id provider/model[/]\n"
         )
         sys.exit(1)
 

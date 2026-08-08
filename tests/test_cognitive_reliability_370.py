@@ -5,12 +5,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 from nexus.competitive_benchmark import CompetitiveDuelRunner
 from nexus.intelligence.deliberation import DeliberationCompiler
 from nexus.intelligence.repository.adaptive import AdaptiveContextSelector
-from nexus.intelligence.repository.model import ContextCandidate, RepositoryFile, RepositorySymbol, RiskLevel
+from nexus.intelligence.repository.model import (
+    ContextCandidate,
+    RepositoryFile,
+    RepositorySymbol,
+    RiskLevel,
+)
 from nexus.multifile.orchestrator import MultiFileOrchestrator
 from nexus.recovery.intelligent import RecoveryAction, RecoveryStateMachine
 from nexus.runtime.process_state import ProcessStateRegistry, reset_process_state
@@ -19,8 +22,12 @@ from nexus.runtime.process_state import ProcessStateRegistry, reset_process_stat
 def test_deliberation_compiles_falsifiable_concurrency_contract():
     contract = DeliberationCompiler.compile(
         "Fix the authentication race in src/session.py without changing the public API",
-        task_type="bug_repair", risk_level="high", context_tree_hash="abc",
-        decisive_files=["src/session.py"], related_tests=["tests/test_session.py"], symbols=["commit_session"],
+        task_type="bug_repair",
+        risk_level="high",
+        context_tree_hash="abc",
+        decisive_files=["src/session.py"],
+        related_tests=["tests/test_session.py"],
+        symbols=["commit_session"],
     )
     assert contract.hypotheses
     assert any("atomic" in item.statement.lower() for item in contract.hypotheses)
@@ -32,17 +39,33 @@ def test_deliberation_compiles_falsifiable_concurrency_contract():
 def test_adaptive_context_propagates_callers_tests_and_dependencies(tmp_path):
     files = {
         "src/session.py": RepositoryFile(
-            "src/session.py", size_bytes=100, imports=["src.store"],
-            symbols=[RepositorySymbol(name="commit_session", kind="function", file_path="src/session.py", line=1)],
+            "src/session.py",
+            size_bytes=100,
+            imports=["src.store"],
+            symbols=[
+                RepositorySymbol(
+                    name="commit_session", kind="function", file_path="src/session.py", line=1
+                )
+            ],
             risk_level=RiskLevel.HIGH,
         ),
         "src/store.py": RepositoryFile("src/store.py", size_bytes=80),
-        "src/api.py": RepositoryFile("src/api.py", size_bytes=80, imports=["src.session"], references=["commit_session"]),
-        "tests/test_session.py": RepositoryFile("tests/test_session.py", size_bytes=80, imports=["src.session"], references=["commit_session"], test_file=True),
+        "src/api.py": RepositoryFile(
+            "src/api.py", size_bytes=80, imports=["src.session"], references=["commit_session"]
+        ),
+        "tests/test_session.py": RepositoryFile(
+            "tests/test_session.py",
+            size_bytes=80,
+            imports=["src.session"],
+            references=["commit_session"],
+            test_file=True,
+        ),
         "pyproject.toml": RepositoryFile("pyproject.toml", size_bytes=80, config_file=True),
     }
     seed = ContextCandidate("src/session.py", "exact", "seed", 1.0, 25, RiskLevel.HIGH, score=100)
-    selection = AdaptiveContextSelector(tmp_path, files).select("fix session race", [seed], max_candidates=8)
+    selection = AdaptiveContextSelector(tmp_path, files).select(
+        "fix session race", [seed], max_candidates=8
+    )
     paths = {item.path for item in selection.candidates}
     assert {"src/session.py", "src/store.py", "src/api.py", "tests/test_session.py"}.issubset(paths)
     assert "tests/test_session.py" in selection.coverage.related_tests
@@ -57,13 +80,20 @@ def test_multifile_completion_contract_blocks_partial_work(tmp_path):
             "src/b.py": RepositoryFile("src/b.py"),
             "tests/test_a.py": RepositoryFile("tests/test_a.py", test_file=True),
         }
+
     contract = MultiFileOrchestrator.derive(
         "Fix src/a.py and src/b.py and add regression tests",
-        repository=Repo(), decisive_files=["src/a.py", "src/b.py"], callers=["src/b.py"],
-        related_tests=["tests/test_a.py"], explicit_files=["src/a.py", "src/b.py"],
-        task_type="bug_repair", risk_level="high",
+        repository=Repo(),
+        decisive_files=["src/a.py", "src/b.py"],
+        callers=["src/b.py"],
+        related_tests=["tests/test_a.py"],
+        explicit_files=["src/a.py", "src/b.py"],
+        task_type="bug_repair",
+        risk_level="high",
     )
-    partial = contract.assess(inspected_files=["src/a.py"], changed_files=["src/a.py"], verified_files=[])
+    partial = contract.assess(
+        inspected_files=["src/a.py"], changed_files=["src/a.py"], verified_files=[]
+    )
     assert not partial.complete
     assert "src/b.py" in partial.missing_inspection
     assert "src/b.py" in partial.missing_changes
@@ -100,7 +130,9 @@ def test_recovery_evidence_delta_resets_stagnation():
 
 
 def test_process_registry_terminates_registered_child():
-    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True)
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True
+    )
     ProcessStateRegistry.register_process(process)
     reset_process_state(strict=True)
     assert process.poll() is not None
@@ -131,21 +163,57 @@ def _make_duel_fixture(tmp_path: Path, *, broken_agent: str | None = None) -> Pa
     manifest = {
         "trials": 1,
         "agents": {
-            "nexus": {"argv": [sys.executable, str(scripts["nexus"])], "version_argv": [sys.executable, "--version"]},
-            "claude": {"argv": [sys.executable, str(scripts["claude"])], "version_argv": [sys.executable, "--version"]},
+            "nexus": {
+                "argv": [sys.executable, str(scripts["nexus"])],
+                "version_argv": [sys.executable, "--version"],
+            },
+            "claude": {
+                "argv": [sys.executable, str(scripts["claude"])],
+                "version_argv": [sys.executable, "--version"],
+            },
         },
-        "tasks": [{
-            "id": "hidden", "repository": str(repo), "prompt": "Fix the hidden defect",
-            "oracle_dir": ".oracle", "allowed_paths": ["src/**"],
-            "verification": [[sys.executable, ".oracle/verify.py"]],
-        }],
+        "tasks": [
+            {
+                "id": "hidden",
+                "repository": str(repo),
+                "prompt": "Fix the hidden defect",
+                "oracle_dir": ".oracle",
+                "allowed_paths": ["src/**"],
+                "verification": [[sys.executable, ".oracle/verify.py"]],
+            }
+        ],
     }
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(manifest))
     return path
 
 
-def test_blind_duel_uses_hidden_oracle_and_matched_scoring(tmp_path):
+def _mock_isolated_candidate(monkeypatch):
+    from nexus.competitive_benchmark import _run_captured_process
+    from nexus.sandbox import CommandResult, SandboxBackend, SandboxRunner
+
+    def run(_runner, spec):
+        captured = _run_captured_process(
+            spec.argv, cwd=Path(spec.cwd), timeout=spec.timeout_seconds, env=spec.env
+        )
+        return CommandResult(
+            argv=list(spec.argv),
+            cwd=spec.cwd,
+            backend=SandboxBackend.BUBBLEWRAP,
+            success=captured.returncode == 0 and not captured.timed_out,
+            exit_code=captured.returncode,
+            stdout=captured.stdout,
+            stderr=captured.stderr,
+            timed_out=captured.timed_out,
+            network_allowed=False,
+            network_enforced=True,
+        )
+
+    monkeypatch.setattr(SandboxRunner, "run", run)
+
+
+def test_blind_duel_uses_hidden_oracle_and_matched_scoring(tmp_path, monkeypatch):
+    _mock_isolated_candidate(monkeypatch)
     report = CompetitiveDuelRunner(_make_duel_fixture(tmp_path), seed=7).run()
     assert report.summary["valid_pairs"] == 1
     assert all(item["verified"] for item in report.task_results[0]["results"])
@@ -153,7 +221,8 @@ def test_blind_duel_uses_hidden_oracle_and_matched_scoring(tmp_path):
     assert report.summary["parity_claim_supported"] is False
 
 
-def test_blind_duel_detects_false_success(tmp_path):
+def test_blind_duel_detects_false_success(tmp_path, monkeypatch):
+    _mock_isolated_candidate(monkeypatch)
     report = CompetitiveDuelRunner(_make_duel_fixture(tmp_path, broken_agent="nexus"), seed=7).run()
     nexus = next(item for item in report.task_results[0]["results"] if item["agent"] == "nexus")
     assert nexus["claimed_success"]
@@ -191,8 +260,12 @@ def test_restricted_sandbox_never_claims_native_autonomy(tmp_path, monkeypatch):
             evidence={},
         )
 
-    monkeypatch.setattr(qualifier, "_workspace_write", lambda backend: probe("workspace_write_allowed"))
-    monkeypatch.setattr(qualifier, "_timeout", lambda backend: probe("timeout_terminates_process_group"))
+    monkeypatch.setattr(
+        qualifier, "_workspace_write", lambda backend: probe("workspace_write_allowed")
+    )
+    monkeypatch.setattr(
+        qualifier, "_timeout", lambda backend: probe("timeout_terminates_process_group")
+    )
     monkeypatch.setattr(qualifier, "_outside_read", lambda backend: probe("outside_read_denied"))
     monkeypatch.setattr(qualifier, "_outside_write", lambda backend: probe("outside_write_denied"))
     monkeypatch.setattr(qualifier, "_network_denied", lambda backend: probe("network_denied"))
@@ -228,14 +301,20 @@ def test_strong_sandbox_requires_all_behavioral_probes(tmp_path, monkeypatch):
             evidence={},
         )
 
-    monkeypatch.setattr(qualifier, "_workspace_write", lambda backend: probe("workspace_write_allowed"))
-    monkeypatch.setattr(qualifier, "_timeout", lambda backend: probe("timeout_terminates_process_group"))
+    monkeypatch.setattr(
+        qualifier, "_workspace_write", lambda backend: probe("workspace_write_allowed")
+    )
+    monkeypatch.setattr(
+        qualifier, "_timeout", lambda backend: probe("timeout_terminates_process_group")
+    )
     monkeypatch.setattr(qualifier, "_outside_read", lambda backend: probe("outside_read_denied"))
     monkeypatch.setattr(qualifier, "_outside_write", lambda backend: probe("outside_write_denied"))
     monkeypatch.setattr(qualifier, "_network_denied", lambda backend: probe("network_denied"))
     assert qualifier.qualify().autonomous_ready
 
-    monkeypatch.setattr(qualifier, "_network_denied", lambda backend: probe("network_denied", False))
+    monkeypatch.setattr(
+        qualifier, "_network_denied", lambda backend: probe("network_denied", False)
+    )
     degraded = qualifier.qualify()
     assert degraded.filesystem_isolation
     assert not degraded.network_isolation
@@ -244,10 +323,10 @@ def test_strong_sandbox_requires_all_behavioral_probes(tmp_path, monkeypatch):
 
 
 def test_high_risk_prior_only_model_requires_approval(monkeypatch):
+    import nexus.model_router as router_module
     from nexus.model_doctor import CapabilityBand, CapabilityProfile, CapabilityScore
     from nexus.model_router import EngineeringPhase, ModelRouter
     from nexus.models import ModelDescriptor, ModelTier, PrivacyClass
-    import nexus.model_router as router_module
 
     descriptor = ModelDescriptor(
         model_id="test/prior-only",

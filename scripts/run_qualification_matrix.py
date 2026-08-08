@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Resumable isolated test matrix for Nexus release qualification.
+"""Resumable isolated test matrix for Noryx release qualification.
 
 Examples:
     python scripts/run_qualification_matrix.py prepare --shards 12
     python scripts/run_qualification_matrix.py shard 1 --shards 12
     python scripts/run_qualification_matrix.py aggregate --shards 12
 
-Each numbered shard has a separate HOME, Nexus state directory, JUnit report,
+Each numbered shard has a separate HOME, Noryx state directory, JUnit report,
 log, and branch-coverage database. Interrupted qualification can resume without
 re-running completed shards.
 """
@@ -162,7 +162,9 @@ def aggregate(count: int) -> None:
     expected_coverage = [ROOT / f".coverage.release-{index:03d}" for index in range(1, count + 1)]
     missing_junit = [str(path) for path in expected_junit if not path.is_file()]
     if missing_junit:
-        raise RuntimeError("qualification matrix is missing JUnit evidence: " + ", ".join(missing_junit))
+        raise RuntimeError(
+            "qualification matrix is missing JUnit evidence: " + ", ".join(missing_junit)
+        )
 
     env = dict(os.environ)
     combined_coverage = ROOT / ".coverage"

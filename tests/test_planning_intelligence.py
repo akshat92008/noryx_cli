@@ -1,25 +1,21 @@
 """Comprehensive Unit Test Suite for Sprint 6 Planning Intelligence Subsystem."""
 
-import pytest
-from pathlib import Path
-from nexus.planning.task_contract import (
-    TaskContract, Requirement, RequirementSource, TaskType, RiskLevel, Question, Assumption
-)
+from nexus.planning.acceptance import AcceptanceEngine
 from nexus.planning.ambiguity import AmbiguityEngine
-from nexus.planning.engineering_plan import (
-    EngineeringPlan, PlanStep, ActionType, Hypothesis, HypothesisStatus
-)
-from nexus.planning.acceptance import AcceptanceEngine, VerificationType
-from nexus.planning.validator import DeterministicValidator, IssueSeverity
-from nexus.planning.graph import PlanDependencyGraph
-from nexus.planning.scope import ScopeEstimator
-from nexus.planning.risk import RiskAssessor
-from nexus.planning.cost import CostEstimator
-from nexus.planning.critic import PlanCritic, CritiqueDecision
-from nexus.planning.execution_contract import ExecutionContractGenerator
-from nexus.planning.replanner import PlanReplanner
-from nexus.planning.policies import PlanningPolicyRegistry
+from nexus.planning.critic import CritiqueDecision, PlanCritic
 from nexus.planning.engine import PlanningEngine
+from nexus.planning.engineering_plan import ActionType, EngineeringPlan, PlanStep
+from nexus.planning.execution_contract import ExecutionContractGenerator
+from nexus.planning.graph import PlanDependencyGraph
+from nexus.planning.replanner import PlanReplanner
+from nexus.planning.task_contract import (
+    Requirement,
+    RequirementSource,
+    RiskLevel,
+    TaskContract,
+    TaskType,
+)
+from nexus.planning.validator import DeterministicValidator, IssueSeverity
 
 
 def test_task_contract_serialization():
@@ -27,14 +23,14 @@ def test_task_contract_serialization():
         id="REQ-1",
         statement="Fix bug in context manager",
         source=RequirementSource.EXPLICIT_USER,
-        mandatory=True
+        mandatory=True,
     )
     contract = TaskContract(
         raw_user_request="Fix bug in context manager",
         normalized_objective="Fix bug in context manager",
         task_type=TaskType.BUG_REPAIR,
         mandatory_requirements=[req],
-        risk_level=RiskLevel.LOW
+        risk_level=RiskLevel.LOW,
     )
     data = contract.to_dict()
     restored = TaskContract.from_dict(data)
@@ -46,11 +42,11 @@ def test_task_contract_serialization():
 
 def test_ambiguity_engine():
     engine = AmbiguityEngine()
-    
+
     # Destructive action -> blocking question
     questions, assumptions = engine.analyze("delete all tables from database")
     assert any(q.is_blocking for q in questions)
-    
+
     # Simple request -> non-blocking assumptions
     questions, assumptions = engine.analyze("add helper method in utils")
     assert not any(q.is_blocking for q in questions)
@@ -64,14 +60,9 @@ def test_acceptance_criteria_engine():
     assert not engine.is_vague("All unit tests in test_auth.py pass cleanly")
 
     req = Requirement(
-        id="REQ-1",
-        statement="All auth tests pass",
-        source=RequirementSource.EXPLICIT_USER
+        id="REQ-1", statement="All auth tests pass", source=RequirementSource.EXPLICIT_USER
     )
-    contract = TaskContract(
-        raw_user_request="All auth tests pass",
-        mandatory_requirements=[req]
-    )
+    contract = TaskContract(raw_user_request="All auth tests pass", mandatory_requirements=[req])
     criteria = engine.generate_criteria(contract, {"tests": ["tests/test_auth.py"]})
     assert len(criteria) >= 1
     assert criteria[0].verification.target_path == "tests/test_auth.py"
@@ -79,7 +70,7 @@ def test_acceptance_criteria_engine():
 
 def test_deterministic_validator():
     validator = DeterministicValidator()
-    
+
     # Valid plan
     step1 = PlanStep(
         step_id="step-1",
@@ -87,11 +78,10 @@ def test_deterministic_validator():
         objective="Inspect code",
         action_type=ActionType.INSPECT,
         completion_condition="Inspected successfully",
-        verification_method="Visual review"
+        verification_method="Visual review",
     )
     plan = EngineeringPlan(
-        steps=[step1],
-        acceptance_criteria=[{"id": "AC-1", "statement": "passes"}]
+        steps=[step1], acceptance_criteria=[{"id": "AC-1", "statement": "passes"}]
     )
     issues = validator.validate(plan)
     assert not any(i.severity == IssueSeverity.ERROR for i in issues)
@@ -103,21 +93,48 @@ def test_deterministic_validator():
 
 
 def test_plan_dependency_graph():
-    step1 = PlanStep(step_id="step-1", title="Step 1", objective="o1", completion_condition="c1", verification_method="v1")
-    step2 = PlanStep(step_id="step-2", title="Step 2", objective="o2", dependencies=["step-1"], completion_condition="c2", verification_method="v2")
-    
+    step1 = PlanStep(
+        step_id="step-1",
+        title="Step 1",
+        objective="o1",
+        completion_condition="c1",
+        verification_method="v1",
+    )
+    step2 = PlanStep(
+        step_id="step-2",
+        title="Step 2",
+        objective="o2",
+        dependencies=["step-1"],
+        completion_condition="c2",
+        verification_method="v2",
+    )
+
     plan = EngineeringPlan(steps=[step1, step2])
     graph = PlanDependencyGraph(plan)
-    
+
     assert graph.detect_cycles() == []
     order = graph.get_execution_order()
     assert [s.step_id for s in order] == ["step-1", "step-2"]
 
 
 def test_plan_dependency_graph_cycle():
-    step1 = PlanStep(step_id="step-1", title="Step 1", objective="o1", dependencies=["step-2"], completion_condition="c1", verification_method="v1")
-    step2 = PlanStep(step_id="step-2", title="Step 2", objective="o2", dependencies=["step-1"], completion_condition="c2", verification_method="v2")
-    
+    step1 = PlanStep(
+        step_id="step-1",
+        title="Step 1",
+        objective="o1",
+        dependencies=["step-2"],
+        completion_condition="c1",
+        verification_method="v1",
+    )
+    step2 = PlanStep(
+        step_id="step-2",
+        title="Step 2",
+        objective="o2",
+        dependencies=["step-1"],
+        completion_condition="c2",
+        verification_method="v2",
+    )
+
     plan = EngineeringPlan(steps=[step1, step2])
     graph = PlanDependencyGraph(plan)
     cycles = graph.detect_cycles()
@@ -132,12 +149,12 @@ def test_plan_critic():
         objective="Edit code",
         action_type=ActionType.MUTATE,
         completion_condition="Code edited",
-        verification_method="Run test"
+        verification_method="Run test",
     )
     plan = EngineeringPlan(
         steps=[step1],
         acceptance_criteria=[{"id": "AC-1", "statement": "passes"}],
-        verification_strategy={"command": "pytest"}
+        verification_strategy={"command": "pytest"},
     )
     critique = critic.critique(plan)
     assert critique.decision in (CritiqueDecision.APPROVE, CritiqueDecision.APPROVE_WITH_WARNINGS)
@@ -153,12 +170,12 @@ def test_execution_contract_generator():
         intended_targets=["nexus/planner.py"],
         allowed_tools=["replace_file_content"],
         completion_condition="Mutated",
-        verification_method="pytest"
+        verification_method="pytest",
     )
     plan = EngineeringPlan(
         steps=[step1],
         affected_scope=["nexus/planner.py"],
-        acceptance_criteria=[{"id": "AC-1", "mandatory": True}]
+        acceptance_criteria=[{"id": "AC-1", "mandatory": True}],
     )
     contract = generator.generate(plan)
     assert contract.is_tool_allowed("replace_file_content")
@@ -168,7 +185,13 @@ def test_execution_contract_generator():
 
 def test_plan_replanner_loop_prevention():
     replanner = PlanReplanner(max_revisions=3)
-    step1 = PlanStep(step_id="step-1", title="Step 1", objective="o1", completion_condition="c1", verification_method="v1")
+    step1 = PlanStep(
+        step_id="step-1",
+        title="Step 1",
+        objective="o1",
+        completion_condition="c1",
+        verification_method="v1",
+    )
     plan = EngineeringPlan(steps=[step1], version=1)
 
     # First revision -> succeeds
@@ -186,7 +209,9 @@ def test_planning_engine_end_to_end(tmp_path):
     contract = engine.interpret_task("Fix bug in context_manager.py")
     assert contract.task_type == TaskType.BUG_REPAIR
 
-    plan = engine.create_engineering_plan(contract, {"relevant_files": ["nexus/context_manager.py"]})
+    plan = engine.create_engineering_plan(
+        contract, {"relevant_files": ["nexus/context_manager.py"]}
+    )
     assert len(plan.steps) == 3
 
     critique, exec_contract = engine.critique_and_finalize(plan, contract)

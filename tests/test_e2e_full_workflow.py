@@ -116,6 +116,7 @@ class FullFakeProvider(Provider):
             "independent, read-only senior code reviewer" in str(message.get("content", ""))
             for message in messages
         ):
+
             class ReviewMessage:
                 content = (
                     '{"approved": true, "summary": "The targeted fix is correct and the '
@@ -154,8 +155,7 @@ def test_full_autonomous_agent_workflow(tmp_path, monkeypatch):
     repo_dir.mkdir()
 
     (repo_dir / "pyproject.toml").write_text(
-        "[project]\nname='e2e-math'\nversion='0.0.0'\n"
-        "[tool.pytest.ini_options]\ntestpaths=['.']\n",
+        "[project]\nname='e2e-math'\nversion='0.0.0'\n[tool.pytest.ini_options]\ntestpaths=['.']\n",
         encoding="utf-8",
     )
 
@@ -276,4 +276,3 @@ def test_full_autonomous_agent_workflow(tmp_path, monkeypatch):
     # VERIFIED completion applies the isolated worktree through the normal
     # product path. The source repository must contain the tested mutation.
     assert "return a + b" in math_py.read_text(encoding="utf-8")
-

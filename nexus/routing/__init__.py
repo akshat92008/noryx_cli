@@ -1,4 +1,4 @@
-"""Routing primitives used by Nexus planning and collaboration layers."""
+"""Routing primitives used by Noryx planning and collaboration layers."""
 
 from nexus.routing.models import ModelTier
 

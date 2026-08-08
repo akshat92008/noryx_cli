@@ -1,4 +1,4 @@
-"""Structured repository permissions loaded from ``.nexus/policies.yml``."""
+"""Structured repository permissions loaded from ``.noryx/policies.yml``."""
 
 from __future__ import annotations
 
@@ -181,7 +181,14 @@ DEFAULT_DECISIONS = {
 class PolicyLoader:
     """Parse JSON or the documented conservative YAML subset."""
 
-    FILENAMES = (".nexus/policies.yml", ".nexus/policies.yaml", ".nexus/policies.json")
+    FILENAMES = (
+        ".noryx/policies.yml",
+        ".noryx/policies.yaml",
+        ".noryx/policies.json",
+        ".noryx/policies.yml",
+        ".noryx/policies.yaml",
+        ".noryx/policies.json",
+    )
 
     def __init__(self, root: str | Path, is_trusted=None):
         self.root = Path(root).expanduser().resolve()
@@ -245,8 +252,14 @@ class PolicyLoader:
             for value in values:
                 rule = CapabilityRule.parse(decision, str(value))
                 if not trusted:
-                    default_decision = DEFAULT_DECISIONS.get(rule.capability, PermissionDecision.ASK)
-                    levels = {PermissionDecision.ALLOW: 0, PermissionDecision.ASK: 1, PermissionDecision.DENY: 2}
+                    default_decision = DEFAULT_DECISIONS.get(
+                        rule.capability, PermissionDecision.ASK
+                    )
+                    levels = {
+                        PermissionDecision.ALLOW: 0,
+                        PermissionDecision.ASK: 1,
+                        PermissionDecision.DENY: 2,
+                    }
                     if levels[rule.decision] < levels[default_decision]:
                         continue
                 rules.append(rule)
@@ -256,8 +269,14 @@ class PolicyLoader:
             for capability, value in raw_defaults.items():
                 decision = PermissionDecision(str(value))
                 if not trusted:
-                    default_decision = DEFAULT_DECISIONS.get(str(capability), PermissionDecision.ASK)
-                    levels = {PermissionDecision.ALLOW: 0, PermissionDecision.ASK: 1, PermissionDecision.DENY: 2}
+                    default_decision = DEFAULT_DECISIONS.get(
+                        str(capability), PermissionDecision.ASK
+                    )
+                    levels = {
+                        PermissionDecision.ALLOW: 0,
+                        PermissionDecision.ASK: 1,
+                        PermissionDecision.DENY: 2,
+                    }
                     if levels[decision] < levels[default_decision]:
                         continue
                 defaults[str(capability)] = decision

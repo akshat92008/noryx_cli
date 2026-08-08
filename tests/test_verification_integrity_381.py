@@ -8,8 +8,10 @@ from nexus.tools import ToolResult, ToolStatus
 from nexus.verification import CheckStatus, CheckType, VerificationEngine
 from nexus.verification_evidence import (
     analyse_test_command,
-    test_origin_for_profile as classify_test_origin,
     validate_test_execution,
+)
+from nexus.verification_evidence import (
+    test_origin_for_profile as classify_test_origin,
 )
 
 
@@ -70,9 +72,15 @@ def test_test_origin_requires_exact_planning_time_hash(tmp_path):
 
     digest = hashlib.sha256(test_file.read_bytes()).hexdigest()
     profile = analyse_test_command("pytest -q tests/test_api.py", root=tmp_path)
-    assert classify_test_origin(profile, {"tests/test_api.py": digest}, root=tmp_path) == "pre_existing"
+    assert (
+        classify_test_origin(profile, {"tests/test_api.py": digest}, root=tmp_path)
+        == "pre_existing"
+    )
     test_file.write_text("def test_ok(): assert True\n", encoding="utf-8")
-    assert classify_test_origin(profile, {"tests/test_api.py": digest}, root=tmp_path) == "modified_pre_existing"
+    assert (
+        classify_test_origin(profile, {"tests/test_api.py": digest}, root=tmp_path)
+        == "modified_pre_existing"
+    )
 
 
 def test_generated_test_is_not_pre_existing(tmp_path):
@@ -86,9 +94,14 @@ def test_generated_test_is_not_pre_existing(tmp_path):
 def test_narrow_pass_never_supersedes_broad_failure():
     records = [
         _test_record("broad", status="failed", scope="full_suite", project_gate=True),
-        _test_record("narrow", status="verified", scope="targeted", targets=["tests/test_small.py"]),
+        _test_record(
+            "narrow", status="verified", scope="targeted", targets=["tests/test_small.py"]
+        ),
     ]
-    assert {item["id"] for item in _effective_evidence(records, "verification_check")} == {"broad", "narrow"}
+    assert {item["id"] for item in _effective_evidence(records, "verification_check")} == {
+        "broad",
+        "narrow",
+    }
 
 
 def test_broad_pass_covers_same_revision_targeted_failure():
@@ -132,7 +145,9 @@ def test_engineering_ledger_records_only_explicit_target(tmp_path):
         name="run_command",
         args={"command": "pytest -q tests/test_api.py"},
         file_path="",
-        result=ToolResult(ToolStatus.SUCCESS, "✅ $ pytest -q tests/test_api.py\n1 passed in 0.01s\n"),
+        result=ToolResult(
+            ToolStatus.SUCCESS, "✅ $ pytest -q tests/test_api.py\n1 passed in 0.01s\n"
+        ),
         success=True,
     )
     assert recorded == ["tests/test_api.py"]
@@ -146,7 +161,9 @@ def test_model_declared_arbitrary_success_command_fails_closed(tmp_path, monkeyp
         workspace_isolation=False,
         allow_unisolated_host_process=True,
     )
-    output, verified, record_id = agent._run_declared_test_command("python -c \"pass\"", source="model")
+    output, verified, record_id = agent._run_declared_test_command(
+        'python -c "pass"', source="model"
+    )
     record = next(item for item in agent.evidence.records() if item["id"] == record_id)
     assert verified is False and "Rejected" in output
     assert record["status"] == "failed" and record["metadata"]["runner_valid"] is False

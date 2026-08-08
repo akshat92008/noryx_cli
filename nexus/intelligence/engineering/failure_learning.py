@@ -57,7 +57,7 @@ class FailureLearningStore:
 
     def __init__(self, repository_root: str | Path):
         root = Path(repository_root).expanduser().resolve()
-        self.path = root / ".nexus" / "failure-lessons.v2.jsonl"
+        self.path = root / ".noryx" / "failure-lessons.v2.jsonl"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.authenticator = StateAuthenticator.for_repository(root)
 

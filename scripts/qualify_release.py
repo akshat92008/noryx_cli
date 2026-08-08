@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate fresh, artifact-bound Nexus release evidence.
+"""Generate fresh, artifact-bound Noryx release evidence.
 
-The qualifier deliberately runs every test module in a separate process. Nexus
+The qualifier deliberately runs every test module in a separate process. Noryx
 exercises global provider registries, subprocesses, servers, and background
 workers; module isolation prevents order-dependent state from creating a false
 green release. The emitted JUnit, coverage, benchmark, source, and distribution
@@ -20,10 +20,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
+
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -176,7 +177,11 @@ def run_isolated_tests(
             shard_index, junit_part, log_path, stdout = future.result()
             completed[shard_index] = (junit_part, log_path, stdout)
             summary_line = next(
-                (line for line in reversed(stdout.splitlines()) if " passed" in line or " skipped" in line),
+                (
+                    line
+                    for line in reversed(stdout.splitlines())
+                    if " passed" in line or " skipped" in line
+                ),
                 "completed",
             )
             print(
@@ -205,7 +210,9 @@ def run_isolated_tests(
     total_tests = total_failures = total_errors = total_skipped = 0
     for part in junit_parts:
         tree_root = ET.parse(part).getroot()
-        suites = [tree_root] if tree_root.tag == "testsuite" else list(tree_root.findall("testsuite"))
+        suites = (
+            [tree_root] if tree_root.tag == "testsuite" else list(tree_root.findall("testsuite"))
+        )
         for suite in suites:
             aggregate.append(suite)
         tests, failures, errors, skipped = _suite_counts(part)
@@ -231,6 +238,7 @@ def run_isolated_tests(
     if summary["collected"] <= 0:
         raise RuntimeError("isolated test matrix collected no tests")
     return junit, coverage, summary, junit_parts
+
 
 def build_distributions(dist: Path, env: dict[str, str]) -> tuple[Path, Path]:
     shutil.rmtree(dist, ignore_errors=True)
@@ -533,9 +541,7 @@ def main() -> int:
     benchmark = output.parent / "installed-benchmark.json"
     offline_benchmark = output.parent / "installed-offline-reliability.json"
     deploy_report = output.parent / "installed-deploy-check.json"
-    installed_result = installed_smoke(
-        wheel, benchmark, offline_benchmark, deploy_report, env
-    )
+    installed_result = installed_smoke(wheel, benchmark, offline_benchmark, deploy_report, env)
     from nexus.sbom import write_spdx_sbom
 
     project_payload = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
@@ -619,7 +625,7 @@ def main() -> int:
         "rollback_plan": {
             "safe_version": "uninstalled",
             "downgrade_tested": True,
-            "instructions": ["Uninstall Nexus and reinstall a SHA-256-pinned prior wheel."],
+            "instructions": ["Uninstall Noryx and reinstall a SHA-256-pinned prior wheel."],
         },
         "provenance": {
             "schema_version": "nexus.release-evidence.v1",
@@ -636,8 +642,14 @@ def main() -> int:
             "test_command": test_command,
             "test_summary": summary,
             "reports": {
-                "environment": {"path": environment_path.name, "sha256": sha256_file(environment_path)},
-                "shared_process": {"path": shared_process.name, "sha256": sha256_file(shared_process)},
+                "environment": {
+                    "path": environment_path.name,
+                    "sha256": sha256_file(environment_path),
+                },
+                "shared_process": {
+                    "path": shared_process.name,
+                    "sha256": sha256_file(shared_process),
+                },
                 "sandbox": {"path": sandbox_report.name, "sha256": sha256_file(sandbox_report)},
                 "junit": {"path": junit.name, "sha256": sha256_file(junit)},
                 "coverage": {"path": coverage.name, "sha256": sha256_file(coverage)},

@@ -1,4 +1,4 @@
-"""Command policy hardening for Nexus CLI.
+"""Command policy hardening for Noryx CLI.
 
 Classifies commands by risk, denies shell string execution for untrusted inputs,
 requires argv array execution, and enforces working directory and timeout bounds.
@@ -7,7 +7,6 @@ requires argv array execution, and enforces working directory and timeout bounds
 from __future__ import annotations
 
 import re
-import shlex
 from enum import Enum
 from pathlib import Path
 from typing import Sequence
@@ -52,6 +51,9 @@ class CommandPolicy:
         args = [item.lower() for item in normalized[1:]]
         full_line = " ".join(normalized)
 
+        if any(token in {"|", "||", "&&", ";", ">", ">>", "<"} for token in normalized):
+            return CommandRisk.UNKNOWN
+
         # Check dangerous patterns first.
         for pattern, _ in DANGEROUS_COMMAND_PATTERNS:
             if re.search(pattern, full_line, re.IGNORECASE):
@@ -67,7 +69,16 @@ class CommandPolicy:
 
         if cmd in {"pytest", "flake8", "eslint", "ruff", "mypy"}:
             return CommandRisk.VALIDATION
-        if (cmd in {"npm", "yarn", "pnpm"} and first == "test") or (cmd in {"go", "cargo"} and first == "test"):
+        if (
+            cmd in {"python", "python3"}
+            and len(args) >= 2
+            and first == "-m"
+            and second in {"pytest", "ruff", "mypy"}
+        ):
+            return CommandRisk.VALIDATION
+        if (cmd in {"npm", "yarn", "pnpm"} and first == "test") or (
+            cmd in {"go", "cargo"} and first == "test"
+        ):
             return CommandRisk.VALIDATION
 
         if cmd in {"make", "gcc", "clang"}:
@@ -77,7 +88,9 @@ class CommandPolicy:
         if cmd in {"cargo", "go"} and first == "build":
             return CommandRisk.BUILD
 
-        if (cmd in {"pip", "pip3"} and first == "install") or (cmd == "uv" and first == "pip" and second == "install"):
+        if (cmd in {"pip", "pip3"} and first == "install") or (
+            cmd == "uv" and first == "pip" and second == "install"
+        ):
             return CommandRisk.PACKAGE_INSTALL
         if cmd in {"npm", "pnpm"} and first in {"install", "add"}:
             return CommandRisk.PACKAGE_INSTALL
@@ -85,12 +98,30 @@ class CommandPolicy:
             return CommandRisk.PACKAGE_INSTALL
         if cmd in {"cargo", "poetry"} and first == "add":
             return CommandRisk.PACKAGE_INSTALL
-        if cmd in {"python", "python3"} and len(args) >= 3 and first == "-m" and second in {"pip", "uv"} and args[2] == "install":
+        if (
+            cmd in {"python", "python3"}
+            and len(args) >= 3
+            and first == "-m"
+            and second in {"pip", "uv"}
+            and args[2] == "install"
+        ):
             return CommandRisk.PACKAGE_INSTALL
 
         if cmd == "git" and first in {
-            "add", "commit", "branch", "checkout", "switch", "merge", "rebase",
-            "reset", "restore", "rm", "mv", "tag", "cherry-pick", "revert",
+            "add",
+            "commit",
+            "branch",
+            "checkout",
+            "switch",
+            "merge",
+            "rebase",
+            "reset",
+            "restore",
+            "rm",
+            "mv",
+            "tag",
+            "cherry-pick",
+            "revert",
         }:
             return CommandRisk.GIT_MUTATION
 
@@ -110,7 +141,9 @@ class CommandPolicy:
     ) -> tuple[str, ...]:
         """Validate command executable and arguments. Returns normalized argv tuple."""
         if allow_shell:
-            raise ValueError("Direct shell execution (shell=True) is forbidden under security policy")
+            raise ValueError(
+                "Direct shell execution (shell=True) is forbidden under security policy"
+            )
 
         if not argv:
             raise ValueError("argv cannot be empty")
@@ -132,6 +165,8 @@ class CommandPolicy:
         try:
             cwd_path.relative_to(self.workspace_root)
         except ValueError:
-            raise ValueError(f"Command working directory is outside workspace: {cwd_path}")
+            raise ValueError(
+                f"Command working directory is outside workspace: {cwd_path}"
+            ) from None
 
         return normalized

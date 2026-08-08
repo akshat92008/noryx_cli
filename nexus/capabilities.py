@@ -244,12 +244,14 @@ TOOL_CAPABILITIES: dict[str, ToolCapabilityDeclaration] = {
     ),
     "github_create_pr": ToolCapabilityDeclaration(
         "github_create_pr",
-        frozenset({
-            ToolCapability.NETWORK,
-            ToolCapability.EXTERNAL_EFFECTS,
-            ToolCapability.GIT_MUTATION,
-            ToolCapability.CONFIRMATION_REQUIRED,
-        }),
+        frozenset(
+            {
+                ToolCapability.NETWORK,
+                ToolCapability.EXTERNAL_EFFECTS,
+                ToolCapability.GIT_MUTATION,
+                ToolCapability.CONFIRMATION_REQUIRED,
+            }
+        ),
         "Create a GitHub pull request",
     ),
     "generate_dashboard": ToolCapabilityDeclaration(

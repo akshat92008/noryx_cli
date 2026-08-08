@@ -1,5 +1,5 @@
 """
-Recovery Controller for Nexus CLI Sprint 7.
+Recovery Controller for Noryx CLI Sprint 7.
 It orchestrates failure normalisation, diagnosis, strategy selection, loop detection,
 and budget enforcement.
 """
@@ -9,14 +9,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any, Tuple, Optional
+from typing import Any, Optional, Tuple
 
-from nexus.recovery.records import FailureRecord, FailureDiagnosis, FailureKind
-from nexus.recovery.normalizer import FailureNormalizer
 from nexus.recovery.diagnosis import DiagnosisEngine
-from nexus.recovery.strategies import StrategySignatureEngine, RecoveryStrategy
-from nexus.recovery.signatures import LoopDetector
 from nexus.recovery.intelligent import RecoveryAction, RecoveryStateMachine
+from nexus.recovery.normalizer import FailureNormalizer
+from nexus.recovery.records import FailureDiagnosis, FailureKind, FailureRecord
+from nexus.recovery.signatures import LoopDetector
+from nexus.recovery.strategies import RecoveryStrategy, StrategySignatureEngine
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +34,16 @@ class RecoveryController:
         Hard time budget for the entire recovery process.
     """
 
-    def __init__(self,
-                 max_repairs: int = 5,
-                 max_loop_iterations: int = 10,
-                 max_time_seconds: int = 300,
-                 run_id: str | None = None,
-                 working_dir: str = ".",
-                 budget: Any = None,
-                 **kwargs: Any):
+    def __init__(
+        self,
+        max_repairs: int = 5,
+        max_loop_iterations: int = 10,
+        max_time_seconds: int = 300,
+        run_id: str | None = None,
+        working_dir: str = ".",
+        budget: Any = None,
+        **kwargs: Any,
+    ):
         self.run_id = run_id
         self.working_dir = working_dir
         self.max_repairs = max_repairs
@@ -121,19 +123,21 @@ class RecoveryController:
 
     def _ensure_timing_started(self):
         from datetime import datetime, timezone
+
         if self._start_time is None:
             self._start_time = datetime.now(timezone.utc)
 
     def _time_exceeded(self) -> bool:
         from datetime import datetime, timezone
+
         if self._start_time is None:
             return False
         elapsed = (datetime.now(timezone.utc) - self._start_time).total_seconds()
         return elapsed > self.max_time_seconds
 
-    def diagnose_and_recover(self,
-                             record: FailureRecord,
-                             context: dict[str, Any]) -> Tuple[bool, Optional[RecoveryStrategy]]:
+    def diagnose_and_recover(
+        self, record: FailureRecord, context: dict[str, Any]
+    ) -> Tuple[bool, Optional[RecoveryStrategy]]:
         """Run the full diagnosis & recovery pipeline.
 
         Returns
@@ -171,7 +175,10 @@ class RecoveryController:
         # Choose a strategy
         strategy = self.signature_engine.select_strategy(diagnosis)
         if strategy is None:
-            logger.info("No viable recovery strategy found for failure %s", getattr(norm_record, "failure_id", "raw"))
+            logger.info(
+                "No viable recovery strategy found for failure %s",
+                getattr(norm_record, "failure_id", "raw"),
+            )
             return False, None
 
         # Strategy metadata never counts as a repair by itself.  The strategy must
@@ -179,14 +186,18 @@ class RecoveryController:
         try:
             applied = bool(strategy.apply(norm_record, context))
         except Exception as exc:
-            logger.exception("Strategy %s raised an exception: %s", getattr(strategy, "name", str(strategy)), exc)
+            logger.exception(
+                "Strategy %s raised an exception: %s", getattr(strategy, "name", str(strategy)), exc
+            )
             applied = False
 
         if applied:
             self.repairs_done += 1
             logger.info("Applied recovery strategy %s", getattr(strategy, "name", str(strategy)))
         else:
-            logger.info("Strategy %s could not be applied", getattr(strategy, "name", str(strategy)))
+            logger.info(
+                "Strategy %s could not be applied", getattr(strategy, "name", str(strategy))
+            )
 
         return applied, strategy
 
@@ -207,27 +218,41 @@ class RecoveryController:
         self._ensure_timing_started()
         norm_record = self.normalizer.normalize(raw_failure)
         context = dict(kwargs)
-        context.update({"source_component": source_component, "phase": phase, "plan_version": plan_version})
+        context.update(
+            {"source_component": source_component, "phase": phase, "plan_version": plan_version}
+        )
         context = self._enrich_context_from_runtime_evidence(raw_failure, context)
         if model_id:
             context["model_id"] = model_id
-        
+
         # Track history for escalation and budget
-        self.history_failures.append({"failure": norm_record, "model_id": model_id, "source": source_component})
+        self.history_failures.append(
+            {"failure": norm_record, "model_id": model_id, "source": source_component}
+        )
 
         diagnosis = self.diagnosis_engine.diagnose(norm_record, context)
         intelligent = self.intelligent_state.decide(norm_record, context)
         self.last_intelligent_decision = intelligent
-        
+
         # Check repeated model failures
-        model_fails = [f for f in self.history_failures if f.get("model_id") == model_id and model_id]
-        if len(model_fails) >= 2 or getattr(diagnosis.primary_failure, "kind", None) == FailureKind.INVALID_STRUCTURED_OUTPUT:
+        model_fails = [
+            f for f in self.history_failures if f.get("model_id") == model_id and model_id
+        ]
+        if (
+            len(model_fails) >= 2
+            or getattr(diagnosis.primary_failure, "kind", None)
+            == FailureKind.INVALID_STRUCTURED_OUTPUT
+        ):
             diagnosis.model_escalation_recommended = True
 
         strategy = self.signature_engine.get(intelligent.action.value)
         if strategy is None:
             strategy = self.signature_engine.select_strategy(diagnosis)
-        if diagnosis.model_escalation_recommended and intelligent.action not in {RecoveryAction.STOP_BLOCKED, RecoveryAction.STOP_FAILED, RecoveryAction.ROLLBACK}:
+        if diagnosis.model_escalation_recommended and intelligent.action not in {
+            RecoveryAction.STOP_BLOCKED,
+            RecoveryAction.STOP_FAILED,
+            RecoveryAction.ROLLBACK,
+        }:
             strategy = self.signature_engine.get("SWITCH_MODEL") or strategy
 
         terminal = "CONTINUE" if strategy and not intelligent.terminal else "TERMINAL_FAILURE"
@@ -235,25 +260,33 @@ class RecoveryController:
         strategy_value = getattr(strategy_type, "value", strategy_type)
         if strategy_value == "STOP_BLOCKED":
             from nexus.recovery.terminal import TerminalState
+
             terminal = TerminalState.BLOCKED.value
         elif strategy_value == "STOP_FAILED":
             from nexus.recovery.terminal import TerminalState
+
             terminal = TerminalState.FAILED.value
-        
+
         # Check budget limits
         if self.budget:
-            max_retries = getattr(self.budget, "max_command_retries", None) or getattr(self.budget, "max_repairs", None)
+            max_retries = getattr(self.budget, "max_command_retries", None) or getattr(
+                self.budget, "max_repairs", None
+            )
             if max_retries is not None and len(self.history_failures) > max_retries:
                 from nexus.recovery.terminal import TerminalState
+
                 terminal = TerminalState.BUDGET_EXHAUSTED.value
 
         wdir = getattr(self, "working_dir", ".") or "."
         rid = getattr(self, "run_id", None) or "test-run-1"
         import os
-        path = os.path.join(wdir, ".nexus", "runs", rid, "failures")
+
+        path = os.path.join(wdir, ".noryx", "runs", rid, "failures")
         os.makedirs(path, exist_ok=True)
         try:
-            with open(os.path.join(path, f"failure-{len(self.history_failures):03d}.json"), "w") as f:
+            with open(
+                os.path.join(path, f"failure-{len(self.history_failures):03d}.json"), "w"
+            ) as f:
                 json.dump({"failure": str(raw_failure), "phase": phase}, f)
         except Exception:
             pass

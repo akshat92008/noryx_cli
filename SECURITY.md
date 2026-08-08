@@ -1,4 +1,4 @@
-# Security Policy — Nexus CLI
+# Security Policy — Noryx CLI
 
 ## Supported Versions
 Security fixes are applied to the latest release line. Pre-release branches and historical checkouts receive continuous security hardening.
@@ -16,4 +16,4 @@ Do not open a public issue for a suspected vulnerability. Use GitHub's **Securit
 
 ## Deployment security boundary
 
-`nexus deploy check --deep` validates package architecture, provider and sandbox readiness, external HMAC key operation, the self-contained benchmark, and the installed offline repair/adversarial suite. A passing result qualifies only supervised isolated Verified Repair use. Autonomous deployment additionally requires live-provider, hidden-task, and platform qualification evidence.
+`noryx deploy check --deep` validates package architecture, provider and sandbox readiness, external HMAC key operation, the self-contained benchmark, and the installed offline repair/adversarial suite. A passing result qualifies only supervised isolated Verified Repair use. Autonomous deployment additionally requires live-provider, hidden-task, and platform qualification evidence.

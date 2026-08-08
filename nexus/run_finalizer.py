@@ -290,6 +290,7 @@ class RunFinalizer:
     def _current_workspace_revision(self) -> str:
         try:
             from nexus.intelligence.repository.snapshot import workspace_revision
+
             return workspace_revision(self._agent.working_dir)
         except (OSError, ValueError):
             return ""
@@ -301,7 +302,8 @@ class RunFinalizer:
         if not revision:
             return records
         return [
-            item for item in records
+            item
+            for item in records
             if not (item.get("metadata") or {}).get("workspace_revision")
             or (item.get("metadata") or {}).get("workspace_revision") == revision
         ]
@@ -316,8 +318,7 @@ class RunFinalizer:
             if metadata.get("independently_validated") is not True:
                 continue
             if metadata.get("check_type") in {"test", "tests"} and not (
-                metadata.get("runner_valid") is True
-                and metadata.get("verification_valid") is True
+                metadata.get("runner_valid") is True and metadata.get("verification_valid") is True
             ):
                 continue
             selected.append(item)
@@ -357,7 +358,6 @@ class RunFinalizer:
     ) -> dict[str, Any]:
         from nexus.agent import _redact_runtime_text
 
-        
         """Evaluate evidence and write a machine-readable final report."""
         if not self._agent.run_ledger.turn_dir:
             return {}
@@ -420,7 +420,8 @@ class RunFinalizer:
             for item in command_records
             if item.get("status") == "failed" or item.get("exit_code") not in (None, 0)
         ] + [
-            item for item in evidence
+            item
+            for item in evidence
             if item.get("kind") == "verification_check" and item.get("status") == "failed"
         ]
 
@@ -451,7 +452,8 @@ class RunFinalizer:
                 target_types = {"build"}
             elif "test" in lowered or "regression" in lowered:
                 return [
-                    item for item in passing_by_type.get("test", [])
+                    item
+                    for item in passing_by_type.get("test", [])
                     if (item.get("metadata") or {}).get("project_gate") is True
                     and (item.get("metadata") or {}).get("verification_valid") is True
                     and (item.get("metadata") or {}).get("runner_valid") is True
@@ -607,7 +609,9 @@ class RunFinalizer:
                     completion_issue = f"Completion contract could not be evaluated: {exc}"
                     run_status = RunStatus.PARTIALLY_VERIFIED
                 if assessment is not None and not assessment.complete:
-                    completion_issue = "Multi-file completion contract incomplete: " + str(assessment.to_dict())
+                    completion_issue = "Multi-file completion contract incomplete: " + str(
+                        assessment.to_dict()
+                    )
                     run_status = RunStatus.PARTIALLY_VERIFIED
                     self._agent.evidence.append(
                         kind="completion_contract",
@@ -668,7 +672,9 @@ class RunFinalizer:
             outcome = "NO_CHANGES"
 
         turn_dir = self._agent.run_ledger.turn_dir
-        model_call_records, _model_call_corruption = self._agent.run_ledger.read_jsonl("model_calls.jsonl")
+        model_call_records, _model_call_corruption = self._agent.run_ledger.read_jsonl(
+            "model_calls.jsonl"
+        )
         logical_model_calls = [
             item for item in model_call_records if item.get("role") != "provider_attempt"
         ]
@@ -855,9 +861,7 @@ class RunFinalizer:
                 if rid:
                     latest_by_id[rid] = item.get("status", "")
 
-        effective_ids = {
-            rid for rid, status in latest_by_id.items() if status == "verified"
-        }
+        effective_ids = {rid for rid, status in latest_by_id.items() if status == "verified"}
 
         # Latest behavioral status per tool
         latest_behavioral: dict[str, str] = {
@@ -882,9 +886,15 @@ class RunFinalizer:
 
             if kind == EvidenceClass.MUTATION and rid in effective_ids and status == "verified":
                 mutations_dict[rid] = item
-            elif kind == EvidenceClass.VERIFICATION and rid in effective_ids and status == "verified":
+            elif (
+                kind == EvidenceClass.VERIFICATION and rid in effective_ids and status == "verified"
+            ):
                 verifications_dict[rid] = item
-            elif kind == EvidenceClass.COMMAND and status == "verified" and item.get("exit_code") == 0:
+            elif (
+                kind == EvidenceClass.COMMAND
+                and status == "verified"
+                and item.get("exit_code") == 0
+            ):
                 cmd_text = item.get("command", "")
                 commands_dict[cmd_text] = item
                 passing_cmd_text.add(cmd_text)

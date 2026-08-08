@@ -1,9 +1,9 @@
-"""Canonical Task Contract for Nexus CLI (Sprint 6)."""
+"""Canonical Task Contract for Noryx CLI (Sprint 6)."""
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -50,7 +50,9 @@ class Requirement:
         return {
             "id": self.id,
             "statement": self.statement,
-            "source": self.source.value if isinstance(self.source, RequirementSource) else self.source,
+            "source": self.source.value
+            if isinstance(self.source, RequirementSource)
+            else self.source,
             "mandatory": self.mandatory,
             "evidence_reference": self.evidence_reference,
         }
@@ -60,7 +62,9 @@ class Requirement:
         return cls(
             id=data["id"],
             statement=data["statement"],
-            source=RequirementSource(data["source"]) if isinstance(data["source"], str) else data["source"],
+            source=RequirementSource(data["source"])
+            if isinstance(data["source"], str)
+            else data["source"],
             mandatory=data.get("mandatory", True),
             evidence_reference=data.get("evidence_reference"),
         )
@@ -135,7 +139,9 @@ class TaskContract:
             "task_id": self.task_id,
             "raw_user_request": self.raw_user_request,
             "normalized_objective": self.normalized_objective,
-            "task_type": self.task_type.value if isinstance(self.task_type, TaskType) else self.task_type,
+            "task_type": self.task_type.value
+            if isinstance(self.task_type, TaskType)
+            else self.task_type,
             "repository_snapshot_id": self.repository_snapshot_id,
             "mandatory_requirements": [r.to_dict() for r in self.mandatory_requirements],
             "optional_requirements": [r.to_dict() for r in self.optional_requirements],
@@ -143,7 +149,9 @@ class TaskContract:
             "prohibited_changes": [p.to_dict() for p in self.prohibited_changes],
             "assumptions": [a.to_dict() for a in self.assumptions],
             "unresolved_questions": [q.to_dict() for q in self.unresolved_questions],
-            "risk_level": self.risk_level.value if isinstance(self.risk_level, RiskLevel) else self.risk_level,
+            "risk_level": self.risk_level.value
+            if isinstance(self.risk_level, RiskLevel)
+            else self.risk_level,
             "completion_definition": self.completion_definition,
         }
 
@@ -153,14 +161,24 @@ class TaskContract:
             task_id=data.get("task_id", f"task-{uuid.uuid4().hex[:8]}"),
             raw_user_request=data.get("raw_user_request", ""),
             normalized_objective=data.get("normalized_objective", ""),
-            task_type=TaskType(data["task_type"]) if "task_type" in data else TaskType.FEATURE_IMPLEMENTATION,
+            task_type=TaskType(data["task_type"])
+            if "task_type" in data
+            else TaskType.FEATURE_IMPLEMENTATION,
             repository_snapshot_id=data.get("repository_snapshot_id", "snap-initial"),
-            mandatory_requirements=[Requirement.from_dict(r) for r in data.get("mandatory_requirements", [])],
-            optional_requirements=[Requirement.from_dict(r) for r in data.get("optional_requirements", [])],
+            mandatory_requirements=[
+                Requirement.from_dict(r) for r in data.get("mandatory_requirements", [])
+            ],
+            optional_requirements=[
+                Requirement.from_dict(r) for r in data.get("optional_requirements", [])
+            ],
             constraints=[Constraint.from_dict(c) for c in data.get("constraints", [])],
-            prohibited_changes=[Constraint.from_dict(p) for p in data.get("prohibited_changes", [])],
+            prohibited_changes=[
+                Constraint.from_dict(p) for p in data.get("prohibited_changes", [])
+            ],
             assumptions=[Assumption.from_dict(a) for a in data.get("assumptions", [])],
-            unresolved_questions=[Question.from_dict(q) for q in data.get("unresolved_questions", [])],
+            unresolved_questions=[
+                Question.from_dict(q) for q in data.get("unresolved_questions", [])
+            ],
             risk_level=RiskLevel(data["risk_level"]) if "risk_level" in data else RiskLevel.LOW,
             completion_definition=data.get("completion_definition", ""),
         )

@@ -6,6 +6,7 @@ returns control to the parent.  This qualifier therefore records the observed
 process exit, kills the complete process group on timeout, and binds the result
 to the exact source/dependency identity.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -70,7 +71,14 @@ def main() -> int:
     started = time.monotonic()
     out_file = tempfile.NamedTemporaryFile(prefix="nexus-shared-", suffix=".out", delete=False)
     err_file = tempfile.NamedTemporaryFile(prefix="nexus-shared-", suffix=".err", delete=False)
-    command = [sys.executable, "-m", "pytest", "-q", "--disable-warnings", *(args.paths or ["tests"])]
+    command = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-q",
+        "--disable-warnings",
+        *(args.paths or ["tests"]),
+    ]
     kwargs: dict[str, object] = {
         "cwd": ROOT,
         "stdout": out_file,

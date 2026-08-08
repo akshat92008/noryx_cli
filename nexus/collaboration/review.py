@@ -21,8 +21,6 @@ from nexus.collaboration.models import (
     AssignmentReview,
     AssignmentStatus,
     ReviewDecision,
-    ReviewFinding,
-    ReviewFindingCategory,
     ReviewIssue,
     RiskLevel,
 )
@@ -58,73 +56,86 @@ class ResultReviewService:
         scope_violations: List[str] = []
         security_findings: List[str] = []
         evidence: List[str] = list(result.evidence_ids or result.evidence)
-        findings: List[ReviewFinding] = []
-        missing_evidence: List[str] = []
-
         # 1. Prohibit Self-Review
         if reviewer_id and reviewer_id == result.worker_id:
-            blocking_issues.append(ReviewIssue(
-                issue_id=str(uuid.uuid4()),
-                description="Self-review prohibited: worker cannot review its own assignment.",
-                severity=RiskLevel.CRITICAL,
-            ))
+            blocking_issues.append(
+                ReviewIssue(
+                    issue_id=str(uuid.uuid4()),
+                    description="Self-review prohibited: worker cannot review its own assignment.",
+                    severity=RiskLevel.CRITICAL,
+                )
+            )
 
         # 2. Schema and Patch Validation
         try:
             validate_result(result, assignment)
         except Exception as exc:
-            blocking_issues.append(ReviewIssue(
-                issue_id=str(uuid.uuid4()),
-                description=f"Validation failed: {exc}",
-                severity=RiskLevel.HIGH,
-            ))
+            blocking_issues.append(
+                ReviewIssue(
+                    issue_id=str(uuid.uuid4()),
+                    description=f"Validation failed: {exc}",
+                    severity=RiskLevel.HIGH,
+                )
+            )
 
         # 3. Scope Compliance & Protected Path Check
-        allowed_paths_strs = {str(p) for p in (assignment.allowed_mutation_paths or assignment.allowed_paths)}
-        prohibited_paths_strs = {str(p) for p in (assignment.protected_paths or assignment.prohibited_paths)}
+        allowed_paths_strs = {
+            str(p) for p in (assignment.allowed_mutation_paths or assignment.allowed_paths)
+        }
+        prohibited_paths_strs = {
+            str(p) for p in (assignment.protected_paths or assignment.prohibited_paths)
+        }
 
         for change in result.proposed_changes:
             path = change.path
             if path in prohibited_paths_strs:
                 msg = f"Change targets protected path: {path}"
                 scope_violations.append(msg)
-                blocking_issues.append(ReviewIssue(
-                    issue_id=str(uuid.uuid4()),
-                    description=msg,
-                    severity=RiskLevel.CRITICAL,
-                ))
+                blocking_issues.append(
+                    ReviewIssue(
+                        issue_id=str(uuid.uuid4()),
+                        description=msg,
+                        severity=RiskLevel.CRITICAL,
+                    )
+                )
             elif allowed_paths_strs and not any(path.startswith(ap) for ap in allowed_paths_strs):
                 msg = f"Change targets unplanned path outside allowed scope: {path}"
                 scope_violations.append(msg)
-                warnings.append(ReviewIssue(
-                    issue_id=str(uuid.uuid4()),
-                    description=msg,
-                    severity=RiskLevel.HIGH,
-                ))
+                warnings.append(
+                    ReviewIssue(
+                        issue_id=str(uuid.uuid4()),
+                        description=msg,
+                        severity=RiskLevel.HIGH,
+                    )
+                )
 
         # 4. Acceptance Criteria & Test Verification
-        for req in (assignment.acceptance_criteria or assignment.requirements):
+        for req in assignment.acceptance_criteria or assignment.requirements:
             matched = any(req.lower() in ev.lower() for ev in evidence)
             if not matched:
                 missing_tests.append(f"Acceptance criterion '{req}' lacks evidence.")
 
         if missing_tests:
-            warnings.append(ReviewIssue(
-                issue_id=str(uuid.uuid4()),
-                description=f"Missing acceptance evidence: {missing_tests}",
-                severity=RiskLevel.MEDIUM,
-            ))
+            warnings.append(
+                ReviewIssue(
+                    issue_id=str(uuid.uuid4()),
+                    description=f"Missing acceptance evidence: {missing_tests}",
+                    severity=RiskLevel.MEDIUM,
+                )
+            )
 
         # 5. Security Inspection
         for finding in result.findings:
             if finding.severity in (RiskLevel.HIGH, RiskLevel.CRITICAL):
                 msg = f"Security concern: {finding.description}"
                 security_findings.append(msg)
-                blocking_issues.append(ReviewIssue(
-                    issue_id=str(uuid.uuid4()),
-                    description=msg,
-                    severity=finding.severity,
-                ))
+                blocking_issues.append(
+                    ReviewIssue(
+                        issue_id=str(uuid.uuid4()),
+                        description=msg,
+                        severity=finding.severity,
+                    )
+                )
 
         # 6. Determine Decision
         if any(i.severity == RiskLevel.CRITICAL for i in blocking_issues):

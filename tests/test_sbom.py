@@ -13,7 +13,7 @@ def test_spdx_sbom_lists_root_and_direct_dependencies(tmp_path: Path):
         created_at="2026-08-06T00:00:00+00:00",
     )
     assert payload["spdxVersion"] == "SPDX-2.3"
-    root = next(item for item in payload["packages"] if item["name"] == "nexusai-cli")
+    root = next(item for item in payload["packages"] if item["name"] == "noryx-cli")
     assert root["versionInfo"] == __version__
     names = {item["name"] for item in payload["packages"]}
     assert {"httpx", "openai"} <= names

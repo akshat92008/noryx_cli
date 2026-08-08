@@ -1,8 +1,8 @@
-"""Self-contained Nova V11 runtime used by Nexus.
+"""Self-contained Nova V11 runtime used by Noryx.
 
 The Nova model weights are served by Ollama, but the protocol parser, task
 contract, guardrails, literal checks, and isolated disk replay are packaged
-with Nexus.  A Nexus wheel therefore never depends on a sibling Nova source
+with Noryx.  A Noryx wheel therefore never depends on a sibling Nova source
 checkout being present on the user's machine.
 """
 
@@ -947,7 +947,7 @@ class TestExecutor:
             target.parent.mkdir(parents=True, exist_ok=True)
             kind = action.action.upper()
             if kind == "DELETE":
-                raise ValueError("Nova DELETE operations require explicit Nexus approval.")
+                raise ValueError("Nova DELETE operations require explicit Noryx approval.")
             if kind == "CREATE" and target.exists() and strict_verify:
                 raise ValueError(f"CREATE target already exists: {action.path}")
 
@@ -974,7 +974,7 @@ class TestExecutor:
         return written
 
 
-CEILING_SYSTEM_PROMPT = """You are the Ceiling planner in Nexus.
+CEILING_SYSTEM_PROMPT = """You are the Ceiling planner in Noryx.
 Decompose the request into bounded, dependency-ordered coding tasks.
 Return strict JSON with a tasks array. Every task must contain id, description,
 expected_files, scope_level (atomic, multi_file, or vague), and depends_on.
@@ -983,7 +983,7 @@ Do not split one standalone executable file into multiple tasks."""
 
 
 class CeilingNode:
-    """Parser-compatible local Ceiling helper used by Nexus guardrails."""
+    """Parser-compatible local Ceiling helper used by Noryx guardrails."""
 
     def __init__(self, provider: str = "manual", api_key: str = ""):
         self.provider = provider

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
+
 from nexus.intelligence.repository.model import RiskLevel
 
 
@@ -29,23 +29,64 @@ class FileClassifier:
         risk_level = RiskLevel.LOW
 
         # Secret sensitive / Protected
-        if name in {".env", ".env.local", ".env.production", "secrets.yaml", "credentials.json", "id_rsa", "id_ed25519"} or name.endswith(".pem") or name.endswith(".key"):
+        if (
+            name
+            in {
+                ".env",
+                ".env.local",
+                ".env.production",
+                "secrets.yaml",
+                "credentials.json",
+                "id_rsa",
+                "id_ed25519",
+            }
+            or name.endswith(".pem")
+            or name.endswith(".key")
+        ):
             category = "secret_sensitive"
             risk_level = RiskLevel.CRITICAL
             is_protected = True
 
         # Binary extensions
-        elif suffix in {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".tar", ".gz", ".pyc", ".so", ".dylib", ".dll", ".exe", ".bin", ".whl"}:
+        elif suffix in {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".ico",
+            ".pdf",
+            ".zip",
+            ".tar",
+            ".gz",
+            ".pyc",
+            ".so",
+            ".dylib",
+            ".dll",
+            ".exe",
+            ".bin",
+            ".whl",
+        }:
             category = "binary"
             is_binary = True
 
         # Lockfiles
-        elif name in {"uv.lock", "poetry.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb", "cargo.lock"}:
+        elif name in {
+            "uv.lock",
+            "poetry.lock",
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "bun.lockb",
+            "cargo.lock",
+        }:
             category = "lockfile"
             is_config = True
 
         # Generated or Vendored
-        elif any(v in parts for v in {"vendor", "node_modules", "third_party", "generated", "dist", "build"}):
+        elif any(
+            v in parts
+            for v in {"vendor", "node_modules", "third_party", "generated", "dist", "build"}
+        ):
             if "vendor" in parts or "third_party" in parts:
                 category = "vendored"
                 is_vendored = True
@@ -74,12 +115,25 @@ class FileClassifier:
 
         # Configuration files
         elif (
-            name in {
-                "package.json", "pyproject.toml", "cargo.toml", "go.mod", "pom.xml",
-                "build.gradle", "dockerfile", "makefile", "tsconfig.json", "vite.config.ts",
-                "next.config.js", "next.config.mjs", "pytest.ini", "setup.py", "setup.cfg"
+            name
+            in {
+                "package.json",
+                "pyproject.toml",
+                "cargo.toml",
+                "go.mod",
+                "pom.xml",
+                "build.gradle",
+                "dockerfile",
+                "makefile",
+                "tsconfig.json",
+                "vite.config.ts",
+                "next.config.js",
+                "next.config.mjs",
+                "pytest.ini",
+                "setup.py",
+                "setup.cfg",
             }
-            or any(part in {".github", ".nexus", "config", "configs"} for part in parts)
+            or any(part in {".github", ".noryx", "config", "configs"} for part in parts)
             or suffix in {".yaml", ".yml", ".toml", ".ini"}
         ):
             category = "configuration"
@@ -92,7 +146,12 @@ class FileClassifier:
             category = "schema"
 
         # Documentation
-        elif suffix in {".md", ".rst", ".txt"} or name in {"readme", "changelog", "license", "contributing"}:
+        elif suffix in {".md", ".rst", ".txt"} or name in {
+            "readme",
+            "changelog",
+            "license",
+            "contributing",
+        }:
             category = "documentation"
 
         # Infrastructure / Deployment
@@ -101,12 +160,27 @@ class FileClassifier:
             risk_level = RiskLevel.MEDIUM
 
         # High risk areas (Security / Auth / Database / Verification)
-        if any(keyword in relative_path.lower() for keyword in {"auth", "security", "crypto", "permission", "verification", "payment", "secret"}):
+        if any(
+            keyword in relative_path.lower()
+            for keyword in {
+                "auth",
+                "security",
+                "crypto",
+                "permission",
+                "verification",
+                "payment",
+                "secret",
+            }
+        ):
             if risk_level != RiskLevel.CRITICAL:
                 risk_level = RiskLevel.HIGH
 
         # Content markers for generated code
-        if content_preview and ("@generated" in content_preview or "DO NOT EDIT" in content_preview or "auto-generated" in content_preview.lower()):
+        if content_preview and (
+            "@generated" in content_preview
+            or "DO NOT EDIT" in content_preview
+            or "auto-generated" in content_preview.lower()
+        ):
             is_generated = True
             category = "generated"
 

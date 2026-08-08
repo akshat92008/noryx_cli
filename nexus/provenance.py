@@ -1,4 +1,4 @@
-"""Deterministic source and build provenance helpers for Nexus releases."""
+"""Deterministic source and build provenance helpers for Noryx releases."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ _IGNORED_PARTS = {
     "release_evidence",
     "verification_evidence",
     "runs",
-    ".nexus",
+    ".noryx",
     ".nexusai",
 }
 _IGNORED_SUFFIXES = {".pyc", ".pyo", ".whl", ".zip", ".gz"}
@@ -94,7 +94,16 @@ def resolve_source_identity(root: str | Path) -> SourceIdentity:
 
     revision = f"git:{commit}" if commit else f"archive:{tree_hash}"
     lock_path = next(
-        (candidate for candidate in (base / "release-constraints.txt", base / "qualification-lock.txt", base / "requirements.txt") if candidate.is_file()),
+        (
+            candidate
+            for candidate in (
+                base / "requirements.lock",
+                base / "release-constraints.txt",
+                base / "qualification-lock.txt",
+                base / "requirements.txt",
+            )
+            if candidate.is_file()
+        ),
         None,
     )
     return SourceIdentity(
@@ -104,5 +113,7 @@ def resolve_source_identity(root: str | Path) -> SourceIdentity:
         source_tree_sha256=tree_hash,
         dependency_lock=lock_path.name if lock_path else "",
         dependency_lock_sha256=sha256_file(lock_path) if lock_path else "",
-        ci_run_id=(os.environ.get("GITHUB_RUN_ID") or os.environ.get("CI_PIPELINE_ID") or "").strip(),
+        ci_run_id=(
+            os.environ.get("GITHUB_RUN_ID") or os.environ.get("CI_PIPELINE_ID") or ""
+        ).strip(),
     )

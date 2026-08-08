@@ -3,6 +3,7 @@
 A revision must change the investigation or execution structure.  Appending a
 failure message to an objective is not considered replanning.
 """
+
 from __future__ import annotations
 
 import copy
@@ -186,15 +187,21 @@ class PlanReplanner:
                 risk_level=RiskLevel.MEDIUM,
                 expected_outcome="A falsifiable root cause linked to concrete repository evidence.",
                 completion_condition="At least one hypothesis is supported or contradicted by reproduced evidence.",
-                verification_method=str(evidence.get("reproduction_command", "targeted reproduction or failing test")),
+                verification_method=str(
+                    evidence.get("reproduction_command", "targeted reproduction or failing test")
+                ),
                 parallelizable=False,
             )
             revised.steps.insert(insertion_index, inspect_step)
             if failed_step is not None:
                 failed_step.dependencies = [inspect_id]
                 failed_step.evidence_inputs.append(evidence_ref)
-                failed_step.intended_targets = list(dict.fromkeys([*failed_step.intended_targets, *paths]))
-                failed_step.mutation_scope = list(dict.fromkeys([*failed_step.mutation_scope, *paths]))
+                failed_step.intended_targets = list(
+                    dict.fromkeys([*failed_step.intended_targets, *paths])
+                )
+                failed_step.mutation_scope = list(
+                    dict.fromkeys([*failed_step.mutation_scope, *paths])
+                )
                 failed_step.objective = (
                     f"{failed_step.objective} Revise implementation using evidence {evidence_sig[:12]}; "
                     "do not repeat the previous patch unchanged."
@@ -205,10 +212,14 @@ class PlanReplanner:
             verification_commands = [verification_commands]
         if tests or verification_commands:
             verify_id = self._next_step_id(revised, revision_id, "targeted-verification")
-            dependency = failed_step.step_id if failed_step is not None else (
-                revised.steps[-1].step_id if revised.steps else ""
+            dependency = (
+                failed_step.step_id
+                if failed_step is not None
+                else (revised.steps[-1].step_id if revised.steps else "")
             )
-            verify_method = " && ".join(str(item) for item in verification_commands if str(item).strip())
+            verify_method = " && ".join(
+                str(item) for item in verification_commands if str(item).strip()
+            )
             if not verify_method and tests:
                 verify_method = "python -m pytest " + " ".join(tests)
             revised.steps.append(
@@ -235,8 +246,12 @@ class PlanReplanner:
             }
 
         revised.affected_scope = list(dict.fromkeys([*revised.affected_scope, *paths]))
-        revised.limitations.append(f"Plan revised from evidence {evidence_sig[:16]}: {trigger_reason[:500]}")
-        revised.confidence = max(0.2, min(0.95, revised.confidence - (0.12 if contradiction else 0.05)))
+        revised.limitations.append(
+            f"Plan revised from evidence {evidence_sig[:16]}: {trigger_reason[:500]}"
+        )
+        revised.confidence = max(
+            0.2, min(0.95, revised.confidence - (0.12 if contradiction else 0.05))
+        )
 
         new_sig = self.compute_plan_signature(revised)
         if new_sig == current_sig or new_sig in self.signature_history:

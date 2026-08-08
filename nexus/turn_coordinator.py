@@ -124,7 +124,13 @@ class TurnCoordinator:
                 duration_ms=duration_ms,
                 success=True,
             )
-        except (LookupError, OSError, RuntimeError, TypeError, ValueError) as exc:# pragma: no cover
+        except (
+            LookupError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:  # pragma: no cover
             duration_ms = int((time.monotonic() - start) * 1000)
             logger.exception("TurnCoordinator.run_turn failed: %s", exc)
             return TurnResult(

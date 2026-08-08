@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import subprocess
 from pathlib import Path
 from typing import Iterable
 
@@ -13,7 +12,7 @@ IGNORED_DIRECTORIES = {
     ".hg",
     ".svn",
     ".nexusai",
-    ".nexus",
+    ".noryx",
     ".pytest_cache",
     ".ruff_cache",
     ".mypy_cache",
@@ -43,10 +42,34 @@ IGNORED_DIRECTORIES = {
 }
 
 SUPPORTED_EXTENSIONS = {
-    ".py", ".pyi", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
-    ".go", ".rs", ".java", ".kt", ".kts", ".rb", ".php", ".cs",
-    ".swift", ".sql", ".graphql", ".prisma", ".json", ".toml",
-    ".yaml", ".yml", ".xml", ".sh", ".bash", ".md"
+    ".py",
+    ".pyi",
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".kt",
+    ".kts",
+    ".rb",
+    ".php",
+    ".cs",
+    ".swift",
+    ".sql",
+    ".graphql",
+    ".prisma",
+    ".json",
+    ".toml",
+    ".yaml",
+    ".yml",
+    ".xml",
+    ".sh",
+    ".bash",
+    ".md",
 }
 
 
@@ -70,7 +93,12 @@ class RepositoryDiscovery:
     def detect_ecosystems(self) -> list[str]:
         """Detect language ecosystems present in the repository."""
         ecosystems = []
-        if (self.root / "pyproject.toml").exists() or (self.root / "setup.py").exists() or (self.root / "requirements.txt").exists() or (self.root / "uv.lock").exists():
+        if (
+            (self.root / "pyproject.toml").exists()
+            or (self.root / "setup.py").exists()
+            or (self.root / "requirements.txt").exists()
+            or (self.root / "uv.lock").exists()
+        ):
             ecosystems.append("python")
         if (self.root / "package.json").exists() or (self.root / "tsconfig.json").exists():
             ecosystems.append("javascript/typescript")
@@ -90,10 +118,11 @@ class RepositoryDiscovery:
         for root_dir, dirs, files in os.walk(self.root):
             # Exclude ignored directories in-place
             dirs[:] = [
-                d for d in dirs
+                d
+                for d in dirs
                 if d not in IGNORED_DIRECTORIES
                 and not d.startswith(".venv")
-                and (not d.startswith(".") or d in {".github", ".vscode", ".nexus"})
+                and (not d.startswith(".") or d in {".github", ".vscode", ".noryx"})
             ]
 
             for filename in sorted(files):
@@ -115,7 +144,11 @@ class RepositoryDiscovery:
                     continue
 
                 if filepath.suffix.lower() in SUPPORTED_EXTENSIONS or filename.lower() in {
-                    "makefile", "dockerfile", "codeowners", ".gitignore", ".env.example"
+                    "makefile",
+                    "dockerfile",
+                    "codeowners",
+                    ".gitignore",
+                    ".env.example",
                 }:
                     discovered.append(filepath)
 

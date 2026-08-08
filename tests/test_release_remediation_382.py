@@ -1,9 +1,9 @@
 """Regression coverage for the 3.8.2 launch-remediation controls."""
+
 from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -40,7 +40,9 @@ def test_environment_qualification_rejects_declared_version_drift(tmp_path, monk
     )
     monkeypatch.setattr(
         "nexus.qualification_environment.subprocess.run",
-        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="No broken requirements found.\n", stderr=""),
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0, stdout="No broken requirements found.\n", stderr=""
+        ),
     )
 
     report = qualify_environment(tmp_path)
@@ -77,9 +79,11 @@ def test_agent_close_closes_provider_exactly_once(tmp_path, monkeypatch):
     assert second["already_closed"] is True
 
 
-@pytest.mark.skipif(os.name != "posix", reason="process-group inheritance regression is POSIX-specific")
+@pytest.mark.skipif(
+    os.name != "posix", reason="process-group inheritance regression is POSIX-specific"
+)
 def test_sandbox_does_not_hang_on_descendant_inherited_pipe(tmp_path: Path):
-    """A descendant holding inherited stdio must not keep Nexus blocked forever."""
+    """A descendant holding inherited stdio must not keep Noryx blocked forever."""
     code = (
         "import subprocess,sys; "
         "subprocess.Popen([sys.executable,'-c','import time; time.sleep(10)']); "
@@ -110,6 +114,7 @@ def test_competitive_process_capture_reaps_inherited_stdio_descendant():
 
     if os.name != "posix":
         import pytest
+
         pytest.skip("POSIX process-group regression")
 
     from nexus.competitive_benchmark import _run_captured_process

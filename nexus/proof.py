@@ -1,10 +1,11 @@
-"""Tamper-evident Nexus Proof receipts.
+"""Tamper-evident Noryx Proof receipts.
 
 A receipt is not a model-authored narrative.  It is a canonical digest of the
 final run report, deterministic evidence, budget usage, repository revision,
 and file fingerprints.  VERIFIED is retained only when the receipt can point
 to passing external checks and satisfied acceptance criteria.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -21,7 +22,7 @@ SCHEMA = "nexus.proof.v2"
 _SUPPORTED_SCHEMAS = {SCHEMA}
 _IGNORED_TREE_PARTS = {
     ".git",
-    ".nexus",
+    ".noryx",
     ".nexusai",
     ".pytest_cache",
     ".ruff_cache",
@@ -184,7 +185,9 @@ def create_proof_receipt(
     checks_pass = bool(checks) and all(item["passed"] for item in checks)
     criteria_pass = bool(criteria) and all(item["passed"] for item in criteria)
     evidence_present = bool(records)
-    within_budget = authorized_budget_inr is None or actual_inr <= float(authorized_budget_inr) + 1e-9
+    within_budget = (
+        authorized_budget_inr is None or actual_inr <= float(authorized_budget_inr) + 1e-9
+    )
 
     status = requested_status
     downgrade_reasons: list[str] = []

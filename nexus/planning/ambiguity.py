@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import re
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from nexus.planning.task_contract import Assumption, Question, TaskContract, TaskType
+from nexus.planning.task_contract import Assumption, Question
 
 
 class ClarificationType(str, Enum):

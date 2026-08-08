@@ -1,5 +1,5 @@
 """
-Canonical Execution Pipeline for Nexus CLI.
+Canonical Execution Pipeline for Noryx CLI.
 
 Defines the single authoritative execution flow consumed by all modes:
     UserPrompt → RepoUnderstanding → Planning → ContextSelection →
@@ -24,6 +24,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from nexus import ui
 from nexus.planner import TaskStatus, TaskType, get_task_type
 from nexus.recovery.controller import RecoveryController
 from nexus.recovery.records import FailureRecord
@@ -190,6 +191,7 @@ class ExecutionPipeline:
         if horizon is not None:
             try:
                 from nexus.intelligence.engineering import LongHorizonPhase
+
                 if horizon.state.phase == LongHorizonPhase.PLAN:
                     horizon.transition(
                         LongHorizonPhase.IMPLEMENT,
@@ -266,11 +268,7 @@ class ExecutionPipeline:
         stage_results.append(evidence_stage)
 
         semantic_status = str(semantic_result.metadata.get("status", ""))
-        status_override = (
-            RunStatus.FAILED
-            if semantic_status == RunStatus.FAILED.value
-            else None
-        )
+        status_override = RunStatus.FAILED if semantic_status == RunStatus.FAILED.value else None
         report = self._agent._run_finalizer.finish(
             response, events, status_override=status_override
         )
@@ -313,7 +311,7 @@ class ExecutionPipeline:
                     duration_ms=int((time.monotonic() - t) * 1000),
                     metadata={"refreshed": False, "reason": "Not a git repository"},
                 )
-            
+
             updated = self._agent.repo_graph.build(force=False)
             return StageResult(
                 stage=PipelineStage.REPO_UNDERSTANDING,
@@ -338,9 +336,8 @@ class ExecutionPipeline:
     def _stage_planning(self, user_input: str) -> tuple[dict[str, Any], Any, StageResult]:
         """Classify intent and generate or retrieve the execution plan."""
         t = time.monotonic()
-        strict_mode = (
-            user_input.lstrip().startswith("[NEXUS VERIFIED REPAIR]")
-            or bool(getattr(getattr(self._agent, "mode_policy", None), "require_review", False))
+        strict_mode = user_input.lstrip().startswith("[NEXUS VERIFIED REPAIR]") or bool(
+            getattr(getattr(self._agent, "mode_policy", None), "require_review", False)
         )
         try:
             resume_analysis = getattr(self._agent, "_resume_analysis_override", None)
@@ -373,10 +370,7 @@ class ExecutionPipeline:
             requires_engineering_contract = (
                 intent is not None and get_task_type(intent) != TaskType.READ_ONLY
             )
-            if (
-                requires_engineering_contract
-                and getattr(self._agent, "engineering_brain", None)
-            ):
+            if requires_engineering_contract and getattr(self._agent, "engineering_brain", None):
                 brain_contract = self._agent.engineering_brain.prepare(
                     user_input,
                     task_id=self._agent.conversation_id,
@@ -395,6 +389,7 @@ class ExecutionPipeline:
                 horizon = self._agent.engineering_brain.long_horizon
                 if horizon is not None and horizon.state.phase.value == "RESEARCH":
                     from nexus.intelligence.engineering import LongHorizonPhase
+
                     horizon.transition(
                         LongHorizonPhase.PLAN,
                         summary="Repository context and initial engineering contract established.",
@@ -434,17 +429,27 @@ class ExecutionPipeline:
                     verification,
                 )
                 if brain_contract is not None:
-                    approved_files = list(dict.fromkeys([
-                        *brain_contract.decisive_files,
-                        *brain_contract.related_tests,
-                    ]))
-                    plan.permitted_files = list(dict.fromkeys([*plan.permitted_files, *approved_files]))
-                    plan.acceptance_criteria = list(dict.fromkeys([
-                        *plan.acceptance_criteria,
-                        "Every changed file is justified by repository impact evidence",
-                        "No prohibited or unrelated area is modified",
-                        "External verification and independent semantic review support completion",
-                    ]))
+                    approved_files = list(
+                        dict.fromkeys(
+                            [
+                                *brain_contract.decisive_files,
+                                *brain_contract.related_tests,
+                            ]
+                        )
+                    )
+                    plan.permitted_files = list(
+                        dict.fromkeys([*plan.permitted_files, *approved_files])
+                    )
+                    plan.acceptance_criteria = list(
+                        dict.fromkeys(
+                            [
+                                *plan.acceptance_criteria,
+                                "Every changed file is justified by repository impact evidence",
+                                "No prohibited or unrelated area is modified",
+                                "External verification and independent semantic review support completion",
+                            ]
+                        )
+                    )
                 for step in plan.steps:
                     step.acceptance_criteria = list(plan.acceptance_criteria)
                     if brain_contract is not None:
@@ -553,7 +558,6 @@ class ExecutionPipeline:
     ) -> dict[str, Any]:
         """Run the model + tool loop."""
         t = time.monotonic()
-        agent = self._agent
         try:
             if routing_mode == "nova":
                 response, events = self._run_nova_turn(user_input, emit_ui=emit_ui)  # noqa: SLF001
@@ -723,7 +727,9 @@ class ExecutionPipeline:
                     metadata={"task_id": current.id, "model_turns_used": turns_used},
                 )
             elif current.status == TaskStatus.FAILED:
-                failure = (current.error or current.result or response or "Unknown step failure").strip()
+                failure = (
+                    current.error or current.result or response or "Unknown step failure"
+                ).strip()
                 fingerprint = failure[:1000]
                 seen = failure_fingerprints.setdefault(current.id, set())
                 repeated = fingerprint in seen
@@ -774,9 +780,7 @@ class ExecutionPipeline:
                                 "task_profile", {}
                             )
                         except (OSError, TypeError, ValueError) as exc:
-                            self._logger.warning(
-                                "Plan-step context expansion failed: %s", exc
-                            )
+                            self._logger.warning("Plan-step context expansion failed: %s", exc)
                     canonical_replanned = agent.planner.revise_canonical_plan(
                         plan,
                         trigger_reason=failure,
@@ -824,10 +828,14 @@ class ExecutionPipeline:
                     agent.run_ledger.record_plan(plan)
                     continue
                 break
-            if "Local Nova fallback" in (response or "") or (response or "").lstrip().upper().startswith(("ERROR:", "BLOCKED:")):
+            if "Local Nova fallback" in (response or "") or (
+                response or ""
+            ).lstrip().upper().startswith(("ERROR:", "BLOCKED:")):
                 if current.status == TaskStatus.IN_PROGRESS:
                     if "Local Nova fallback" in (response or ""):
-                        agent.planner.advance_step(current.id, TaskStatus.COMPLETED, response[:2000])
+                        agent.planner.advance_step(
+                            current.id, TaskStatus.COMPLETED, response[:2000]
+                        )
                     else:
                         agent.planner.advance_step(current.id, TaskStatus.FAILED, response[:2000])
                 break
@@ -881,6 +889,7 @@ class ExecutionPipeline:
             if horizon is not None and verified:
                 try:
                     from nexus.intelligence.engineering import LongHorizonPhase
+
                     ids = [str(item.get("id")) for item in [*mutations, *checks] if item.get("id")]
                     if ids and horizon.state.phase == LongHorizonPhase.IMPLEMENT:
                         horizon.transition(
@@ -931,6 +940,7 @@ class ExecutionPipeline:
                 horizon = brain.long_horizon
                 if horizon is not None:
                     from nexus.intelligence.engineering import LongHorizonPhase
+
                     if horizon.state.phase in {LongHorizonPhase.VERIFY, LongHorizonPhase.REVIEW}:
                         horizon.transition(
                             LongHorizonPhase.IMPLEMENT,
@@ -1036,16 +1046,19 @@ class ExecutionPipeline:
                 metadata={"status": RunStatus.PARTIALLY_VERIFIED.value},
                 error="Engineering contract unavailable.",
             )
-        evidence = self._agent.evidence.records()[
-            getattr(self._agent, "_turn_evidence_start", 0) :
-        ]
+        evidence = self._agent.evidence.records()[getattr(self._agent, "_turn_evidence_start", 0) :]
         changed_files = []
         for item in self._agent.history.changes[getattr(self._agent, "_run_history_start", 0) :]:
             raw = item.get("filepath", "")
             if not raw:
                 continue
             try:
-                changed_files.append(Path(raw).resolve().relative_to(Path(self._agent.working_dir).resolve()).as_posix())
+                changed_files.append(
+                    Path(raw)
+                    .resolve()
+                    .relative_to(Path(self._agent.working_dir).resolve())
+                    .as_posix()
+                )
             except ValueError:
                 changed_files.append(str(raw))
         criteria = []
@@ -1062,20 +1075,32 @@ class ExecutionPipeline:
         if horizon is not None:
             try:
                 from nexus.intelligence.engineering import LongHorizonPhase
+
                 semantic_ids = [str(item.get("id")) for item in evidence if item.get("id")]
-                if review_result.success and horizon.state.phase == LongHorizonPhase.VERIFY and semantic_ids:
+                if (
+                    review_result.success
+                    and horizon.state.phase == LongHorizonPhase.VERIFY
+                    and semantic_ids
+                ):
                     horizon.transition(
                         LongHorizonPhase.REVIEW,
                         summary="Independent review completed after deterministic verification.",
                         evidence_ids=semantic_ids,
                     )
-                if result.satisfied and horizon.state.phase == LongHorizonPhase.REVIEW and semantic_ids:
+                if (
+                    result.satisfied
+                    and horizon.state.phase == LongHorizonPhase.REVIEW
+                    and semantic_ids
+                ):
                     horizon.transition(
                         LongHorizonPhase.COMPLETE,
                         summary="Semantic acceptance and scope checks passed.",
                         evidence_ids=semantic_ids,
                     )
-                elif not result.satisfied and horizon.state.phase not in {LongHorizonPhase.COMPLETE, LongHorizonPhase.FAILED}:
+                elif not result.satisfied and horizon.state.phase not in {
+                    LongHorizonPhase.COMPLETE,
+                    LongHorizonPhase.FAILED,
+                }:
                     horizon.transition(
                         LongHorizonPhase.BLOCKED,
                         summary="Semantic acceptance remained incomplete.",
@@ -1083,6 +1108,7 @@ class ExecutionPipeline:
                     )
             except Exception as exc:
                 from nexus.intelligence.engineering import LongHorizonIntegrityError
+
                 if isinstance(exc, LongHorizonIntegrityError):
                     self._agent.evidence.append(
                         kind="engineering_state_integrity",
@@ -1135,7 +1161,6 @@ class ExecutionPipeline:
                 duration_ms=int((time.monotonic() - t) * 1000),
                 metadata={"warning": str(exc)},
             )
-
 
     def _run_two_node_turn(
         self, user_input: str, analysis: dict, emit_ui: bool = True
@@ -1328,8 +1353,6 @@ class ExecutionPipeline:
         agent._auto_save()
         return breakdown, events
 
-
-
     def _run_nova_turn(self, user_input: str, emit_ui: bool = True) -> tuple[str, list[dict]]:
         """Run one turn through the local Nova pipeline backend."""
         from nexus.nova_backend import NovaBackendError, NovaPipelineBackend
@@ -1474,4 +1497,3 @@ class ExecutionPipeline:
         return final_content, events
 
     # ── Subagent Integration ─────────────────────────────────────────────
-

@@ -33,7 +33,7 @@ class RuntimeContext:
 class SecureExtensionRuntime:
     """Run extensions in isolated subprocess workers with capability enforcement.
 
-    Extensions NEVER run in the main Nexus process. All tool invocations
+    Extensions NEVER run in the main Noryx process. All tool invocations
     go through the Tool Gateway. All mutations go through the Transaction Engine.
     """
 

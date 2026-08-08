@@ -224,6 +224,7 @@ class VerificationEngine:
 
         try:
             import sys
+
             # SECURITY CLASSIFICATION: INTERNAL_GIT_OP
             result = subprocess.run(
                 [os.environ.get("PYTHON", sys.executable), "-m", "compileall", "-q", "-f", "."],
@@ -397,14 +398,10 @@ class VerificationEngine:
         """Run fast, dependency-focused checks before the complete gate.
 
         A failing targeted test immediately returns high-signal evidence to the
-        repair loop. When focused checks pass, Nexus still runs the complete
+        repair loop. When focused checks pass, Noryx still runs the complete
         project verification suite so optimization never weakens the release bar.
         """
-        normalized = [
-            str(Path(path))
-            for path in changed_paths
-            if str(path).strip()
-        ]
+        normalized = [str(Path(path)) for path in changed_paths if str(path).strip()]
         focused: list[CheckResult] = []
         if self.project_type == "python" and impacted_tests:
             interpreter = _shell_executable(os.environ.get("PYTHON") or sys.executable)
@@ -446,7 +443,11 @@ class VerificationEngine:
         normalized = re.sub(r"pid=\d+", "pid=<PID>", normalized)
 
         # For pytest, extract semantic signatures
-        if "=================================== FAILURES ===================================" in normalized or "short test summary info" in normalized:
+        if (
+            "=================================== FAILURES ==================================="
+            in normalized
+            or "short test summary info" in normalized
+        ):
             signatures = []
             for line in normalized.splitlines():
                 stripped = line.rstrip()
@@ -464,7 +465,9 @@ class VerificationEngine:
             # failure identity. The failure sections and node IDs remain below.
             if re.fullmatch(r"[.FEsxX]+\s+\[\s*\d+%\]", stripped.strip()):
                 continue
-            if re.fullmatch(r"=+\s*(?:short test summary info|FAILURES|ERRORS)\s*=+", stripped.strip()):
+            if re.fullmatch(
+                r"=+\s*(?:short test summary info|FAILURES|ERRORS)\s*=+", stripped.strip()
+            ):
                 continue
             # Pytest's final aggregate count varies in timing only; individual
             # FAILED/ERROR node lines and assertion content are retained.
@@ -711,6 +714,15 @@ class VerificationEngine:
 
         start = time.monotonic()
 
+        # A prior tool/test may narrow PATH.  Resolve the generic Python command
+        # to this running interpreter so verification stays reproducible.
+        command = re.sub(
+            r"^python(?:3)?(?=\s|$)",
+            _shell_executable(sys.executable),
+            command,
+            count=1,
+        )
+
         try:
             safety = SafetyLayer().check_command(command)
             if safety.level in {SafetyLevel.BLOCKED, SafetyLevel.DANGEROUS}:
@@ -745,7 +757,9 @@ class VerificationEngine:
                 )
                 if not valid:
                     status = CheckStatus.FAILED
-                    output = (output.rstrip() + f"\n\n[NEXUS] Test evidence rejected: {detail}").strip()
+                    output = (
+                        output.rstrip() + f"\n\n[NEXUS] Test evidence rejected: {detail}"
+                    ).strip()
 
             # Count errors and warnings from output
             error_count = output.lower().count("error")
@@ -835,7 +849,7 @@ class VerificationEngine:
         )
 
     def _verification_config(self) -> dict:
-        path = Path(self.working_dir) / ".nexus" / "verify.json"
+        path = Path(self.working_dir) / ".noryx" / "verify.json"
         if not path.is_file():
             return {}
         from nexus.trust import TrustStore

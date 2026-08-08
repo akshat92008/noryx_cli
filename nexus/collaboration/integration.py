@@ -94,14 +94,21 @@ class IntegrationCoordinator:
         eligible: List[AssignmentResult] = []
         for result in accepted_results:
             review = reviews.get(result.assignment_id)
-            if review is None or not review.accepted or review.decision != ReviewDecision.APPROVE_FOR_INTEGRATION:
+            if (
+                review is None
+                or not review.accepted
+                or review.decision != ReviewDecision.APPROVE_FOR_INTEGRATION
+            ):
                 logger.warning(
                     "IntegrationCoordinator: assignment '%s' skipped — review decision not APPROVE_FOR_INTEGRATION.",
                     result.assignment_id,
                 )
                 rejected.append(result.assignment_id)
                 continue
-            if result.status not in (AssignmentStatus.COMPLETED, AssignmentStatus.LOCALLY_VALIDATED):
+            if result.status not in (
+                AssignmentStatus.COMPLETED,
+                AssignmentStatus.LOCALLY_VALIDATED,
+            ):
                 rejected.append(result.assignment_id)
                 continue
             eligible.append(result)
@@ -109,7 +116,9 @@ class IntegrationCoordinator:
         if not eligible:
             return IntegrationResult(
                 integration_id=integration_id,
-                status=IntegrationStatus.FAILED if accepted_results else IntegrationStatus.INTEGRATED,
+                status=IntegrationStatus.FAILED
+                if accepted_results
+                else IntegrationStatus.INTEGRATED,
                 baseline_tree=baseline_tree,
                 integrated_tree=baseline_tree,
                 applied_assignments=(),
@@ -123,7 +132,9 @@ class IntegrationCoordinator:
             change_signals = [
                 ChangeSignal(
                     assignment_id=r.assignment_id,
-                    affected_files=[_get_change_path(c) for c in r.proposed_changes if _get_change_path(c)],
+                    affected_files=[
+                        _get_change_path(c) for c in r.proposed_changes if _get_change_path(c)
+                    ],
                 )
                 for r in eligible
             ]
@@ -140,8 +151,9 @@ class IntegrationCoordinator:
                 conflict_descriptions.append(desc)
                 logger.error("IntegrationCoordinator: %s", desc)
 
-            blocked_ids = {sc.assignment_id_a for sc in blocking_conflicts} | \
-                          {sc.assignment_id_b for sc in blocking_conflicts}
+            blocked_ids = {sc.assignment_id_a for sc in blocking_conflicts} | {
+                sc.assignment_id_b for sc in blocking_conflicts
+            }
             for r in eligible:
                 if r.assignment_id in blocked_ids:
                     rejected.append(r.assignment_id)
@@ -184,7 +196,12 @@ class IntegrationCoordinator:
         int_workspace_dir = Path(tempfile.mkdtemp(prefix="nexus-integration-"))
         try:
             for item in self._lead_root.iterdir():
-                if item.name.startswith(".") or item.name in ("__pycache__", "build", "dist", "node_modules"):
+                if item.name.startswith(".") or item.name in (
+                    "__pycache__",
+                    "build",
+                    "dist",
+                    "node_modules",
+                ):
                     continue
                 dest = int_workspace_dir / item.name
                 if item.is_dir():
@@ -257,10 +274,14 @@ class IntegrationCoordinator:
                 for aid in integrated:
                     rejected.append(aid)
                 integrated.clear()
-                conflict_descriptions.append("Central verification failed — integration rolled back.")
+                conflict_descriptions.append(
+                    "Central verification failed — integration rolled back."
+                )
                 integrated_tree_hash = None
 
-            status = IntegrationStatus.INTEGRATED if verification_passed else IntegrationStatus.FAILED
+            status = (
+                IntegrationStatus.INTEGRATED if verification_passed else IntegrationStatus.FAILED
+            )
 
             return IntegrationResult(
                 integration_id=integration_id,

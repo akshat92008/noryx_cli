@@ -1,5 +1,5 @@
 """
-Offline-capable HTML Regression Dashboard generator for Nexus benchmark results.
+Offline-capable HTML Regression Dashboard generator for Noryx benchmark results.
 """
 
 import json
@@ -11,7 +11,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Regression Dashboard</title>
+    <title>Noryx Regression Dashboard</title>
     <style>
         :root {{
             --bg-color: #0f172a;
@@ -74,7 +74,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
     <div class="header">
-        <h1>Nexus Regression Dashboard</h1>
+        <h1>Noryx Regression Dashboard</h1>
         <p style="color: var(--text-muted);">Generated on {generated_at} from {manifest_id}</p>
     </div>
 

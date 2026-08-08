@@ -5,12 +5,13 @@ messages, and concurrency symptoms into deterministic repository signals.  It
 then derives an expansion budget from uncertainty rather than applying a fixed
 "add N files" rule.
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Iterable, Mapping, TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, Mapping
 
 from nexus.intelligence.repository.model import ContextBundle, TaskIntent
 
@@ -20,18 +21,34 @@ if TYPE_CHECKING:  # pragma: no cover
 
 _PATH_PATTERNS = (
     re.compile(r'File\s+["\'](?P<path>[^"\']+)["\'],\s*line\s+\d+'),
-    re.compile(r'(?P<path>(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\.(?:py|pyi|js|jsx|ts|tsx|go|rs|java|kt|rb|php|cs|cpp|c|h|hpp|json|ya?ml|toml|ini|cfg|sql|sh|md))(?::\d+(?::\d+)?)?'),
+    re.compile(
+        r"(?P<path>(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\.(?:py|pyi|js|jsx|ts|tsx|go|rs|java|kt|rb|php|cs|cpp|c|h|hpp|json|ya?ml|toml|ini|cfg|sql|sh|md))(?::\d+(?::\d+)?)?"
+    ),
 )
 _SYMBOL_PATTERNS = (
     re.compile(r"NameError:\s*name\s*['\"](?P<symbol>[A-Za-z_][A-Za-z0-9_]*)['\"]"),
-    re.compile(r"AttributeError:.*?has no attribute\s*['\"](?P<symbol>[A-Za-z_][A-Za-z0-9_]*)['\"]"),
+    re.compile(
+        r"AttributeError:.*?has no attribute\s*['\"](?P<symbol>[A-Za-z_][A-Za-z0-9_]*)['\"]"
+    ),
     re.compile(r"cannot import name\s*['\"]?(?P<symbol>[A-Za-z_][A-Za-z0-9_]*)"),
-    re.compile(r"(?:undefined|unresolved)\s+(?:name|symbol|reference)\s*[:=]?\s*['\"]?(?P<symbol>[A-Za-z_$][A-Za-z0-9_$]*)", re.I),
-    re.compile(r"TypeError:\s*(?P<symbol>[A-Za-z_][A-Za-z0-9_.]*)\([^\n]*?(?:missing|required|unexpected keyword)"),
+    re.compile(
+        r"(?:undefined|unresolved)\s+(?:name|symbol|reference)\s*[:=]?\s*['\"]?(?P<symbol>[A-Za-z_$][A-Za-z0-9_$]*)",
+        re.I,
+    ),
+    re.compile(
+        r"TypeError:\s*(?P<symbol>[A-Za-z_][A-Za-z0-9_.]*)\([^\n]*?(?:missing|required|unexpected keyword)"
+    ),
 )
-_TEST_NODE = re.compile(r"(?P<path>(?:tests?|specs?)/[^\s:]+\.(?:py|js|jsx|ts|tsx))(?:::(?P<node>[^\s]+))?")
-_IMPORT_PATTERN = re.compile(r"(?:ModuleNotFoundError|ImportError):\s*(?:No module named\s*)?['\"]?(?P<module>[A-Za-z0-9_./-]+)")
-_CONFIG_PATTERN = re.compile(r"(?P<name>(?:pyproject\.toml|package\.json|tsconfig(?:\.[A-Za-z0-9_-]+)?\.json|go\.mod|Cargo\.toml|requirements[^\s/]*\.txt|[^\s/]+\.(?:ya?ml|toml|ini|cfg)))", re.I)
+_TEST_NODE = re.compile(
+    r"(?P<path>(?:tests?|specs?)/[^\s:]+\.(?:py|js|jsx|ts|tsx))(?:::(?P<node>[^\s]+))?"
+)
+_IMPORT_PATTERN = re.compile(
+    r"(?:ModuleNotFoundError|ImportError):\s*(?:No module named\s*)?['\"]?(?P<module>[A-Za-z0-9_./-]+)"
+)
+_CONFIG_PATTERN = re.compile(
+    r"(?P<name>(?:pyproject\.toml|package\.json|tsconfig(?:\.[A-Za-z0-9_-]+)?\.json|go\.mod|Cargo\.toml|requirements[^\s/]*\.txt|[^\s/]+\.(?:ya?ml|toml|ini|cfg)))",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -52,15 +69,19 @@ class EvidenceSignals:
         return self.uncertainty_score >= 0.65
 
     def query_terms(self) -> list[str]:
-        return list(dict.fromkeys([
-            *self.paths,
-            *self.symbols,
-            *self.modules,
-            *self.configuration,
-            *self.failure_kinds,
-            *self.concurrency_terms,
-            *self.migration_terms,
-        ]))
+        return list(
+            dict.fromkeys(
+                [
+                    *self.paths,
+                    *self.symbols,
+                    *self.modules,
+                    *self.configuration,
+                    *self.failure_kinds,
+                    *self.concurrency_terms,
+                    *self.migration_terms,
+                ]
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -97,12 +118,20 @@ class FailureEvidenceExtractor:
             if normalized:
                 tests.append(normalized)
                 paths.append(normalized)
-        symbols = [match.group("symbol").split(".")[-1] for pattern in _SYMBOL_PATTERNS for match in pattern.finditer(text)]
+        symbols = [
+            match.group("symbol").split(".")[-1]
+            for pattern in _SYMBOL_PATTERNS
+            for match in pattern.finditer(text)
+        ]
         modules = [match.group("module").strip("'\"") for match in _IMPORT_PATTERN.finditer(text)]
         configuration: list[str] = []
         for match in _CONFIG_PATTERN.finditer(text):
             name = match.group("name")
-            candidates = sorted(path for path in known if PurePosixPath(path).name.lower() == PurePosixPath(name).name.lower())
+            candidates = sorted(
+                path
+                for path in known
+                if PurePosixPath(path).name.lower() == PurePosixPath(name).name.lower()
+            )
             configuration.extend(candidates or [name])
 
         lowered = text.lower()
@@ -114,29 +143,77 @@ class FailureEvidenceExtractor:
             "build_failure": ("build failed", "compilation failed", "syntaxerror", "linker"),
             "runtime_exception": ("traceback", "exception", "panic:", "segmentation fault"),
             "timeout_or_deadlock": ("timed out", "timeout", "deadlock", "hung"),
-            "data_integrity_failure": ("constraint failed", "integrityerror", "duplicate key", "corrupt"),
+            "data_integrity_failure": (
+                "constraint failed",
+                "integrityerror",
+                "duplicate key",
+                "corrupt",
+            ),
         }
         for kind, terms in kind_terms.items():
             if any(term in lowered for term in terms):
                 failure_kinds.append(kind)
 
         concurrency_vocab = (
-            "race condition", "deadlock", "lock contention", "lost update", "atomic", "thread",
-            "asyncio", "concurrent", "concurrency", "transaction", "isolation level", "shared state", "mutex",
-            "semaphore", "process leak", "connection pool",
+            "race condition",
+            "deadlock",
+            "lock contention",
+            "lost update",
+            "atomic",
+            "thread",
+            "asyncio",
+            "concurrent",
+            "concurrency",
+            "transaction",
+            "isolation level",
+            "shared state",
+            "mutex",
+            "semaphore",
+            "process leak",
+            "connection pool",
         )
         migration_vocab = (
-            "migration", "migrate", "deprecated", "deprecation", "breaking change", "schema",
-            "codemod", "framework upgrade", "api change", "rename", "compatibility layer",
+            "migration",
+            "migrate",
+            "deprecated",
+            "deprecation",
+            "breaking change",
+            "schema",
+            "codemod",
+            "framework upgrade",
+            "api change",
+            "rename",
+            "compatibility layer",
         )
         concurrency_terms = [item for item in concurrency_vocab if item in lowered]
         migration_terms = [item for item in migration_vocab if item in lowered]
 
-        signal_count = len(set(paths)) + len(set(symbols)) + len(set(modules)) + len(set(failure_kinds))
+        signal_count = (
+            len(set(paths)) + len(set(symbols)) + len(set(modules)) + len(set(failure_kinds))
+        )
         unresolved_penalty = 0.25 if not paths else 0.0
         no_symbol_penalty = 0.15 if not symbols and "error" in lowered else 0.0
-        broad_penalty = 0.20 if any(term in lowered for term in ("repository-wide", "all callers", "across the repo", "framework migration")) else 0.0
-        uncertainty = min(1.0, 0.2 + unresolved_penalty + no_symbol_penalty + broad_penalty + (0.15 if signal_count <= 2 else 0.0))
+        broad_penalty = (
+            0.20
+            if any(
+                term in lowered
+                for term in (
+                    "repository-wide",
+                    "all callers",
+                    "across the repo",
+                    "framework migration",
+                )
+            )
+            else 0.0
+        )
+        uncertainty = min(
+            1.0,
+            0.2
+            + unresolved_penalty
+            + no_symbol_penalty
+            + broad_penalty
+            + (0.15 if signal_count <= 2 else 0.0),
+        )
         return EvidenceSignals(
             paths=tuple(dict.fromkeys(paths)),
             symbols=tuple(dict.fromkeys(symbols)),
@@ -181,7 +258,9 @@ class FailureEvidenceExtractor:
         if normalized.startswith("/"):
             matches = [path for path in known if normalized.endswith("/" + path)]
             return min(matches, key=len) if matches else ""
-        suffix_matches = [path for path in known if path.endswith("/" + normalized) or path == normalized]
+        suffix_matches = [
+            path for path in known if path.endswith("/" + normalized) or path == normalized
+        ]
         return min(suffix_matches, key=len) if suffix_matches else normalized if not known else ""
 
 
@@ -218,10 +297,16 @@ class ExpansionPolicy:
         if risk in {"high", "critical"}:
             base_growth += 6
 
-        max_files = min(64, max(len(bundle.files) + base_growth, 24 if intent in broad_intents else 18))
+        max_files = min(
+            64, max(len(bundle.files) + base_growth, 24 if intent in broad_intents else 18)
+        )
         token_growth = max(12_000, base_growth * 1_500)
         max_tokens = min(128_000, max(bundle.estimated_tokens + token_growth, max_files * 2_000))
-        max_hops = 5 if intent in broad_intents or signals.concurrency_terms or signals.migration_terms else 4
+        max_hops = (
+            5
+            if intent in broad_intents or signals.concurrency_terms or signals.migration_terms
+            else 4
+        )
         if signals.high_uncertainty:
             max_hops = min(6, max_hops + 1)
         multiplier = 5 if max_hops >= 5 else 4
@@ -247,14 +332,20 @@ class EvidenceDrivenContextExpander:
         additional_files: Iterable[str] = (),
         risk_level: str = "medium",
     ) -> ContextBundle:
-        signals = FailureEvidenceExtractor.extract(evidence or reason, repository_paths=self.repository.files)
-        explicit = list(dict.fromkeys([
-            *(item.path for item in bundle.files),
-            *signals.paths,
-            *signals.tests,
-            *signals.configuration,
-            *(str(item) for item in additional_files),
-        ]))
+        signals = FailureEvidenceExtractor.extract(
+            evidence or reason, repository_paths=self.repository.files
+        )
+        explicit = list(
+            dict.fromkeys(
+                [
+                    *(item.path for item in bundle.files),
+                    *signals.paths,
+                    *signals.tests,
+                    *signals.configuration,
+                    *(str(item) for item in additional_files),
+                ]
+            )
+        )
         budget = ExpansionPolicy.derive(bundle, signals, risk_level=risk_level)
         query_parts = [bundle.task_intent.value, reason, *signals.query_terms()]
         expanded = self.repository.context_bundle(
@@ -276,5 +367,7 @@ class EvidenceDrivenContextExpander:
                 "Failure evidence remains ambiguous; completion must require targeted reproduction before mutation."
             )
         for path in signals.paths:
-            expanded.selection_rationales.setdefault(path, []).append("Observed directly in runtime failure evidence.")
+            expanded.selection_rationales.setdefault(path, []).append(
+                "Observed directly in runtime failure evidence."
+            )
         return expanded

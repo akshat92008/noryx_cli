@@ -1,5 +1,5 @@
 """
-Nexus Runtime Architecture
+Noryx Runtime Architecture
 """
 
 from nexus.runtime.engine import ExecutionEngine

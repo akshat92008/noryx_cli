@@ -6,14 +6,12 @@ import hashlib
 import json
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
-from nexus.paths import nexus_home
 from nexus.intelligence.repository.engine import RepositoryIntelligence
-from nexus.intelligence.repository.model import FileContext, ArchitectureMap, RiskLevel
+from nexus.intelligence.repository.model import ArchitectureMap, FileContext
+from nexus.paths import nexus_home
 
 
 class ContextManager:
@@ -89,18 +87,20 @@ class ContextManager:
 
     def get_relevant_context(self, user_input: str = "") -> str:
         self._refresh_stale_contexts()
-        bundle = self.engine.context_bundle(user_input, max_total_tokens=self.max_context_tokens // 2)
-        
+        bundle = self.engine.context_bundle(
+            user_input, max_total_tokens=self.max_context_tokens // 2
+        )
+
         # Combine engine bundle with active file summaries
         prompt = bundle.to_formatted_prompt()
         active_entries = []
         for abs_path, ctx in self._file_contexts.items():
             if ctx.summary and Path(abs_path).exists():
                 active_entries.append(f"{Path(abs_path).name}: {ctx.summary}")
-        
+
         if active_entries:
             prompt += "\n\n[ACTIVE FILE SUMMARIES]\n" + "\n".join(active_entries[:10])
-            
+
         return prompt
 
     def get_architecture_context(self) -> str:
@@ -119,8 +119,6 @@ class ContextManager:
     def summarize_file(self, filepath: str, content: str) -> str:
         lines = content.split("\n")
         line_count = len(lines)
-        lang = Path(filepath).suffix.lower()
-
         parts = [f"{line_count} lines"]
         classes = re.findall(r"^class\s+(\w+)", content, re.MULTILINE)
         functions = re.findall(r"^(?:def|function|const|let|var)\s+(\w+)", content, re.MULTILINE)

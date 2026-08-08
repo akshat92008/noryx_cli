@@ -1,5 +1,5 @@
 """
-Structured Recovery Lifecycle Events for Nexus CLI.
+Structured Recovery Lifecycle Events for Noryx CLI.
 """
 
 from __future__ import annotations

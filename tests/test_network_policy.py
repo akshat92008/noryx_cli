@@ -54,9 +54,9 @@ def test_every_dns_answer_must_be_public():
 
 def test_userinfo_and_non_public_special_ranges_are_blocked():
     userinfo = NetworkPolicy().check_url_syntax("https://user:password@example.com")
-    carrier_nat = NetworkPolicy(
-        resolver=lambda *_args: _address_info("100.64.0.1")
-    ).check_url("https://example.test")
+    carrier_nat = NetworkPolicy(resolver=lambda *_args: _address_info("100.64.0.1")).check_url(
+        "https://example.test"
+    )
 
     assert userinfo is not None and userinfo.category == "userinfo"
     assert carrier_nat is not None and carrier_nat.category == "special_range"

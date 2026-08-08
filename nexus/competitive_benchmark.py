@@ -4,6 +4,7 @@ The harness does not claim parity.  It creates matched disposable repositories,
 withholds oracle material during agent execution, randomizes invocation order,
 and scores both systems through the same deterministic verifier.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -29,7 +30,7 @@ class AgentInvocation:
     argv: tuple[str, ...]
     version_argv: tuple[str, ...] = ()
     success_markers: tuple[str, ...] = ("COMPLETED", "VERIFIED", "SUCCESS")
-    metrics_file: str = ""
+    evaluator_metrics_file: str = ""
     product_identity: str = ""
     model_identity: str = ""
 
@@ -96,7 +97,7 @@ def _read_capped(stream: Any, *, limit: int = 1_000_000) -> str:
         prefix = stream.read(head)
         stream.seek(max(0, size - tail))
         suffix = stream.read(tail)
-        raw = prefix + b"\n...[NEXUS OUTPUT TRUNCATED]...\n" + suffix
+        raw = prefix + b"\n...[NORYX OUTPUT TRUNCATED]...\n" + suffix
     if isinstance(raw, str):
         return raw
     return raw.decode("utf-8", errors="replace")
@@ -209,9 +210,7 @@ def _run_captured_process(
         stderr = _read_capped(stderr_file)
         if timed_out:
             stderr = (stderr + "\nTIMEOUT").strip()
-        return _CapturedProcess(
-            process.returncode, stdout, stderr, timed_out, descendants_reaped
-        )
+        return _CapturedProcess(process.returncode, stdout, stderr, timed_out, descendants_reaped)
 
 
 class CompetitiveDuelRunner:
@@ -231,7 +230,7 @@ class CompetitiveDuelRunner:
     def superiority_preflight(self, *, thresholds: Any = None) -> dict[str, Any]:
         """Validate a private superiority campaign before paid agent execution.
 
-        This does not qualify Nexus. It prevents structurally invalid, duplicated,
+        This does not qualify Noryx. It prevents structurally invalid, duplicated,
         placeholder, or underpowered campaigns from consuming model budget.
         """
         from collections import Counter
@@ -250,15 +249,12 @@ class CompetitiveDuelRunner:
         }
         declared_agents = set(self.manifest.get("agents") or {})
         if declared_agents != required_agents:
-            failures.append(
-                "agents_must_be_exactly:" + ",".join(sorted(required_agents))
-            )
+            failures.append("agents_must_be_exactly:" + ",".join(sorted(required_agents)))
 
         def placeholder(value: Any) -> bool:
             text = json.dumps(value, sort_keys=True).lower()
             return any(
-                marker in text
-                for marker in ("replace-with", "placeholder", "unsigned-until")
+                marker in text for marker in ("replace-with", "placeholder", "unsigned-until")
             )
 
         agent_data = self.manifest.get("agents") or {}
@@ -277,8 +273,7 @@ class CompetitiveDuelRunner:
         if (
             limits.nexus_agent in identities
             and limits.direct_baseline_agent in identities
-            and identities[limits.nexus_agent][1]
-            != identities[limits.direct_baseline_agent][1]
+            and identities[limits.nexus_agent][1] != identities[limits.direct_baseline_agent][1]
         ):
             failures.append("direct_baseline_model_mismatch")
         products = {value[0] for value in identities.values() if value[0]}
@@ -303,14 +298,10 @@ class CompetitiveDuelRunner:
 
         trials = max(1, int(self.manifest.get("trials", 1)))
         if trials < limits.minimum_trials_per_task:
-            failures.append(
-                f"trials:{trials}<{limits.minimum_trials_per_task}"
-            )
+            failures.append(f"trials:{trials}<{limits.minimum_trials_per_task}")
         tasks = self.manifest.get("tasks") or []
         if len(tasks) < limits.minimum_unique_tasks:
-            failures.append(
-                f"unique_tasks:{len(tasks)}<{limits.minimum_unique_tasks}"
-            )
+            failures.append(f"unique_tasks:{len(tasks)}<{limits.minimum_unique_tasks}")
         categories = Counter(str(task.get("category", "")) for task in tasks)
         required_categories = set(
             limits.required_categories or tuple(sorted(REQUIRED_HARD_TASK_CATEGORIES))
@@ -335,9 +326,7 @@ class CompetitiveDuelRunner:
             repository_hash = hashlib.sha256(
                 json.dumps(snapshot, sort_keys=True).encode("utf-8")
             ).hexdigest()
-            prompt_hash = hashlib.sha256(
-                str(task.get("prompt", "")).encode("utf-8")
-            ).hexdigest()
+            prompt_hash = hashlib.sha256(str(task.get("prompt", "")).encode("utf-8")).hexdigest()
             repository_hashes.add(repository_hash)
             fingerprint = (repository_hash, prompt_hash)
             if fingerprint in fingerprints:
@@ -345,8 +334,7 @@ class CompetitiveDuelRunner:
             fingerprints.add(fingerprint)
         if len(repository_hashes) < limits.minimum_unique_repositories:
             failures.append(
-                "unique_repositories:"
-                f"{len(repository_hashes)}<{limits.minimum_unique_repositories}"
+                f"unique_repositories:{len(repository_hashes)}<{limits.minimum_unique_repositories}"
             )
 
         budget = self._budget_policy()
@@ -362,9 +350,7 @@ class CompetitiveDuelRunner:
             if declared_budget.get(key) is not True:
                 failures.append(f"budget_policy_not_equal:{key}")
         try:
-            maximum_wall = float(
-                declared_budget.get("maximum_wall_time_seconds_per_run", 0)
-            )
+            maximum_wall = float(declared_budget.get("maximum_wall_time_seconds_per_run", 0))
         except (TypeError, ValueError):
             maximum_wall = 0.0
         if maximum_wall <= 0 or budget["timeout_seconds"] > maximum_wall:
@@ -388,7 +374,10 @@ class CompetitiveDuelRunner:
         }
 
     def _validate_manifest(self) -> None:
-        if not isinstance(self.manifest.get("agents"), dict) or not 2 <= len(self.manifest["agents"]) <= 4:
+        if (
+            not isinstance(self.manifest.get("agents"), dict)
+            or not 2 <= len(self.manifest["agents"]) <= 4
+        ):
             raise ValueError("manifest.agents must define between two and four agents")
         tasks = self.manifest.get("tasks")
         if not isinstance(tasks, list) or not tasks:
@@ -416,10 +405,12 @@ class CompetitiveDuelRunner:
 
     def run(self, *, output: str | Path | None = None, dry_run: bool = False) -> DuelReport:
         rng = random.Random(self.seed)
-        invocations = {name: self._invocation(name, data) for name, data in self.manifest["agents"].items()}
+        invocations = {
+            name: self._invocation(name, data) for name, data in self.manifest["agents"].items()
+        }
         all_results: list[dict[str, Any]] = []
         trials = max(1, int(self.manifest.get("trials", 1)))
-        with tempfile.TemporaryDirectory(prefix="nexus-duel-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="noryx-duel-") as temporary:
             root = Path(temporary)
             for trial in range(trials):
                 for task in self.manifest["tasks"]:
@@ -436,8 +427,11 @@ class CompetitiveDuelRunner:
                     }
                     for agent_name in order:
                         result = self._run_one(
-                            invocation=invocations[agent_name], task=task, trial=trial + 1,
-                            workspace_root=root, dry_run=dry_run,
+                            invocation=invocations[agent_name],
+                            task=task,
+                            trial=trial + 1,
+                            workspace_root=root,
+                            dry_run=dry_run,
                         )
                         task_record["results"].append(asdict(result))
                     all_results.append(task_record)
@@ -457,7 +451,7 @@ class CompetitiveDuelRunner:
             }
         )
         report = DuelReport(
-            schema_version="nexus.competitive-duel.v3",
+            schema_version="noryx.competitive-duel.v4",
             manifest_sha256=self.manifest_sha256,
             seed=self.seed,
             dry_run=bool(dry_run),
@@ -527,7 +521,7 @@ class CompetitiveDuelRunner:
             "python_implementation": platform.python_implementation(),
             "python_version": platform.python_version(),
             "executable": str(Path(sys.executable).resolve()),
-            "harness": "nexus.competitive-duel.v3",
+            "harness": "noryx.competitive-duel.v4",
         }
         return {"declared": dict(declared), "runtime": runtime}
 
@@ -555,20 +549,29 @@ class CompetitiveDuelRunner:
             name=name,
             argv=tuple(map(str, argv)),
             version_argv=tuple(map(str, data.get("version_argv") or [])),
-            success_markers=tuple(map(str, data.get("success_markers") or ("COMPLETED", "VERIFIED", "SUCCESS"))),
-            metrics_file=str(data.get("metrics_file") or ""),
+            success_markers=tuple(
+                map(str, data.get("success_markers") or ("COMPLETED", "VERIFIED", "SUCCESS"))
+            ),
+            evaluator_metrics_file=str(data.get("evaluator_metrics_file") or ""),
             product_identity=str(data.get("product_identity") or "").strip(),
             model_identity=str(data.get("model_identity") or "").strip(),
         )
 
     def _run_one(
-        self, *, invocation: AgentInvocation, task: Mapping[str, Any], trial: int,
-        workspace_root: Path, dry_run: bool,
+        self,
+        *,
+        invocation: AgentInvocation,
+        task: Mapping[str, Any],
+        trial: int,
+        workspace_root: Path,
+        dry_run: bool,
     ) -> AgentRunResult:
         source = self._resolve(str(task["repository"]))
         workspace = workspace_root / f"{task['id']}-{trial}-{invocation.name}"
         oracle_name = str(task.get("oracle_dir", ".oracle"))
-        shutil.copytree(source, workspace, ignore=shutil.ignore_patterns(oracle_name, ".git", ".nexus"))
+        shutil.copytree(
+            source, workspace, ignore=shutil.ignore_patterns(oracle_name, ".git", ".noryx")
+        )
         baseline = self._snapshot(workspace)
         argv = tuple(self._expand(item, task, workspace) for item in invocation.argv)
         executable = shutil.which(argv[0]) or (argv[0] if Path(argv[0]).is_file() else "")
@@ -585,22 +588,68 @@ class CompetitiveDuelRunner:
             "model_identity": invocation.model_identity,
         }
         if dry_run:
-            return AgentRunResult(invocation.name, str(task["id"]), bool(executable), False, False, False, False, None, 0, provenance=provenance)
+            return AgentRunResult(
+                invocation.name,
+                str(task["id"]),
+                bool(executable),
+                False,
+                False,
+                False,
+                False,
+                None,
+                0,
+                provenance=provenance,
+            )
         if not executable:
-            return AgentRunResult(invocation.name, str(task["id"]), False, False, False, False, False, None, 0, stderr="executable unavailable", provenance=provenance)
+            return AgentRunResult(
+                invocation.name,
+                str(task["id"]),
+                False,
+                False,
+                False,
+                False,
+                False,
+                None,
+                0,
+                stderr="executable unavailable",
+                provenance=provenance,
+            )
         started = time.monotonic()
         timeout = self._effective_task_budget(task)["agent_timeout_seconds"]
-        completed = _run_captured_process(
-            argv, cwd=workspace, timeout=timeout, env=self._safe_env(task)
+        from nexus.sandbox import CommandSpec, SandboxBackend, SandboxRunner
+
+        candidate = SandboxRunner(workspace).run(
+            CommandSpec.create(
+                argv,
+                workspace,
+                timeout_seconds=timeout,
+                network=False,
+                env=self._safe_env(task),
+                max_output_bytes=1_000_000,
+                require_os_isolation=True,
+                allow_unisolated_host_process=False,
+            )
         )
-        exit_code = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
-        completed_normally = not completed.timed_out and exit_code is not None
+        exit_code = candidate.exit_code
+        stdout = candidate.stdout
+        stderr = candidate.stderr or candidate.blocked_reason
+        isolated = candidate.backend in {
+            SandboxBackend.BUBBLEWRAP,
+            SandboxBackend.MACOS,
+        }
+        completed_normally = isolated and not candidate.timed_out and exit_code is not None
+        provenance["candidate_isolation"] = {
+            "backend": candidate.backend.value,
+            "filesystem_isolation": isolated,
+            "network_denied": not candidate.network_allowed,
+            "network_enforced": candidate.network_enforced,
+            "original_repository_unreadable": isolated,
+            "oracle_unreadable": isolated,
+        }
         provenance["process_tree_cleanup"] = {
-            "isolated_group": os.name in {"posix", "nt"},
-            "descendants_reaped": completed.descendants_reaped,
-            "timed_out": completed.timed_out,
+            "isolated_group": isolated,
+            "descendants_reaped": isolated,
+            "timed_out": candidate.timed_out,
         }
         duration = int((time.monotonic() - started) * 1000)
         changed = self._changed_files(baseline, self._snapshot(workspace))
@@ -610,37 +659,86 @@ class CompetitiveDuelRunner:
         verification = self._verify(task, workspace)
         forbidden = tuple(map(str, task.get("forbidden_content") or []))
         forbidden_hit = self._contains_forbidden(workspace, forbidden)
-        verified = bool(verification) and all(item["success"] for item in verification) and not unexpected and not forbidden_hit
+        verified = (
+            bool(verification)
+            and all(item["success"] for item in verification)
+            and not unexpected
+            and not forbidden_hit
+        )
         output = f"{stdout}\n{stderr}".upper()
-        claimed = exit_code == 0 and any(marker.upper() in output for marker in invocation.success_markers)
-        metrics = self._load_agent_metrics(invocation, task, workspace)
+        claimed = exit_code == 0 and any(
+            marker.upper() in output for marker in invocation.success_markers
+        )
+        metrics = self._load_evaluator_metrics(invocation, task, trial, workspace)
+        provenance["telemetry"] = metrics.pop("_provenance", {})
         return AgentRunResult(
-            invocation.name, str(task["id"]), True, completed_normally, claimed, verified,
-            claimed and not verified, exit_code, duration, changed, unexpected, verification,
-            stdout[-20000:], stderr[-20000:], provenance,
+            invocation.name,
+            str(task["id"]),
+            True,
+            completed_normally,
+            claimed,
+            verified,
+            claimed and not verified,
+            exit_code,
+            duration,
+            changed,
+            unexpected,
+            verification,
+            stdout[-20000:],
+            stderr[-20000:],
+            provenance,
             cost_usd=metrics.get("cost_usd"),
             input_tokens=metrics.get("input_tokens"),
             output_tokens=metrics.get("output_tokens"),
             human_interventions=metrics.get("human_interventions"),
         )
 
-    @staticmethod
-    def _load_agent_metrics(
-        invocation: AgentInvocation, task: Mapping[str, Any], workspace: Path
+    def _load_evaluator_metrics(
+        self,
+        invocation: AgentInvocation,
+        task: Mapping[str, Any],
+        trial: int,
+        workspace: Path,
     ) -> dict[str, Any]:
-        template = invocation.metrics_file or str(task.get("metrics_file", ""))
-        if not template:
+        """Load metrics from an evaluator-owned path outside the candidate mount."""
+        template = invocation.evaluator_metrics_file
+        root_value = str(self.manifest.get("evaluator_metrics_root", "")).strip()
+        if not template or not root_value:
             return {}
-        candidate = Path(template.format(
-            workspace=str(workspace), task_id=str(task.get("id", "")), agent=invocation.name
-        ))
+        metrics_root = self._resolve(root_value)
+        candidate = Path(
+            template.format(task_id=str(task.get("id", "")), agent=invocation.name, trial=trial)
+        )
         if not candidate.is_absolute():
-            candidate = workspace / candidate
+            candidate = metrics_root / candidate
+        candidate = candidate.resolve()
+        try:
+            candidate.relative_to(metrics_root)
+        except ValueError:
+            return {}
+        try:
+            candidate.relative_to(workspace.resolve())
+            return {}
+        except ValueError:
+            pass
         try:
             payload = json.loads(candidate.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
             return {}
         if not isinstance(payload, Mapping):
+            return {}
+        identity = {
+            "source": str(payload.get("source", "")),
+            "task_id": str(payload.get("task_id", "")),
+            "agent": str(payload.get("agent", "")),
+            "trial": int(payload.get("trial", 0) or 0),
+        }
+        if identity != {
+            "source": "evaluator_harness",
+            "task_id": str(task.get("id", "")),
+            "agent": invocation.name,
+            "trial": trial,
+        }:
             return {}
         metrics: dict[str, Any] = {}
         for key in ("cost_usd", "input_tokens", "output_tokens", "human_interventions"):
@@ -651,11 +749,21 @@ class CompetitiveDuelRunner:
                 metrics[key] = float(value) if key == "cost_usd" else int(value)
             except (TypeError, ValueError):
                 continue
+        metrics["_provenance"] = {
+            "source": "evaluator_harness",
+            "path_sha256": hashlib.sha256(str(candidate).encode("utf-8")).hexdigest(),
+            "record_sha256": hashlib.sha256(candidate.read_bytes()).hexdigest(),
+            "candidate_writable": False,
+        }
         return metrics
 
     @staticmethod
     def _expand(value: str, task: Mapping[str, Any], workspace: Path) -> str:
-        return value.format(workspace=str(workspace), prompt=str(task.get("prompt", "")), task_id=str(task.get("id", "")))
+        return value.format(
+            workspace=str(workspace),
+            prompt=str(task.get("prompt", "")),
+            task_id=str(task.get("id", "")),
+        )
 
     def _install_oracle(self, source: Path, workspace: Path, oracle_name: str) -> None:
         oracle = source / oracle_name
@@ -671,35 +779,45 @@ class CompetitiveDuelRunner:
             result = _run_captured_process(
                 expanded, cwd=workspace, timeout=timeout, env=self._safe_env(task)
             )
-            records.append({
-                "argv": expanded,
-                "success": not result.timed_out and result.returncode == 0,
-                "exit_code": result.returncode,
-                "duration_ms": int((time.monotonic()-started)*1000),
-                "stdout": result.stdout[-10000:],
-                "stderr": result.stderr[-10000:],
-                "timed_out": result.timed_out,
-                "descendants_reaped": result.descendants_reaped,
-            })
+            records.append(
+                {
+                    "argv": expanded,
+                    "success": not result.timed_out and result.returncode == 0,
+                    "exit_code": result.returncode,
+                    "duration_ms": int((time.monotonic() - started) * 1000),
+                    "stdout": result.stdout[-10000:],
+                    "stderr": result.stderr[-10000:],
+                    "timed_out": result.timed_out,
+                    "descendants_reaped": result.descendants_reaped,
+                }
+            )
         return records
 
     @staticmethod
     def _safe_env(task: Mapping[str, Any]) -> dict[str, str]:
-        allowed = {"PATH", "HOME", "USER", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "COMSPEC", "PATHEXT", "LANG", "LC_ALL"}
+        allowed = {
+            "PATH",
+            "HOME",
+            "USER",
+            "TMPDIR",
+            "TEMP",
+            "TMP",
+            "SYSTEMROOT",
+            "COMSPEC",
+            "PATHEXT",
+            "LANG",
+            "LC_ALL",
+        }
         env = {key: value for key, value in os.environ.items() if key in allowed}
         env.update({str(k): str(v) for k, v in dict(task.get("env") or {}).items()})
         return env
 
     @staticmethod
-    def _snapshot(
-        root: Path, *, excluded_paths: Sequence[str] = ()
-    ) -> dict[str, str]:
+    def _snapshot(root: Path, *, excluded_paths: Sequence[str] = ()) -> dict[str, str]:
         result: dict[str, str] = {}
-        excluded = tuple(
-            tuple(Path(value).parts) for value in excluded_paths if str(value).strip()
-        )
+        excluded = tuple(tuple(Path(value).parts) for value in excluded_paths if str(value).strip())
         for path in sorted(root.rglob("*")):
-            if not path.is_file() or ".git" in path.parts or ".nexus" in path.parts:
+            if not path.is_file() or ".git" in path.parts or ".noryx" in path.parts:
                 continue
             relative = path.relative_to(root)
             if any(relative.parts[: len(prefix)] == prefix for prefix in excluded):
@@ -709,12 +827,18 @@ class CompetitiveDuelRunner:
 
     @staticmethod
     def _changed_files(before: Mapping[str, str], after: Mapping[str, str]) -> list[str]:
-        return sorted(path for path in set(before) | set(after) if before.get(path) != after.get(path))
+        return sorted(
+            path for path in set(before) | set(after) if before.get(path) != after.get(path)
+        )
 
     @staticmethod
     def _matches(path: str, patterns: Sequence[str]) -> bool:
         from fnmatch import fnmatch
-        return any(fnmatch(path, pattern) or path == pattern or path.startswith(pattern.rstrip("/") + "/") for pattern in patterns)
+
+        return any(
+            fnmatch(path, pattern) or path == pattern or path.startswith(pattern.rstrip("/") + "/")
+            for pattern in patterns
+        )
 
     @staticmethod
     def _contains_forbidden(root: Path, markers: Iterable[str]) -> bool:
@@ -758,12 +882,22 @@ class CompetitiveDuelRunner:
             categories[category] = categories.get(category, 0) + 1
             repositories.add(str(task.get("repository_id", task.get("task_id", ""))))
             for item in results:
-                bucket = by_agent.setdefault(item["agent"], {
-                    "runs": 0, "available": 0, "completed": 0, "verified": 0,
-                    "false_success": 0, "unexpected_change_runs": 0,
-                    "duration_ms": 0, "cost_usd_total": 0.0, "cost_observations": 0,
-                    "human_interventions": 0, "intervention_observations": 0,
-                })
+                bucket = by_agent.setdefault(
+                    item["agent"],
+                    {
+                        "runs": 0,
+                        "available": 0,
+                        "completed": 0,
+                        "verified": 0,
+                        "false_success": 0,
+                        "unexpected_change_runs": 0,
+                        "duration_ms": 0,
+                        "cost_usd_total": 0.0,
+                        "cost_observations": 0,
+                        "human_interventions": 0,
+                        "intervention_observations": 0,
+                    },
+                )
                 bucket["runs"] += 1
                 bucket["available"] += int(item["available"])
                 bucket["completed"] += int(item["completed"])
@@ -785,11 +919,13 @@ class CompetitiveDuelRunner:
             bucket["average_duration_ms"] = bucket["duration_ms"] / runs
             bucket["average_cost_usd"] = (
                 bucket["cost_usd_total"] / bucket["cost_observations"]
-                if bucket["cost_observations"] else None
+                if bucket["cost_observations"]
+                else None
             )
             bucket["average_human_interventions"] = (
                 bucket["human_interventions"] / bucket["intervention_observations"]
-                if bucket["intervention_observations"] else None
+                if bucket["intervention_observations"]
+                else None
             )
         return {
             "valid_pairs": valid_pairs,

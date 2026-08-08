@@ -120,13 +120,16 @@ def test_hosted_provider_forwards_normalized_supported_options(monkeypatch):
     monkeypatch.setattr("nexus.providers.hosted.NvidiaClient", Client)
     provider = HostedProvider(api_key="test")
 
-    assert provider.chat_sync(
-        "model",
-        [{"role": "user", "content": "hello"}],
-        response_format={"type": "json_object"},
-        seed=7,
-        top_p=0.8,
-    ) == "ok"
+    assert (
+        provider.chat_sync(
+            "model",
+            [{"role": "user", "content": "hello"}],
+            response_format={"type": "json_object"},
+            seed=7,
+            top_p=0.8,
+        )
+        == "ok"
+    )
     assert captured["response_format"] == {"type": "json_object"}
     assert captured["seed"] == 7
     assert captured["top_p"] == 0.8
@@ -238,6 +241,7 @@ def test_retry_exhaustion_propagates_last_error():
 
 def test_streaming_fallback_delivers_all_chunks():
     """When primary fails before first chunk, fallback must deliver ALL chunks."""
+
     def explode():
         raise RuntimeError("stream refused")
         yield "never"

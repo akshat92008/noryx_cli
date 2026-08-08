@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Normalize Python release archives for byte-for-byte reproducible builds."""
+
 from __future__ import annotations
 
 import argparse

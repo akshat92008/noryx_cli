@@ -1,4 +1,4 @@
-"""Canonical, crash-resilient state for Nexus engineering runs.
+"""Canonical, crash-resilient state for Noryx engineering runs.
 
 Conversation history is useful for a model, but it is not an execution
 ledger.  This module persists each user turn as a versioned run containing
@@ -86,7 +86,7 @@ def _atomic_write_json(path: Path, value: Any) -> None:
 
 
 class RunLedger:
-    """Persistent run directory for a Nexus conversation.
+    """Persistent run directory for a Noryx conversation.
 
     Directory layout::
 
@@ -557,7 +557,7 @@ class RunLedger:
 
     def _require_turn(self) -> Path:
         if self.turn_dir is None:
-            raise RuntimeError("No active Nexus run. Call begin() first.")
+            raise RuntimeError("No active Noryx run. Call begin() first.")
         return self.turn_dir
 
     def _update_state(self, **updates: Any) -> None:

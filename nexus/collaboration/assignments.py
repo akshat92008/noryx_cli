@@ -77,9 +77,7 @@ class AssignmentGraph:
             raise AssignmentValidationError(f"Assignment '{aid}' already registered.")
 
         if not assignment.expected_outputs:
-            raise AssignmentValidationError(
-                f"Assignment '{aid}' has no expected_outputs. Reject."
-            )
+            raise AssignmentValidationError(f"Assignment '{aid}' has no expected_outputs. Reject.")
 
         if not assignment.verification_requirements:
             raise AssignmentValidationError(
@@ -176,16 +174,12 @@ class AssignmentGraph:
         when both are mutation-capable.
         Returns list of (assignment_id_a, assignment_id_b, overlapping_paths).
         """
-        mutation_nodes = [
-            n for n in self._nodes.values()
-            if n.assignment.mutation_policy.allowed
-        ]
+        mutation_nodes = [n for n in self._nodes.values() if n.assignment.mutation_policy.allowed]
         overlaps: List[Tuple[str, str, List[Path]]] = []
         for i, na in enumerate(mutation_nodes):
-            for nb in mutation_nodes[i + 1:]:
+            for nb in mutation_nodes[i + 1 :]:
                 shared = [
-                    p for p in na.assignment.allowed_paths
-                    if p in nb.assignment.allowed_paths
+                    p for p in na.assignment.allowed_paths if p in nb.assignment.allowed_paths
                 ]
                 if shared:
                     overlaps.append((na.assignment_id, nb.assignment_id, shared))

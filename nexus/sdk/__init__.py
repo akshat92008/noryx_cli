@@ -1,4 +1,4 @@
-"""Versioned Nexus extension SDK.
+"""Versioned Noryx extension SDK.
 
 The SDK exports the same protocols used by the production extension loader;
 there is no separate, disconnected execution model.

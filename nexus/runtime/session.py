@@ -23,7 +23,7 @@ from nexus.runtime.kernel import (
 
 
 class ExecutionSession:
-    """Canonical orchestration session for Nexus execution paths."""
+    """Canonical orchestration session for Noryx execution paths."""
 
     def __init__(
         self,

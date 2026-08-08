@@ -1,5 +1,28 @@
 # Changelog
 
+## [3.8.4] - 2026-08-08
+
+### Noryx public-launch hardening
+
+- Rebranded the distribution and canonical command to `noryx-cli` and `noryx`,
+  while retaining the `nexus` command and Python package as 3.x compatibility
+  surfaces.
+- Made evaluator signatures trust only operator-supplied keys and bound every
+  superiority decision to an out-of-band campaign identity.
+- Isolated benchmark candidates from original repositories and hidden oracles;
+  telemetry is accepted only from evaluator-owned, candidate-unwritable files.
+- Escalated managed-process shutdown from TERM to KILL, waited for reaping, and
+  delayed registry/profile cleanup until exit was proven.
+- Replaced unrestricted macOS Mach lookups with a minimal explicit service list
+  and added deterministic profile cleanup coverage.
+- Routed command authorization through one typed risk classifier and fixed
+  relative working-directory containment.
+- Added read-only-home state-key fallback, Noryx-first environment variables,
+  canonical `~/.noryx` state, hash-locked dependencies, SPDX evidence, and
+  launch regression/stress coverage.
+- Competitive superiority remains unclaimed until the independent private
+  50-task/10-repository/3-trial campaign passes the external trust policy.
+
 ## [3.8.2] - 2026-08-07
 
 ### Launch-remediation and evidence hardening
@@ -51,8 +74,8 @@
 ### Competitive proof
 - Extended the blind benchmark harness to two-to-four distinct agents with repository/prompt provenance, task categories, cost, token, and intervention metrics.
 - Added a fail-closed superiority gate requiring at least 50 private unseen tasks across 10 repositories, all seven hard categories, three trials, withheld oracles, independent evaluation, equal budgets, real Claude Code provenance, same-model uplift, quality margin, safety, cost, latency, and intervention thresholds.
-- Added `nexus benchmark superiority-gate`; smoke scripts and dry runs can never authorize a superiority claim.
-- Added a fail-fast `nexus benchmark superiority-preflight` that rejects duplicate repository content, repeated task fingerprints, placeholder identities, incomplete category coverage, missing withheld oracles, unequal model identities, and invalid budgets before paid executions begin.
+- Added `noryx benchmark superiority-gate`; smoke scripts and dry runs can never authorize a superiority claim.
+- Added a fail-fast `noryx benchmark superiority-preflight` that rejects duplicate repository content, repeated task fingerprints, placeholder identities, incomplete category coverage, missing withheld oracles, unequal model identities, and invalid budgets before paid executions begin.
 - Bound competitive reports to disclosed budget and runtime-environment manifests, content-derived repository hashes, exact model/product identities, per-task timeout envelopes, and complete cost/token/intervention metrics.
 
 ## [3.7.0] - 2026-08-06
@@ -73,7 +96,7 @@
 - Added mandatory shared-process qualification with a watchdog and before/after source-tree SHA-256.
 
 ### External proof
-- Added blind matched-repository Nexus-versus-Claude duel execution with hidden oracle installation, randomized order, identical verification, provenance, scope scoring, and false-success detection.
+- Added blind matched-repository Noryx-versus-Claude duel execution with hidden oracle installation, randomized order, identical verification, provenance, scope scoring, and false-success detection.
 - Added behavioral host sandbox qualification and a Linux/macOS/Windows CI matrix; policy guards are never mislabeled as native filesystem isolation.
 
 ## [3.6.1] - 2026-08-06
@@ -90,7 +113,7 @@
 - Added immutable preimages, deletion-aware history, mode restoration, digest verification, unreadable-tree fail-closed behavior, and preflight validation before rollback.
 - Failed commands now automatically roll back all tracked partial workspace mutations and verify the restored tree; transaction IDs are collision-resistant UUIDs.
 - Command mutation history is committed atomically in one batch, and rollback evidence describes the verified restored state instead of leaving stale success artifacts.
-- Excluded Nexus internal state/preimage storage from user-workspace mutation reports.
+- Excluded Noryx internal state/preimage storage from user-workspace mutation reports.
 - Added typed artifact evidence with expected-existence verification.
 
 ### Engineering planning
@@ -116,7 +139,7 @@
 ### Authenticated state and deployment
 - Replaced adjacent unkeyed checksums with HMAC-SHA256 state authentication using keys outside the editable repository.
 - Added corruption, stale-writer, concurrent-writer, and invalid-key regression coverage.
-- Added `nexus deploy check --deep` for supervised deployment qualification and explicit autonomous blockers.
+- Added `noryx deploy check --deep` for supervised deployment qualification and explicit autonomous blockers.
 - Added an installed offline reliability benchmark that performs a real repair and four adversarial integrity scenarios.
 - Added an SPDX 2.3 SBOM and bound it to release evidence.
 
@@ -140,8 +163,8 @@ Engineering Brain reliability release.
 - Surgical mutation scope with file, line, prohibition, and bounded expansion budgets enforced below the model layer.
 - Semantic verification requiring external evidence, scope compliance, acceptance mapping, and independent review.
 - Hash-chained failure-learning store with redaction, fsync, corruption detection, and repeated-failure escalation.
-- `nexus intelligence inspect`, `nexus intelligence memory`, `nexus deploy check`, and `nexus benchmark compare-matched`.
-- Matched direct-versus-Nexus benchmark analysis for identical task/model/revision/budget pairs.
+- `noryx intelligence inspect`, `noryx intelligence memory`, `noryx deploy check`, and `noryx benchmark compare-matched`.
+- Matched direct-versus-Noryx benchmark analysis for identical task/model/revision/budget pairs.
 
 ### Changed
 
@@ -157,18 +180,18 @@ Engineering Brain reliability release.
 - Tampered long-horizon checkpoints are rejected instead of reset.
 - New-file requests remain bounded by extracting explicit user-named paths before repository mutation.
 
-All notable changes to NexusAI CLI are documented here.
+All notable changes to Noryx CLI are documented here.
 
 ## [3.4.0] - 2026-08-05
 
 ### Verified Repair reliability release
 
-- Added the `nexus fix` workflow with risk-aware model routing, workspace isolation, hard INR budgets, bounded turns, plan criticism, verification-first execution, and optional Nexus Proof receipts.
+- Added the `noryx fix` workflow with risk-aware model routing, workspace isolation, hard INR budgets, bounded turns, plan criticism, verification-first execution, and optional Noryx Proof receipts.
 - Added tamper-evident `nexus.proof.v2` receipts that downgrade unsupported VERIFIED claims and record repository state, changed-file fingerprints, checks, criteria, costs, routing, risks, rollback, and evidence hashes.
 - Removed execution/recovery module-package collisions and replaced the shipped `AgentSession` success stub with a fail-closed controller contract.
 - Made installed benchmarks self-contained through package resources and verified them from an unrelated empty directory.
 - Added artifact-bound qualification for source, wheel, source distribution, JUnit, coverage, benchmark, runner, test counts, and timestamps.
-- Added resumable isolated release-test shards with separate HOME, cache, Nexus state, logs, JUnit, and coverage databases.
+- Added resumable isolated release-test shards with separate HOME, cache, Noryx state, logs, JUnit, and coverage databases.
 - Added source-layout, fake-success, concrete-placeholder, unreachable-module, and complexity-regression architecture gates.
 - Added source-distribution coverage for workflows, tests, benchmark fixtures, scripts, and package resources.
 - Fresh deterministic matrix: 771 collected, 769 passed, 0 failed, 2 platform-specific skips on Linux.
@@ -191,8 +214,8 @@ All notable changes to NexusAI CLI are documented here.
 
 - **Independent Benchmark Suite & Runner**: Built `FinalBenchmarkRunner` (`nexus/benchmarks/benchmark_final_runner.py`) and benchmark manifest (`benchmarks/final/manifest.yaml`) executing 12 tasks across 11 task classes (Investigation, Single-file repair, Multi-file repair, Feature implementation, Refactor, Migration, Testing, Debugging/Recovery, Security, Budget, Collaboration, False-Success Prevention) with 100% verified success rate.
 - **Zero False-Success Qualification**: Verified fail-closed canonical verification (`tests/test_qualification_sprint12.py`) returning `FAILED` whenever acceptance checks or validators fail, guaranteeing 0 false `VERIFIED` outcomes.
-- **Clean-Machine Distribution & Wheel Qualification**: Qualified sdist (`dist/nexusai_cli-3.2.1.tar.gz`) and wheel (`dist/nexusai_cli-3.2.1-py3-none-any.whl`) building (`python3 -m build`), verifying clean venv installation and independent entry point execution (`nexus --version`, `nexus doctor`).
-- **Authoritative Release Gate Matrix & Release Tiers**: Established `FINAL_RELEASE_GATES.md` (13/13 mandatory gates passed) and `RELEASE_TIERS.md` qualifying Nexus for `RELEASE_CANDIDATE` and `PUBLIC_BETA` launch tiers.
+- **Clean-Machine Distribution & Wheel Qualification**: Qualified sdist (`dist/nexusai_cli-3.2.1.tar.gz`) and wheel (`dist/nexusai_cli-3.2.1-py3-none-any.whl`) building (`python3 -m build`), verifying clean venv installation and independent entry point execution (`noryx --version`, `noryx doctor`).
+- **Authoritative Release Gate Matrix & Release Tiers**: Established `FINAL_RELEASE_GATES.md` (13/13 mandatory gates passed) and `RELEASE_TIERS.md` qualifying Noryx for `RELEASE_CANDIDATE` and `PUBLIC_BETA` launch tiers.
 - **Supply Chain, Dependency & Privacy Governance**: Created `DEPENDENCY_RELEASE_REVIEW.md`, `PRIVACY.md`, `PACKAGING_QUALIFICATION.md`, `DOCUMENTATION_QUALIFICATION.md`, `FINAL_PARITY_SCORECARD.md`, and `LAUNCH_PLAN.md`.
 - **Release Manifest & Reproducible Evidence**: Generated `artifacts/release-manifest.json` and `artifacts/sprint-12-final-release.json` documenting exact cryptographic SHA-256 hashes, test summaries (830 passed), security summaries (34 passed), and launch tier recommendations.
 
@@ -222,7 +245,7 @@ All notable changes to NexusAI CLI are documented here.
 - **Independent Result Review Service**: Built `ResultReviewService` (`nexus/collaboration/review.py`) prohibiting worker self-review, checking acceptance evidence, scope bounds, and security findings before issuing `APPROVE_FOR_INTEGRATION`.
 - **Patch Integration & Conflict Resolution**: Implemented `IntegrationCoordinator` (`nexus/collaboration/integration.py`) applying patch artifacts to clean integration workspaces with mechanical and semantic conflict checks and SHA-256 tree hash calculation.
 - **Independent Central Verification**: Implemented lead orchestrator central verification (`nexus/collaboration/lead_orchestrator.py`) executing verification strictly on the exact integrated tree hash before issuing `COMPLETED`.
-- **CLI Commands & Multi-Agent Benchmark**: Added `nexus collaborate` and `nexus collaboration {status|assignments|conflicts|resume|cancel}` subcommands alongside `benchmark_collaboration.py` evaluating multi-agent performance across 4 task classes with 100% selection accuracy and 0% false successes.
+- **CLI Commands & Multi-Agent Benchmark**: Added `noryx collaborate` and `noryx collaboration {status|assignments|conflicts|resume|cancel}` subcommands alongside `benchmark_collaboration.py` evaluating multi-agent performance across 4 task classes with 100% selection accuracy and 0% false successes.
 
 ### Sprint 9 — Model Doctor, Adaptive Model Routing, Budget Guard and Cost Governance
 
@@ -233,7 +256,7 @@ All notable changes to NexusAI CLI are documented here.
 - **Canonical Cost Accounting Ledger**: Built `CostLedger` (`nexus/cost_accounting.py`) tracking token usage, native USD cost, display INR cost (85 INR/USD), pre-call reservations, and cost per verified task success.
 - **Budget Guard Ceilings & Directives**: Enhanced `BudgetController` (`nexus/budget.py`) with `RunBudget`, `--budget-inr` CLI flag support, pre-call reservation checks, and explicit currency budget exhaustion safeguards.
 - **Provider Resilience & Privacy Governance**: Built `ProviderResilienceEngine` (`nexus/provider_resilience.py`) normalizing HTTP 429, 401, 404, rate limit retry-after headers, and enforcing local-only privacy policies.
-- **CLI Commands & Routing Benchmark**: Added `nexus models`, `nexus model doctor <m>`, `nexus model show <m>`, `nexus model compare <a ><b>`, `nexus budget show`, `nexus cost show` subcommands alongside benchmark `benchmark_model_routing.py` demonstrating a 72% cost reduction vs static ceiling.
+- **CLI Commands & Routing Benchmark**: Added `noryx models`, `noryx model doctor <m>`, `noryx model show <m>`, `noryx model compare <a ><b>`, `noryx budget show`, `noryx cost show` subcommands alongside benchmark `benchmark_model_routing.py` demonstrating a 72% cost reduction vs static ceiling.
 
 ### Sprint 8 — Multi-File Engineering, Refactoring, Feature Delivery and Migration Intelligence
 
@@ -245,7 +268,7 @@ All notable changes to NexusAI CLI are documented here.
 - **Bounded Staged Execution & Checkpoints**: Built `StagedChangeSetExecutor` running multi-file changes through bounded stages with checkpoints, intermediate verifier commands, and mandatory gate enforcement.
 - **Symbol Rename & Signature Orchestration**: Implemented `SymbolRenameEngine` (safely distinguishing code symbols from strings/docs/configs) and `SignatureChangeOrchestrator` (inventorying callers/implementations and assessing backward compatibility).
 - **Migration & Recovery Orchestration**: Implemented `MigrationOrchestrator` (config, schema with approval for destructive edits, dependency upgrades, bounded framework stages) and `MultiFileRecoveryHandler` (missed caller scope expansion up to limit 3, repeated strategy loop prevention).
-- **CLI Commands & Benchmark**: Added `nexus change {analyze|validate|execute|status|rollback}` subcommands and `benchmark_multifile.py` achieving < 2ms impact analysis and 8.81ms 50-file patch throughput.
+- **CLI Commands & Benchmark**: Added `noryx change {analyze|validate|execute|status|rollback}` subcommands and `benchmark_multifile.py` achieving < 2ms impact analysis and 8.81ms 50-file patch throughput.
 
 - **Canonical Task & Plan Contracts**: Built typed `TaskContract`, `EngineeringPlan`, `PlanStep`, `AcceptanceCriterion`, and `RequirementSource` provenance models.
 - **Ambiguity & Clarification Engine**: Built structured ambiguity detection (`AmbiguityEngine`) distinguishing blocking vs non-blocking questions and suppressing questions answerable from repository intelligence.
@@ -253,7 +276,7 @@ All notable changes to NexusAI CLI are documented here.
 - **Deterministic Validation & Graph Analysis**: Implemented `DeterministicValidator` and `PlanDependencyGraph` enforcing step ordering, cycle detection, parallelization safety, and scope bounds.
 - **Enforceable Execution Contracts**: Implemented `ExecutionContractGenerator` converting approved plans into runtime-enforceable `ExecutionContract` objects governing allowed tools, mutation scope, budget, and mandatory verification gates before code mutation.
 - **Lineage-Preserving Replanner**: Built `PlanReplanner` supporting versioned plan revisions (`v1` -> `v2`) with repeated-signature anti-infinite-loop protection.
-- **Planner CLI & Benchmark**: Added `nexus plan "<task>"`, `nexus plan show <run-id>`, and `nexus plan validate <plan-file>` CLI commands alongside dedicated planning benchmark (`benchmark_planning.py`) achieving 100% requirement recall, 100% file recall, and 100% critic defect detection.
+- **Planner CLI & Benchmark**: Added `noryx plan "<task>"`, `noryx plan show <run-id>`, and `noryx plan validate <plan-file>` CLI commands alongside dedicated planning benchmark (`benchmark_planning.py`) achieving 100% requirement recall, 100% file recall, and 100% critic defect detection.
 
 ### Sprint 5 — Repository Intelligence and Context Engine
 
@@ -374,7 +397,7 @@ Launch-readiness reliability release.
   unverified work can no longer set `PipelineResult.success` to true.
 - Nova's generic provider adapter now exposes the common streaming and
   non-streaming response contract instead of accessing a nonexistent field.
-- Benchmarks require both Nexus `VERIFIED` status and external checks, count
+- Benchmarks require both Noryx `VERIFIED` status and external checks, count
   local model calls, and preserve internal/external outcomes separately.
 - Autonomous dangerous and networked commands fail closed when native OS
   isolation is unavailable.
@@ -393,7 +416,7 @@ Launch-readiness reliability release.
 
 ## [3.0.0] - 2026-07-29
 
-Single integrated Nexus software-engineering runtime.
+Single integrated Noryx software-engineering runtime.
 
 ### Added
 
@@ -414,9 +437,9 @@ Single integrated Nexus software-engineering runtime.
   and `rollback`.
 - Canonical model/tool/cost logs plus patch, test, checkpoint, and
   `final_report.json` artifacts.
-- Structured `.nexus/policies.yml` capabilities and versioned provider, tool,
+- Structured `.noryx/policies.yml` capabilities and versioned provider, tool,
   and policy extension contracts.
-- `nexus run`, CI, local-only, budget, maximum-quality, issue-solving, JSONL,
+- `noryx run`, CI, local-only, budget, maximum-quality, issue-solving, JSONL,
   and documented cost-control aliases.
 - Reproducible `nexus.benchmark.v1` manifests, disposable repository execution,
   typed acceptance checks, scope/cost metrics, and versioned JSON results.
@@ -425,7 +448,7 @@ Single integrated Nexus software-engineering runtime.
 
 ### Changed
 
-- Nexus no longer accepts a verified mutation alone as proof that the user
+- Noryx no longer accepts a verified mutation alone as proof that the user
   objective succeeded; deterministic validation and review evidence are
   required for a fully verified result.
 - Web sessions use isolated workspaces and modifying CLI modes isolate by
@@ -437,7 +460,7 @@ Single integrated Nexus software-engineering runtime.
 
 ## [2.1.0] - 2026-07-29
 
-Verified-runtime foundation for the long-term Nexus engineering contract.
+Verified-runtime foundation for the long-term Noryx engineering contract.
 
 ### Added
 
@@ -466,19 +489,19 @@ Verified-runtime foundation for the long-term Nexus engineering contract.
 
 ## [2.0.0] - 2026-07-29
 
-First launch release for the guarded Nexus CLI and Nova 3B v11 integration.
+First launch release for the guarded Noryx CLI and Nova 3B v11 integration.
 
 ### Added
 
 - Self-contained Nova 3B v11 parser, guardrail, retry, and verification runtime.
-- `nexus --doctor` backend and installation diagnostics.
-- `nexus --version` and structured success fields for JSON output.
+- `noryx --doctor` backend and installation diagnostics.
+- `noryx --version` and structured success fields for JSON output.
 - Deterministic release gate and GitHub Actions test matrix.
 - Clean-wheel import and command smoke tests.
 
 ### Changed
 
-- Distribution renamed to `nexusai-cli` because `nexusai` on PyPI is unrelated.
+- Distribution renamed to `noryx-cli` because `nexusai` on PyPI is unrelated.
 - Hosted-provider timeouts default to 60 seconds and remain configurable.
 - Groq fallback uses current production model IDs.
 - Source and global-checkout launchers are portable across installations.

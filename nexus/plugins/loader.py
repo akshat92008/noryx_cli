@@ -6,7 +6,7 @@ Security model:
   2. Every plugin requires a ``plugin.json`` manifest.
   3. Empty manifest discovery must NOT evaluate as trusted (no ``all([])`` bypass).
   4. Trust is content-addressed: any byte change invalidates approval.
-  5. Plugin code executes in an isolated subprocess worker, NOT in the Nexus process.
+  5. Plugin code executes in an isolated subprocess worker, NOT in the Noryx process.
   6. Loading failures produce structured diagnostics, never silent ``except Exception: pass``.
 
 Discovers plugins in:
@@ -48,7 +48,7 @@ class PluginLoader:
     Secure plugin discovery and loading.
 
     Loads manifests, validates trust, and runs plugin code in isolated workers.
-    Never executes plugin code in the Nexus process.
+    Never executes plugin code in the Noryx process.
     """
 
     def __init__(
@@ -138,7 +138,9 @@ class PluginLoader:
 
             # Check content-addressed trust
             content_hash = compute_plugin_hash(item, manifest)
-            if self._trust_checker and self._trust_checker(manifest_file, expected_digest=content_hash):
+            if self._trust_checker and self._trust_checker(
+                manifest_file, expected_digest=content_hash
+            ):
                 # Check if the content hash matches what was approved
                 diag = PluginDiagnostic(
                     plugin_dir=str(item),
@@ -207,7 +209,9 @@ class PluginLoader:
 
         # ── Content-addressed trust check ────────────────────────────────
         content_hash = compute_plugin_hash(plugin_dir, manifest)
-        if self._trust_checker and not self._trust_checker(manifest_file, expected_digest=content_hash):
+        if self._trust_checker and not self._trust_checker(
+            manifest_file, expected_digest=content_hash
+        ):
             diag = PluginDiagnostic(
                 plugin_dir=str(plugin_dir),
                 status="trust_required",
@@ -310,7 +314,9 @@ class _PluginProxy(BasePlugin):
     def get_tool_dispatch(self) -> dict[str, Any]:
         dispatch: dict[str, Any] = {}
         for definition in self.get_tools():
-            function = definition.get("function", definition) if isinstance(definition, dict) else {}
+            function = (
+                definition.get("function", definition) if isinstance(definition, dict) else {}
+            )
             tool_name = str(function.get("name", "")) if isinstance(function, dict) else ""
             if not tool_name:
                 continue

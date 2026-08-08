@@ -42,9 +42,9 @@ class ModelDescriptor:
     supports_structured_output: bool = True
     supports_streaming: bool = True
     supports_images: bool = False
-    input_cost: float | Decimal | None = None       # USD per 1,000,000 input tokens
-    output_cost: float | Decimal | None = None      # USD per 1,000,000 output tokens
-    cached_input_cost: float | Decimal | None = None # USD per 1,000,000 cached tokens
+    input_cost: float | Decimal | None = None  # USD per 1,000,000 input tokens
+    output_cost: float | Decimal | None = None  # USD per 1,000,000 output tokens
+    cached_input_cost: float | Decimal | None = None  # USD per 1,000,000 cached tokens
     privacy_class: PrivacyClass = PrivacyClass.APPROVED_CLOUD
     tier: ModelTier = ModelTier.AFFORDABLE
     data_retention_class: str | None = None
@@ -73,7 +73,9 @@ class ModelDescriptor:
             "supports_images": self.supports_images,
             "input_cost": float(self.input_cost) if self.input_cost is not None else None,
             "output_cost": float(self.output_cost) if self.output_cost is not None else None,
-            "cached_input_cost": float(self.cached_input_cost) if self.cached_input_cost is not None else None,
+            "cached_input_cost": float(self.cached_input_cost)
+            if self.cached_input_cost is not None
+            else None,
             "privacy_class": self.privacy_class.value,
             "tier": self.tier.value,
             "data_retention_class": self.data_retention_class,
@@ -297,7 +299,7 @@ DEFAULT_MODEL = "glm-5.2"
 
 
 class ModelRegistry:
-    """Thread-safe authoritative model registry for Nexus CLI."""
+    """Thread-safe authoritative model registry for Noryx CLI."""
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
@@ -331,8 +333,13 @@ class ModelRegistry:
                 raise ValueError("Model key cannot be empty")
             if key_clean in self._descriptors:
                 existing = self._descriptors[key_clean]
-                if existing.model_id == descriptor.model_id and existing.model_version != descriptor.model_version:
-                    descriptor.capability_profile_id = f"{descriptor.model_id}:{descriptor.model_version}"
+                if (
+                    existing.model_id == descriptor.model_id
+                    and existing.model_version != descriptor.model_version
+                ):
+                    descriptor.capability_profile_id = (
+                        f"{descriptor.model_id}:{descriptor.model_version}"
+                    )
             self._descriptors[key_clean] = descriptor
             self._key_map[descriptor.model_id.lower()] = key_clean
 
@@ -352,7 +359,11 @@ class ModelRegistry:
                 return self._key_map[name_clean]
 
             for k, desc in self._descriptors.items():
-                if name_clean in k or name_clean in desc.display_name.lower() or name_clean in desc.model_id.lower():
+                if (
+                    name_clean in k
+                    or name_clean in desc.display_name.lower()
+                    or name_clean in desc.model_id.lower()
+                ):
                     return k
         return None
 

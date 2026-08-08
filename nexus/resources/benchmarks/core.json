@@ -1,6 +1,6 @@
 {
   "schema_version": "nexus.benchmark.v1",
-  "name": "nexus-core-engineering",
+  "name": "noryx-core-engineering",
   "tasks": [
     {
       "id": "python-calculator-regression",

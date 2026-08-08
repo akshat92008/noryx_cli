@@ -1,5 +1,5 @@
 """
-Failure Taxonomy and Record Definitions for Nexus CLI Recovery System.
+Failure Taxonomy and Record Definitions for Noryx CLI Recovery System.
 """
 
 from __future__ import annotations
@@ -197,7 +197,9 @@ class FailureRecord:
         return {
             "failure_id": self.failure_id,
             "run_id": self.run_id,
-            "category": self.category.value if hasattr(self.category, "value") else str(self.category),
+            "category": self.category.value
+            if hasattr(self.category, "value")
+            else str(self.category),
             "kind": self.kind.value if hasattr(self.kind, "value") else str(self.kind),
             "source_component": self.source_component,
             "phase": self.phase,
@@ -207,7 +209,9 @@ class FailureRecord:
             "plan_version": self.plan_version,
             "attempt_number": self.attempt_number,
             "retryable": self.retryable,
-            "severity": self.severity.value if hasattr(self.severity, "value") else str(self.severity),
+            "severity": self.severity.value
+            if hasattr(self.severity, "value")
+            else str(self.severity),
             "user_action_required": self.user_action_required,
             "likely_causes": [h.__dict__ for h in self.likely_causes],
             "created_at": self.created_at,

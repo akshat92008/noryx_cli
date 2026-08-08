@@ -1,23 +1,25 @@
 """Tests for refactoring workflows — ChangeDependencyGraph (Sprint 8)."""
+
 from __future__ import annotations
 
 import pytest
-from pathlib import Path
 
-from nexus.multifile.contracts import ChangeType, ChangeDependency, PlannedFileChange
+from nexus.multifile.consistency import ChangeSetConsistencyValidator
+from nexus.multifile.contracts import (
+    ChangeType,
+    EngineeringChangeSet,
+    PlannedFileChange,
+)
 from nexus.multifile.graph import (
     ChangeDependencyGraph,
     DependencyCycleError,
-    DependencyConflictError,
     build_graph,
 )
-from nexus.multifile.consistency import ChangeSetConsistencyValidator
-from nexus.multifile.contracts import EngineeringChangeSet
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def fc(path: str, change_type=ChangeType.MODIFY, symbols=(), depends_on=()) -> PlannedFileChange:
     return PlannedFileChange(
@@ -58,16 +60,6 @@ def test_move_module_imports_updated(tmp_path):
     importer = tmp_path / "nexus" / "core.py"
     importer.write_text("from nexus.helpers import helper\n", encoding="utf-8")
 
-    cs = EngineeringChangeSet(
-        file_changes=[
-            PlannedFileChange(
-                path="nexus/utils/helpers.py",
-                reason="Move helpers to utils package",
-                change_type=ChangeType.MOVE,
-            ),
-            # core.py NOT updated → should be detected as stale reference
-        ]
-    )
     # Simulate: the MOVE means nexus.helpers is gone
     # The validator checks for stale imports of the moved module
     # (We check the inverse: if we had MOVED the file, stale refs should be caught)
@@ -176,4 +168,6 @@ def test_architecture_violation_detection(tmp_path):
     )
     validator = ChangeSetConsistencyValidator(repo_root=tmp_path)
     result = validator.validate(cs)
-    assert any("SECURITY" in v.path or "protected" in v.reason.lower() for v in result.scope_violations)
+    assert any(
+        "SECURITY" in v.path or "protected" in v.reason.lower() for v in result.scope_violations
+    )

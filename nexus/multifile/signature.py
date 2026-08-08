@@ -25,7 +25,6 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from nexus.multifile.contracts import (
     ChangeType,
@@ -33,7 +32,6 @@ from nexus.multifile.contracts import (
     ContractChange,
     ContractScope,
     ContractType,
-    ImpactCategory,
     PlannedFileChange,
     Reference,
     SymbolReference,
@@ -45,6 +43,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ParameterDiff:
     """Describes the change to one parameter of a function signature."""
+
     kind: str  # ADDED | REMOVED | RENAMED | TYPE_CHANGED | OPTIONAL_TO_REQUIRED | etc.
     name_before: str = ""
     name_after: str = ""
@@ -57,6 +56,7 @@ class ParameterDiff:
 @dataclass
 class SignatureChange:
     """Complete description of a function signature change."""
+
     symbol: str
     definition_path: str
     signature_before: str
@@ -92,6 +92,7 @@ class SignatureChange:
 @dataclass
 class SignatureChangeImpact:
     """Result of inventorying the impact of a signature change."""
+
     signature_change: SignatureChange
     callers: list[Reference] = field(default_factory=list)
     implementations: list[Reference] = field(default_factory=list)
@@ -152,9 +153,7 @@ class SignatureChangeOrchestrator:
 
         return impact
 
-    def impact_to_contract_change(
-        self, impact: SignatureChangeImpact
-    ) -> ContractChange:
+    def impact_to_contract_change(self, impact: SignatureChangeImpact) -> ContractChange:
         """Convert a SignatureChangeImpact into a typed ContractChange for the change set."""
         sc = impact.signature_change
         return ContractChange(
@@ -175,9 +174,7 @@ class SignatureChangeOrchestrator:
             unresolved_consumers=[c.path for c in impact.stale_callers],
         )
 
-    def to_planned_changes(
-        self, impact: SignatureChangeImpact
-    ) -> list[PlannedFileChange]:
+    def to_planned_changes(self, impact: SignatureChangeImpact) -> list[PlannedFileChange]:
         """Produce PlannedFileChange objects for all files that must be updated."""
         sc = impact.signature_change
         changes: list[PlannedFileChange] = []
@@ -243,7 +240,9 @@ class SignatureChangeOrchestrator:
             # SECURITY CLASSIFICATION: INTERNAL_GIT_OP
             result = subprocess.run(
                 ["python", "-m", "py_compile", str(full)],
-                capture_output=True, text=True, timeout=10
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             return result.returncode == 0, result.stderr
         except Exception as exc:

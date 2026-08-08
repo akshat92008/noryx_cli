@@ -1,4 +1,4 @@
-"""List, inspect, and replay durable Nexus runs."""
+"""List, inspect, and replay durable Noryx runs."""
 
 from __future__ import annotations
 
@@ -101,12 +101,12 @@ class RunCatalog:
         if not raw:
             candidates = self.list(limit=1)
             if not candidates:
-                raise FileNotFoundError("No Nexus runs exist")
+                raise FileNotFoundError("No Noryx runs exist")
             return Path(candidates[0].path)
         if "/" in raw:
             parts = raw.split("/")
             if len(parts) != 2:
-                raise FileNotFoundError(f"Invalid Nexus run id: {raw}")
+                raise FileNotFoundError(f"Invalid Noryx run id: {raw}")
             session_id, turn_id = parts
             self._validate_identifier(session_id)
             self._validate_identifier(turn_id)
@@ -127,15 +127,15 @@ class RunCatalog:
         try:
             candidate.resolve().relative_to(self.runs_dir.resolve())
         except ValueError as exc:
-            raise FileNotFoundError(f"Invalid Nexus run id: {raw}") from exc
+            raise FileNotFoundError(f"Invalid Noryx run id: {raw}") from exc
         if not candidate.is_dir():
-            raise FileNotFoundError(f"Nexus run not found: {raw}")
+            raise FileNotFoundError(f"Noryx run not found: {raw}")
         return candidate
 
     @staticmethod
     def _validate_identifier(value: str) -> None:
         if value in {"", ".", ".."} or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value):
-            raise FileNotFoundError(f"Invalid Nexus run identifier: {value}")
+            raise FileNotFoundError(f"Invalid Noryx run identifier: {value}")
 
     @staticmethod
     def _read_json(path: Path) -> dict[str, Any] | None:

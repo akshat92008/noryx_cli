@@ -10,15 +10,13 @@ from typing import Any, Iterable
 
 from nexus.intelligence.engineering.constraints import (
     CompiledConstraint,
-    ConstraintCompilation,
     ConstraintCompiler,
 )
 
-
 _ALWAYS_FORBIDDEN = (
     ".git/**",
-    ".nexus/task-memory/**",
-    ".nexus/long-horizon/**",
+    ".noryx/task-memory/**",
+    ".noryx/long-horizon/**",
     "**/.env",
     "**/.env.*",
     "**/*credential*",
@@ -61,7 +59,9 @@ class ScopeExpansionEvidence:
     approved_by: str = ""
 
     @classmethod
-    def from_value(cls, value: "ScopeExpansionEvidence | dict[str, Any]") -> "ScopeExpansionEvidence":
+    def from_value(
+        cls, value: "ScopeExpansionEvidence | dict[str, Any]"
+    ) -> "ScopeExpansionEvidence":
         if isinstance(value, cls):
             return value
         return cls(
@@ -298,9 +298,7 @@ class SurgicalScopeGuard:
                 False,
                 f"Change would exceed the {self.contract.max_changed_files}-file surgical budget.",
                 normalized,
-                remaining_expansions=max(
-                    0, self.contract.expansion_budget - self.expansions_used
-                ),
+                remaining_expansions=max(0, self.contract.expansion_budget - self.expansions_used),
             )
 
         if not self.contract.strict:
@@ -325,9 +323,7 @@ class SurgicalScopeGuard:
                 + "; ".join(self.contract.unresolved_constraints),
                 normalized,
                 requires_scope_expansion=True,
-                remaining_expansions=max(
-                    0, self.contract.expansion_budget - self.expansions_used
-                ),
+                remaining_expansions=max(0, self.contract.expansion_budget - self.expansions_used),
             )
 
         if self.expansions_used >= self.contract.expansion_budget:
@@ -340,9 +336,7 @@ class SurgicalScopeGuard:
                 remaining_expansions=0,
             )
 
-        valid, message, approved = self._validate_expansion_evidence(
-            outside, expansion_evidence
-        )
+        valid, message, approved = self._validate_expansion_evidence(outside, expansion_evidence)
         if not valid:
             return ScopeDecision(
                 False,
@@ -353,12 +347,10 @@ class SurgicalScopeGuard:
             )
 
         self.expansions_used += 1
-        for path, evidence in zip(outside, approved):
+        for path, evidence in zip(outside, approved, strict=True):
             if path not in self.contract.allowed_files:
                 self.contract.allowed_files.append(path)
-            self.contract.rationale[path] = (
-                f"{evidence.evidence_type.value}:{evidence.evidence_id}"
-            )
+            self.contract.rationale[path] = f"{evidence.evidence_type.value}:{evidence.evidence_id}"
             self._approved_expansion_evidence[path] = evidence
         evidence_ids = [item.evidence_id for item in approved]
         return ScopeDecision(
@@ -366,9 +358,7 @@ class SurgicalScopeGuard:
             "Approved bounded scope expansion from typed repository/human evidence.",
             normalized,
             requires_scope_expansion=True,
-            remaining_expansions=max(
-                0, self.contract.expansion_budget - self.expansions_used
-            ),
+            remaining_expansions=max(0, self.contract.expansion_budget - self.expansions_used),
             expansion_evidence_ids=evidence_ids,
         )
 
@@ -385,9 +375,7 @@ class SurgicalScopeGuard:
                 f"Cumulative edit volume {projected_lines} exceeds the "
                 f"{self.contract.max_changed_lines}-line budget.",
                 decision.normalized_paths,
-                remaining_expansions=max(
-                    0, self.contract.expansion_budget - self.expansions_used
-                ),
+                remaining_expansions=max(0, self.contract.expansion_budget - self.expansions_used),
             )
         self.changed_files.update(decision.normalized_paths)
         self.changed_lines = projected_lines

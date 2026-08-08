@@ -1,4 +1,4 @@
-"""Opt-in Git worktree isolation for Nexus modifying sessions."""
+"""Opt-in Git worktree isolation for Noryx modifying sessions."""
 
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ class GitWorktreeSession:
         if any(self._is_unmerged_status(item) for item in status_entries):
             raise WorktreeError(
                 "Source repository has unresolved merge conflicts. Resolve them "
-                "before creating an isolated Nexus workspace."
+                "before creating an isolated Noryx workspace."
             )
 
         source_was_dirty = bool(status_entries)
@@ -119,12 +119,12 @@ class GitWorktreeSession:
                     [
                         "git",
                         "-c",
-                        "user.name=Nexus",
+                        "user.name=Noryx",
                         "-c",
                         "user.email=nexus@localhost",
                         "commit",
                         "-m",
-                        "Nexus source workspace snapshot",
+                        "Noryx source workspace snapshot",
                     ],
                     cwd=self.path,
                     capture_output=True,
@@ -436,12 +436,12 @@ class GitWorktreeSession:
             [
                 "git",
                 "-c",
-                "user.name=Nexus",
+                "user.name=Noryx",
                 "-c",
                 "user.email=nexus@localhost",
                 "commit",
                 "-m",
-                "Nexus workspace apply",
+                "Noryx workspace apply",
             ],
             cwd=self.path,
             capture_output=True,
@@ -456,7 +456,7 @@ class GitWorktreeSession:
         current_hash = self._source_state_hash()
         if current_hash != self.info.source_state_hash:
             raise WorktreeError(
-                "Source repository changed after the Nexus snapshot was created. "
+                "Source repository changed after the Noryx snapshot was created. "
                 "Review the workspace diff and apply it manually to avoid overwriting work."
             )
 
@@ -481,7 +481,7 @@ class GitWorktreeSession:
         )
         if applied.returncode != 0:
             raise WorktreeError(
-                "Could not apply Nexus changes over the preserved dirty source: "
+                "Could not apply Noryx changes over the preserved dirty source: "
                 f"{applied.stderr.decode(errors='replace').strip()}. "
                 f"Recovery patch: {patch_path}"
             )
@@ -491,7 +491,7 @@ class GitWorktreeSession:
 
         Clean repositories use a normal branch merge with a recovery ref. Dirty
         repositories use the immutable snapshot commit created at session start:
-        Nexus computes only its delta from that snapshot and applies the delta to
+        Noryx computes only its delta from that snapshot and applies the delta to
         the unchanged source working tree. This preserves the user's staged,
         unstaged, and untracked state instead of forcing a stash or commit.
         """
@@ -700,7 +700,7 @@ class GitWorktreeSession:
 
 
 class WorkspaceManager:
-    """Manages global isolation sessions for Nexus."""
+    """Manages global isolation sessions for Noryx."""
 
     def __init__(self, state_root: str | Path | None = None):
         self.state_root = Path(state_root).expanduser().resolve() if state_root else nexus_home()

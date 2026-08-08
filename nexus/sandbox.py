@@ -1,4 +1,4 @@
-"""Typed, policy-driven command execution for Nexus.
+"""Typed, policy-driven command execution for Noryx.
 
 The legacy shell tool remains available for compatibility, but autonomous
 workflows use :class:`SandboxRunner` with an argv vector.  The runner selects
@@ -152,7 +152,7 @@ class CommandResult:
         if not self.stdout and not self.stderr:
             chunks.append("(no output)")
         if self.output_truncated:
-            chunks.append("[output truncated by Nexus policy]")
+            chunks.append("[output truncated by Noryx policy]")
         return "\n".join(chunks)
 
 
@@ -245,17 +245,13 @@ class SandboxRunner:
                 kwargs["start_new_session"] = True
             elif os.name == "nt":
                 kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 512)
-            
+
             process = subprocess.Popen(
-                command,
-                cwd=cwd,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                **kwargs
+                command, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs
             )
             self.apply_resource_limits(process.pid, spec)
             import threading
+
             stdout_chunks = []
             stderr_chunks = []
             stdout_truncated = [False]
@@ -286,9 +282,17 @@ class SandboxRunner:
                         break
                     chunks.append(chunk)
 
-            stdout_thread = threading.Thread(target=read_stream, args=(process.stdout, stdout_chunks, stdout_truncated, spec.max_output_bytes), daemon=True)
-            stderr_thread = threading.Thread(target=read_stream, args=(process.stderr, stderr_chunks, stderr_truncated, spec.max_output_bytes), daemon=True)
-            
+            stdout_thread = threading.Thread(
+                target=read_stream,
+                args=(process.stdout, stdout_chunks, stdout_truncated, spec.max_output_bytes),
+                daemon=True,
+            )
+            stderr_thread = threading.Thread(
+                target=read_stream,
+                args=(process.stderr, stderr_chunks, stderr_truncated, spec.max_output_bytes),
+                daemon=True,
+            )
+
             stdout_thread.start()
             stderr_thread.start()
 
@@ -312,13 +316,15 @@ class SandboxRunner:
                             pass
                 else:
                     # SECURITY CLASSIFICATION: INTERNAL_GIT_OP
-                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True)
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True
+                    )
                 process.wait()
                 completed_returncode = None
-            
+
             # A descendant can inherit stdout/stderr and keep the pipe open even
             # after the direct child exits.  Never let a reader-thread join hang
-            # the entire Nexus process.  Give streams a short grace period, then
+            # the entire Noryx process.  Give streams a short grace period, then
             # terminate the process group and close the pipe handles.
             reader_grace = min(1.0, max(0.1, spec.timeout_seconds * 0.05))
             stdout_thread.join(timeout=reader_grace)
@@ -351,14 +357,14 @@ class SandboxRunner:
                         pass
                 stdout_thread.join(timeout=0.5)
                 stderr_thread.join(timeout=0.5)
-            
+
             duration = int((time.monotonic() - started) * 1000)
-            
+
             stdout = b"".join(stdout_chunks).decode("utf-8", errors="replace").rstrip()
             stderr = b"".join(stderr_chunks).decode("utf-8", errors="replace").rstrip()
             stdout_cut = stdout_truncated[0]
             stderr_cut = stderr_truncated[0]
-            
+
             if timed_out:
                 return CommandResult(
                     argv=list(spec.argv),
@@ -375,7 +381,7 @@ class SandboxRunner:
                     output_truncated=stdout_cut or stderr_cut,
                     stream_cleanup_failed=stream_cleanup_failed,
                 )
-            
+
             return CommandResult(
                 argv=list(spec.argv),
                 cwd=str(cwd),
@@ -436,15 +442,13 @@ class SandboxRunner:
                 "allow_unisolated_host_process=True capability with require_os_isolation=False."
             )
 
-        env = self._filtered_env(
-            spec.env, allowed_sensitive_keys=spec.allowed_sensitive_env_keys
-        )
+        env = self._filtered_env(spec.env, allowed_sensitive_keys=spec.allowed_sensitive_env_keys)
         if backend == SandboxBackend.MACOS:
             # Never expose the host-wide temporary directory to generated code.
             # macOS sandboxed commands receive a workspace-private temporary
             # root so temporary-file use remains functional without granting
             # read/write access to unrelated host process artifacts.
-            private_tmp = self.workspace / ".nexus" / "sandbox-tmp"
+            private_tmp = self.workspace / ".noryx" / "sandbox-tmp"
             private_tmp.mkdir(parents=True, exist_ok=True)
             for key in ("TMPDIR", "TMP", "TEMP"):
                 env[key] = str(private_tmp)
@@ -510,22 +514,24 @@ class SandboxRunner:
             "/lib64",
             "/lib64",
         ]
-        
+
         import sys
+
         for root in {sys.prefix, sys.base_prefix}:
             if root and Path(root).exists():
                 command.extend(["--ro-bind", root, root])
 
         command.extend(
             [
-            "--ro-bind",
-            "/etc/alternatives",
-            "/etc/alternatives",
-            "--proc",
-            "/proc",
-            "--dev",
-            "/dev",
-        ])
+                "--ro-bind",
+                "/etc/alternatives",
+                "/etc/alternatives",
+                "--proc",
+                "/proc",
+                "--dev",
+                "/dev",
+            ]
+        )
         try:
             self.workspace.relative_to(Path(tempfile.gettempdir()).resolve())
         except ValueError:
@@ -548,6 +554,7 @@ class SandboxRunner:
 
     def _macos_command(self, spec: CommandSpec, cwd: Path) -> tuple[list[str], Path]:
         import sys
+
         workspace = str(self.workspace.resolve()).replace('"', '\\"')
         read_roots = [
             workspace,
@@ -572,7 +579,16 @@ class SandboxRunner:
             "(deny default)",
             "(allow process*)",
             "(allow sysctl-read)",
-            "(allow mach-lookup)",
+            # Keep Mach IPC fail-closed.  Developer runtimes need a small set
+            # of OS services; arbitrary global-name lookup would expose the
+            # candidate to unrelated XPC/keychain/daemon surfaces.
+            "(allow mach-lookup",
+            '  (global-name "com.apple.system.logger")',
+            '  (global-name "com.apple.logd")',
+            '  (global-name "com.apple.cfprefsd.agent")',
+            '  (global-name "com.apple.cfprefsd.daemon")',
+            '  (global-name "com.apple.opendirectoryd.libinfo")',
+            '  (global-name "com.apple.SystemConfiguration.configd"))',
             "(allow ipc-posix-shm)",
             "(allow file-read-metadata)",
             f"(allow file-read* {read_rules} "
@@ -584,7 +600,7 @@ class SandboxRunner:
         ]
         if spec.network:
             rules.append("(allow network*)")
-        fd, raw_path = tempfile.mkstemp(prefix="nexus-sandbox-", suffix=".sb")
+        fd, raw_path = tempfile.mkstemp(prefix="noryx-sandbox-", suffix=".sb")
         os.close(fd)
         profile = Path(raw_path)
         profile.write_text("\n".join(rules) + "\n", encoding="utf-8")
@@ -622,8 +638,14 @@ class SandboxRunner:
             "$USERPROFILE",
             "${USERPROFILE}",
         )
-        allowed_device_paths = {Path("/dev/null"), Path("/dev/zero"), Path("/dev/random"), Path("/dev/urandom")}
+        allowed_device_paths = {
+            Path("/dev/null"),
+            Path("/dev/zero"),
+            Path("/dev/random"),
+            Path("/dev/urandom"),
+        }
         import sys
+
         safe_system_roots = tuple(
             Path(item)
             for item in (
@@ -661,12 +683,17 @@ class SandboxRunner:
             if resolved in allowed_device_paths:
                 return True
             if executable:
-                return any(_is_relative_to(resolved, root) for root in safe_system_roots) and not _is_relative_to(resolved, Path("/System/Volumes/Data"))
+                return any(
+                    _is_relative_to(resolved, root) for root in safe_system_roots
+                ) and not _is_relative_to(resolved, Path("/System/Volumes/Data"))
             # Runtime/toolchain reads are safe; user, home, root and /etc reads are not.
-            return any(_is_relative_to(resolved, root) for root in safe_system_roots) and not _is_relative_to(resolved, Path("/System/Volumes/Data"))
+            return any(
+                _is_relative_to(resolved, root) for root in safe_system_roots
+            ) and not _is_relative_to(resolved, Path("/System/Volumes/Data"))
 
         def _remove_safe_urls(text: str) -> str:
             from urllib.parse import urlparse
+
             for match in re.finditer(r"\b([a-zA-Z][a-zA-Z0-9+.-]*://\S+)", text):
                 candidate_url = match.group(1).strip("'\"()[]{};,|&<>")
                 try:
@@ -736,7 +763,7 @@ class SandboxRunner:
             key: value
             for key, value in os.environ.items()
             if key in self.SAFE_ENV_KEYS
-            or (key.startswith("NEXUS_") and not self._is_sensitive_env_key(key))
+            or (key.startswith(("NORYX_", "NEXUS_")) and not self._is_sensitive_env_key(key))
         }
         allowed = {str(key).upper() for key in allowed_sensitive_keys}
         for key, value in additions.items():
@@ -756,6 +783,8 @@ class SandboxRunner:
                 "TERM": "dumb",
                 "PYTHONDONTWRITEBYTECODE": "1",
                 "PYTHONUNBUFFERED": "1",
+                "NORYX_SANDBOX": "1",
+                # Compatibility for existing plugins during the rename window.
                 "NEXUS_SANDBOX": "1",
             }
         )

@@ -1,13 +1,11 @@
-"""Enterprise policy model and precedence merger for Nexus CLI.
+"""Enterprise policy model and precedence merger for Noryx CLI.
 
 Supports organization, project, and user policy schemas with deterministic precedence merging.
 """
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
 from typing import Any
 
 
@@ -43,14 +41,16 @@ class PolicyMerger:
         org_policy: OrganizationPolicy | dict[str, Any],
         proj_policy: ProjectPolicy | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        org_dict = org_policy.to_dict() if isinstance(org_policy, OrganizationPolicy) else org_policy
+        org_dict = (
+            org_policy.to_dict() if isinstance(org_policy, OrganizationPolicy) else org_policy
+        )
         proj_dict = (
-            proj_policy.to_dict()
-            if isinstance(proj_policy, ProjectPolicy)
-            else (proj_policy or {})
+            proj_policy.to_dict() if isinstance(proj_policy, ProjectPolicy) else (proj_policy or {})
         )
 
-        effective_deny_actions = set(org_dict.get("deny_actions", [])) | set(proj_dict.get("deny_actions", []))
+        effective_deny_actions = set(org_dict.get("deny_actions", [])) | set(
+            proj_dict.get("deny_actions", [])
+        )
 
         return {
             "organization_id": org_dict.get("organization_id", "org-default"),

@@ -24,9 +24,7 @@ from nexus.performance import ContentHashCache
 def _repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
-    (root / "calculator.py").write_text(
-        "def multiply(a, b):\n    return a + b\n", encoding="utf-8"
-    )
+    (root / "calculator.py").write_text("def multiply(a, b):\n    return a + b\n", encoding="utf-8")
     (root / "verify.py").write_text(
         "from calculator import multiply\n\ndef test_multiply():\n    assert multiply(2, 3) == 6\n",
         encoding="utf-8",
@@ -44,7 +42,11 @@ def _repo(tmp_path: Path) -> Path:
         ("Fix the bug but preserve the database schema", "FORBID_SCHEMA_CHANGE", ""),
         ("Fix the bug with no new dependencies", "FORBID_NEW_DEPENDENCY", ""),
         ("Fix the endpoint and keep the public API unchanged", "FORBID_PUBLIC_API_CHANGE", ""),
-        ("Fix internals while maintaining backward compatibility", "REQUIRE_BACKWARD_COMPATIBILITY", ""),
+        (
+            "Fix internals while maintaining backward compatibility",
+            "REQUIRE_BACKWARD_COMPATIBILITY",
+            "",
+        ),
     ],
 )
 def test_constraint_compiler_emits_typed_hard_policy(objective: str, kind: str, target: str):
@@ -191,9 +193,7 @@ def test_repository_intelligence_invalidates_same_size_rewrite(tmp_path: Path):
     intelligence = RepositoryIntelligence(root, state_root=tmp_path / "state")
     intelligence.build()
     before = intelligence.files["calculator.py"].content_hash
-    (root / "calculator.py").write_text(
-        "def multiply(a, b):\n    return a * b\n", encoding="utf-8"
-    )
+    (root / "calculator.py").write_text("def multiply(a, b):\n    return a * b\n", encoding="utf-8")
     intelligence.build()
     after = intelligence.files["calculator.py"].content_hash
     assert before != after
@@ -232,9 +232,7 @@ def test_engineering_brain_rejects_fabricated_typed_scope_evidence(tmp_path: Pat
         source_revision=revision,
         details="model invented this edge",
     )
-    decision = brain.authorize_mutation(
-        ["helper.py"], expansion_evidence=[fabricated]
-    )
+    decision = brain.authorize_mutation(["helper.py"], expansion_evidence=[fabricated])
     assert not decision.allowed
     assert "evidence" in decision.reason.lower()
 
@@ -242,13 +240,14 @@ def test_engineering_brain_rejects_fabricated_typed_scope_evidence(tmp_path: Pat
 def test_hmac_key_is_not_stored_under_repository_nexus_home(tmp_path: Path, monkeypatch):
     root = _repo(tmp_path)
     monkeypatch.delenv("NEXUS_STATE_HMAC_KEY", raising=False)
+    monkeypatch.delenv("NORYX_STATE_HMAC_KEY", raising=False)
     monkeypatch.setenv("NEXUS_HOME", str(root / "state"))
     monkeypatch.setenv("HOME", str(tmp_path / "user-home"))
     store = EngineeringMemoryStore(root)
     memory = store.create("external-key", "Fix calculator")
     store.save(memory)
     assert not list(root.rglob("*.key"))
-    assert list((tmp_path / "user-home" / ".nexusai" / "state-keys").glob("*.key"))
+    assert list((tmp_path / "user-home" / ".noryx" / "state-keys").glob("*.key"))
 
 
 def test_external_edit_between_plan_and_write_is_blocked(tmp_path: Path):
@@ -278,9 +277,12 @@ def test_constraint_compiler_handles_natural_variants(phrase: str, kind: str):
 
 
 def test_preserve_behavior_requires_preexisting_regression_evidence():
-    constraints = [item.to_dict() for item in ConstraintCompiler.compile(
-        "Refactor calculator.py but preserve existing behavior"
-    ).constraints]
+    constraints = [
+        item.to_dict()
+        for item in ConstraintCompiler.compile(
+            "Refactor calculator.py but preserve existing behavior"
+        ).constraints
+    ]
     base = [
         {"id": "m1", "kind": "file_mutation", "status": "verified"},
         {"id": "r1", "kind": "independent_review", "status": "verified"},
@@ -311,8 +313,7 @@ def test_preserve_behavior_requires_preexisting_regression_evidence():
     )
     assert not weak.satisfied
     assert any(
-        finding.code == "SEM-BEHAVIOR-PRESERVATION-PROOF-MISSING"
-        for finding in weak.findings
+        finding.code == "SEM-BEHAVIOR-PRESERVATION-PROOF-MISSING" for finding in weak.findings
     )
 
 
@@ -324,7 +325,8 @@ def test_authenticated_state_rejects_corrupt_external_key(tmp_path, monkeypatch)
     home = tmp_path / "home"
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("NEXUS_STATE_HMAC_KEY", raising=False)
-    key_dir = home / ".nexusai" / "state-keys"
+    monkeypatch.delenv("NORYX_STATE_HMAC_KEY", raising=False)
+    key_dir = home / ".noryx" / "state-keys"
     key_dir.mkdir(parents=True)
     key_name = integrity._repository_id(repository) + ".key"
     (key_dir / key_name).write_bytes(b"short")

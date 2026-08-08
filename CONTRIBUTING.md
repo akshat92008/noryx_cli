@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve NexusAI CLI.
+Thanks for helping improve Noryx CLI.
 
 ## Set up
 

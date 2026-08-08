@@ -15,7 +15,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 from nexus.multifile.consistency import ChangeSetConsistencyValidator
 from nexus.multifile.contracts import (
@@ -26,7 +25,6 @@ from nexus.multifile.contracts import (
     SymbolReference,
 )
 from nexus.multifile.impact import ImpactAnalyzer
-from nexus.multifile.patch import MultiFilePatchManager
 from nexus.multifile.persistence import ChangeSetPersistence
 from nexus.multifile.staged_execution import StagedChangeSetExecutor
 
@@ -65,7 +63,9 @@ def add_change_subparsers(subparsers: argparse._SubParsersAction) -> None:
     p_analyze.add_argument("--repo-root", default=".", help="Repository root directory")
 
     # validate
-    p_validate = change_subparsers.add_parser("validate", help="Validate an EngineeringChangeSet JSON file")
+    p_validate = change_subparsers.add_parser(
+        "validate", help="Validate an EngineeringChangeSet JSON file"
+    )
     p_validate.add_argument("changeset_file", help="Path to change set JSON file")
     p_validate.add_argument("--repo-root", default=".", help="Repository root directory")
 
@@ -159,7 +159,7 @@ def _cmd_execute(args: argparse.Namespace) -> int:
 
 def _cmd_status(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
-    run_dir = repo_root / ".nexus" / "runs" / args.run_id
+    run_dir = repo_root / ".noryx" / "runs" / args.run_id
     persistence = ChangeSetPersistence(run_dir)
     status_info = persistence.prepare_resume(args.run_id, str(repo_root))
     print(json.dumps(status_info, indent=2))
@@ -168,7 +168,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
 
 def _cmd_rollback(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
-    run_dir = repo_root / ".nexus" / "runs" / args.run_id
+    run_dir = repo_root / ".noryx" / "runs" / args.run_id
     persistence = ChangeSetPersistence(run_dir)
     cs = persistence.load_change_set(args.run_id)
     if not cs:

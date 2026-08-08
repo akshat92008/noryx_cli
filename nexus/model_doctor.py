@@ -120,7 +120,9 @@ def _prior_for(model_name: str) -> CapabilityProfile:
     values: dict[str, CapabilityScore] = {}
     for dimension in dimensions:
         score = base
-        notes: list[str] = ["Conservative tier prior; run model doctor to replace with measured evidence."]
+        notes: list[str] = [
+            "Conservative tier prior; run model doctor to replace with measured evidence."
+        ]
         if tier == ModelTier.LOCAL:
             if dimension in {
                 CapabilityDimension.MULTI_FILE_REASONING,
@@ -144,12 +146,18 @@ def _prior_for(model_name: str) -> CapabilityProfile:
             score += 0.04
         score = max(0.05, min(0.95, score))
         values[dimension.value] = CapabilityScore(score=score, confidence=0.35, notes=tuple(notes))
-    return CapabilityProfile(model_id=model_id, capabilities=values, overall_band=_band([v.score for v in values.values()]))
+    return CapabilityProfile(
+        model_id=model_id,
+        capabilities=values,
+        overall_band=_band([v.score for v in values.values()]),
+    )
 
 
 class ModelDoctor:
     def __init__(self, store_path: str | Path | None = None) -> None:
-        default = Path(os.environ.get("NEXUS_HOME", Path.home() / ".nexusai")) / "model-profiles.json"
+        default = (
+            Path(os.environ.get("NEXUS_HOME", Path.home() / ".nexusai")) / "model-profiles.json"
+        )
         self.store_path = Path(store_path or default).expanduser()
         self._profiles: dict[str, CapabilityProfile] = {}
         self._load()
@@ -170,7 +178,11 @@ class ModelDoctor:
             self.store_path.parent.mkdir(parents=True, exist_ok=True)
             temp = self.store_path.with_suffix(".tmp")
             temp.write_text(
-                json.dumps({key: profile.to_dict() for key, profile in self._profiles.items()}, indent=2, sort_keys=True),
+                json.dumps(
+                    {key: profile.to_dict() for key, profile in self._profiles.items()},
+                    indent=2,
+                    sort_keys=True,
+                ),
                 encoding="utf-8",
             )
             temp.replace(self.store_path)
@@ -205,12 +217,16 @@ class ModelDoctor:
         prior = _prior_for(model_name)
 
         measured: dict[str, CapabilityScore] = {}
-        for dimension, previous in ((CapabilityDimension(key), value) for key, value in prior.capabilities.items()):
+        for dimension, previous in (
+            (CapabilityDimension(key), value) for key, value in prior.capabilities.items()
+        ):
             samples: list[float] = []
             if backend_probe.ready and probe_runner is not None:
                 for _ in range(max(1, int(trials_per_probe))):
                     raw = probe_runner(model_name, dimension)
-                    samples.append(float(raw) if not isinstance(raw, bool) else (1.0 if raw else 0.0))
+                    samples.append(
+                        float(raw) if not isinstance(raw, bool) else (1.0 if raw else 0.0)
+                    )
             if samples:
                 score = max(0.0, min(1.0, sum(samples) / len(samples)))
                 measured[dimension.value] = CapabilityScore(
@@ -224,7 +240,12 @@ class ModelDoctor:
                     score=previous.score,
                     confidence=previous.confidence,
                     trials=0,
-                    notes=previous.notes + (("Backend readiness confirmed; capability benchmark not executed.",) if backend_probe.ready else ("Backend unavailable; retained conservative prior.",)),
+                    notes=previous.notes
+                    + (
+                        ("Backend readiness confirmed; capability benchmark not executed.",)
+                        if backend_probe.ready
+                        else ("Backend unavailable; retained conservative prior.",)
+                    ),
                 )
 
         profile = CapabilityProfile(

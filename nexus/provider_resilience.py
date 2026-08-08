@@ -5,7 +5,7 @@ Provider Resilience, Error Normalization, Privacy & Risk Policy Governance.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -52,7 +52,16 @@ class ProviderResilienceEngine:
         norm = msg.lower()
 
         # 1. Auth Failures
-        if any(w in norm for w in ("401", "unauthorized", "invalid api key", "authentication failed", "invalid_api_key")):
+        if any(
+            w in norm
+            for w in (
+                "401",
+                "unauthorized",
+                "invalid api key",
+                "authentication failed",
+                "invalid_api_key",
+            )
+        ):
             return NormalizedProviderError(
                 error_class=ProviderErrorClass.AUTHENTICATION_FAILURE,
                 raw_message=msg,
@@ -62,7 +71,9 @@ class ProviderResilienceEngine:
             )
 
         # 2. Quota Exhausted
-        if any(w in norm for w in ("insufficient_quota", "quota exceeded", "billing", "credit balance")):
+        if any(
+            w in norm for w in ("insufficient_quota", "quota exceeded", "billing", "credit balance")
+        ):
             return NormalizedProviderError(
                 error_class=ProviderErrorClass.QUOTA_EXHAUSTED,
                 raw_message=msg,
@@ -84,7 +95,9 @@ class ProviderResilienceEngine:
             )
 
         # 4. Model Unavailable
-        if any(w in norm for w in ("404", "model not found", "model unavailable", "does not exist")):
+        if any(
+            w in norm for w in ("404", "model not found", "model unavailable", "does not exist")
+        ):
             return NormalizedProviderError(
                 error_class=ProviderErrorClass.MODEL_UNAVAILABLE,
                 raw_message=msg,
@@ -94,7 +107,10 @@ class ProviderResilienceEngine:
             )
 
         # 5. Context Limit Exceeded
-        if any(w in norm for w in ("context_length_exceeded", "maximum context length", "prompt is too long")):
+        if any(
+            w in norm
+            for w in ("context_length_exceeded", "maximum context length", "prompt is too long")
+        ):
             return NormalizedProviderError(
                 error_class=ProviderErrorClass.CONTEXT_LIMIT_EXCEEDED,
                 raw_message=msg,
@@ -142,10 +158,21 @@ class ProviderResilienceEngine:
             return True, "Unknown model"
 
         if policy == PrivacyClass.LOCAL_ONLY and not desc.local:
-            return False, f"Privacy Violation: Policy is LOCAL_ONLY but model '{desc.display_name}' sends code to remote cloud."
+            return (
+                False,
+                f"Privacy Violation: Policy is LOCAL_ONLY but model '{desc.display_name}' sends code to remote cloud.",
+            )
 
-        if policy == PrivacyClass.PRIVATE_INFRASTRUCTURE and not desc.local and desc.privacy_class not in (PrivacyClass.LOCAL_ONLY, PrivacyClass.PRIVATE_INFRASTRUCTURE):
-            return False, f"Privacy Violation: Policy requires private infrastructure but '{desc.display_name}' uses public cloud."
+        if (
+            policy == PrivacyClass.PRIVATE_INFRASTRUCTURE
+            and not desc.local
+            and desc.privacy_class
+            not in (PrivacyClass.LOCAL_ONLY, PrivacyClass.PRIVATE_INFRASTRUCTURE)
+        ):
+            return (
+                False,
+                f"Privacy Violation: Policy requires private infrastructure but '{desc.display_name}' uses public cloud.",
+            )
 
         return True, "Privacy policy satisfied"
 

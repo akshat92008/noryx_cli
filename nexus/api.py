@@ -1,4 +1,4 @@
-"""Multi-provider hosted inference client for the NexusAI runtime.
+"""Multi-provider hosted inference client for the Noryx runtime.
 
 Supports multi-key NVIDIA rotation and a compatible Groq fallback.
 """
@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from nexus.env import noryx_env
 from nexus.openai_compat import OpenAI
 
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
@@ -18,8 +19,8 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # Hosted inference can legitimately take more than a few seconds before the
 # first token. Keep the defaults conservative while allowing operators to tune
 # them for their environment.
-DEFAULT_NVIDIA_TIMEOUT = float(os.environ.get("NEXUS_NVIDIA_TIMEOUT", "60.0"))
-DEFAULT_GROQ_TIMEOUT = float(os.environ.get("NEXUS_GROQ_TIMEOUT", "60.0"))
+DEFAULT_NVIDIA_TIMEOUT = float(noryx_env("NVIDIA_TIMEOUT", "60.0"))
+DEFAULT_GROQ_TIMEOUT = float(noryx_env("GROQ_TIMEOUT", "60.0"))
 
 # Groq model mappings for ultimate fallback (must support tool calling if used)
 GROQ_MODEL_MAP = {
@@ -113,7 +114,7 @@ class _ObservedStream:
 
 
 def _load_env_file():
-    """Load local Nexus environment files without overriding process values."""
+    """Load local Noryx environment files without overriding process values."""
     cwd = os.getcwd()
     checkout = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     possible_paths = [
@@ -132,7 +133,22 @@ def _load_env_file():
                             k, v = line.split("=", 1)
                             k, v = k.strip(), v.strip().strip("'\"")
                             if p == os.path.join(cwd, ".env"):
-                                if k.startswith(("NEXUS_", "OPENAI_", "ANTHROPIC_", "GROQ_", "NVIDIA_", "OPENROUTER_")) or k in {"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"}:
+                                if k.startswith(
+                                    (
+                                        "NEXUS_",
+                                        "OPENAI_",
+                                        "ANTHROPIC_",
+                                        "GROQ_",
+                                        "NVIDIA_",
+                                        "OPENROUTER_",
+                                    )
+                                ) or k in {
+                                    "HTTP_PROXY",
+                                    "HTTPS_PROXY",
+                                    "ALL_PROXY",
+                                    "SSL_CERT_FILE",
+                                    "REQUESTS_CA_BUNDLE",
+                                }:
                                     continue
                             # Explicit process environment wins over repository .env.
                             # This is required for CLI flags, CI, and isolated tests.
@@ -196,7 +212,7 @@ class RoundRobinKeyPool:
 
 class NvidiaClient:
     """
-    Multi-Provider & Multi-Key Resilient Client for NexusAI.
+    Multi-Provider & Multi-Key Resilient Client for Noryx.
     Handles automatic round-robin key rotation across NVIDIA API keys,
     NVIDIA model fallbacks, and seamless Groq API ultimate failover.
     """
@@ -218,9 +234,9 @@ class NvidiaClient:
         self._client_lock = threading.RLock()
         self._client_cache: dict[tuple[str, str, float], Any] = {}
         self._closed = False
-        self.custom_base_url = os.environ.get("NEXUS_OPENAI_BASE_URL", "").strip().rstrip("/")
-        self.custom_api_key = os.environ.get("NEXUS_OPENAI_API_KEY", "").strip()
-        self.custom_model = os.environ.get("NEXUS_MODEL_ID", "").strip()
+        self.custom_base_url = str(noryx_env("OPENAI_BASE_URL", "")).strip().rstrip("/")
+        self.custom_api_key = str(noryx_env("OPENAI_API_KEY", "")).strip()
+        self.custom_model = str(noryx_env("MODEL_ID", "")).strip()
 
         # Collect all NVIDIA keys
         self.nvidia_keys = [self.primary_key] if self.primary_key else []
@@ -455,7 +471,8 @@ class NvidiaClient:
 
         if network_globally_disabled():
             raise RuntimeError(
-                "Outbound provider requests are disabled by NEXUS_DISABLE_NETWORK."
+                "Outbound provider requests are disabled by NORYX_DISABLE_NETWORK "
+                "(legacy NEXUS_DISABLE_NETWORK)."
             )
         kwargs = {
             "messages": messages,
@@ -670,7 +687,7 @@ class NvidiaClient:
 
         # If all providers and keys failed, raise a clear exception with details
         summary_err = " | ".join(errors[-3:]) if errors else "All API attempts failed"
-        raise RuntimeError(f"Nexus AI Provider Failover Error: {summary_err}")
+        raise RuntimeError(f"Noryx AI Provider Failover Error: {summary_err}")
 
     def chat_sync(
         self,

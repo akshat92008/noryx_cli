@@ -1,10 +1,10 @@
 """Small OpenAI-compatible client with an optional official-SDK fast path.
 
-Nexus declares the official ``openai`` package as a normal dependency.  This
+Noryx declares the official ``openai`` package as a normal dependency.  This
 module keeps source checkouts, diagnostics, and local-only workflows usable
 when that package has not been installed yet.  When the SDK is available it is
 used unchanged; otherwise a narrow HTTPX implementation covers the Chat
-Completions surface Nexus needs.
+Completions surface Noryx needs.
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ except ImportError:  # pragma: no cover - fallback is covered in this repository
             self.completions = _Completions(owner)
 
     class OpenAI:
-        """Subset of the official client used by Nexus.
+        """Subset of the official client used by Noryx.
 
         The class intentionally mirrors the public attributes used by the
         runtime and tests: ``base_url``, ``timeout``, and

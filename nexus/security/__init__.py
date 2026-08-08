@@ -1,4 +1,4 @@
-"""Security, policy enforcement, and enterprise governance primitives for Nexus CLI."""
+"""Security, policy enforcement, and enterprise governance primitives for Noryx CLI."""
 
 from nexus.security.policy_engine import (
     PolicyDecision,

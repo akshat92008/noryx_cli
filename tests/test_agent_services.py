@@ -41,7 +41,9 @@ def _fake_agent(tmp_path: Path):
         ),
         model_key="test",
         model_cfg={"name": "test", "id": "test"},
-        mode_policy=SimpleNamespace(allow_shell_command=True, require_os_isolation=False, may_edit=True),
+        mode_policy=SimpleNamespace(
+            allow_shell_command=True, require_os_isolation=False, may_edit=True
+        ),
         _enforce_plan_tool_contract=False,
         history=[],
         conversation_id="test-conv",
@@ -131,11 +133,14 @@ class TestToolExecutionController:
     def test_execute_delegates_to_agent(self, tmp_path):
         agent = _fake_agent(tmp_path)
         ctrl = ToolExecutionController(agent)
-        
+
         # Mock the dispatch to avoid actually reading files in this unit test
         from nexus.tools import ToolResult, ToolStatus
-        ctrl._dispatch_tool_execution = lambda name, args: ToolResult(status=ToolStatus.SUCCESS, output="ok")
-        
+
+        ctrl._dispatch_tool_execution = lambda name, args: ToolResult(
+            status=ToolStatus.SUCCESS, output="ok"
+        )
+
         result, ok = ctrl.execute("read_file", {"path": "a.py"})
         assert result == "ok"
         assert ok is True
@@ -181,7 +186,12 @@ class TestRunFinalizer:
 
     def test_classify_evidence_passing_command(self):
         records = [
-            {"kind": EvidenceClass.COMMAND, "status": "verified", "exit_code": 0, "command": "pytest"},
+            {
+                "kind": EvidenceClass.COMMAND,
+                "status": "verified",
+                "exit_code": 0,
+                "command": "pytest",
+            },
         ]
         summary = RunFinalizer.classify_evidence(records)
         assert len(summary.passing_commands) == 1
@@ -235,15 +245,11 @@ class TestRunFinalizer:
 
     def test_determine_status_awaiting_approval(self):
         summary = EvidenceSummary()
-        assert (
-            RunFinalizer.determine_status(summary, awaiting_approval=True)
-            == "AWAITING_APPROVAL"
-        )
+        assert RunFinalizer.determine_status(summary, awaiting_approval=True) == "AWAITING_APPROVAL"
 
     def test_determine_status_unverified_empty(self):
         summary = EvidenceSummary()
         assert RunFinalizer.determine_status(summary) == "UNVERIFIED"
-
 
     def test_make_finalizer_attaches_to_agent(self, tmp_path):
         agent = _fake_agent(tmp_path)

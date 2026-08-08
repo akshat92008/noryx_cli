@@ -1,10 +1,12 @@
 """Tests for SymbolRenameEngine (Sprint 8)."""
+
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 
-from nexus.multifile.rename import SymbolRenameEngine, RenameKind
+import pytest
+
+from nexus.multifile.rename import SymbolRenameEngine
 
 
 def _write(path: Path, content: str) -> None:
@@ -14,37 +16,55 @@ def _write(path: Path, content: str) -> None:
 
 @pytest.fixture()
 def repo(tmp_path: Path) -> Path:
-    _write(tmp_path / "nexus" / "calculator.py", """\
+    _write(
+        tmp_path / "nexus" / "calculator.py",
+        """\
 def compute_total(items: list) -> float:
     '''Compute the total of items.'''
     return sum(items)
-""")
-    _write(tmp_path / "nexus" / "report.py", """\
+""",
+    )
+    _write(
+        tmp_path / "nexus" / "report.py",
+        """\
 from nexus.calculator import compute_total
 
 def generate_report(data):
     total = compute_total(data)
     return f"Total: {total}"
-""")
-    _write(tmp_path / "tests" / "test_calculator.py", """\
+""",
+    )
+    _write(
+        tmp_path / "tests" / "test_calculator.py",
+        """\
 from nexus.calculator import compute_total
 
 def test_compute_total():
     assert compute_total([1, 2, 3]) == 6
-""")
-    _write(tmp_path / "docs" / "api.md", """\
+""",
+    )
+    _write(
+        tmp_path / "docs" / "api.md",
+        """\
 # API Reference
 `compute_total(items)` computes the sum of a list.
-""")
-    _write(tmp_path / "config" / "settings.yaml", """\
+""",
+    )
+    _write(
+        tmp_path / "config" / "settings.yaml",
+        """\
 feature_compute_total_enabled: true
-""")
-    _write(tmp_path / "nexus" / "dynamic_user.py", """\
+""",
+    )
+    _write(
+        tmp_path / "nexus" / "dynamic_user.py",
+        """\
 import importlib
 mod = importlib.import_module("nexus.calculator")
 fn = getattr(mod, "compute_total")
 result = fn([1, 2])
-""")
+""",
+    )
     return tmp_path
 
 
@@ -78,13 +98,17 @@ def test_tests_discovered(repo):
 
 def test_string_false_positive_not_auto_renamed(repo):
     """Strings containing the symbol name are not put in safe_occurrences."""
+    _write(repo / "nexus" / "string_only.py", 'LABEL = "compute_total"\n')
     engine = SymbolRenameEngine(repo)
     analysis = engine.analyze("compute_total", "calculate_total")
     # String occurrences should be in string_occurrences, not safe_occurrences
-    string_paths = [o.path for o in analysis.string_occurrences]
-    safe_paths = [o.path for o in analysis.safe_occurrences]
+    string_paths = {o.path for o in analysis.string_occurrences}
+    safe_paths = {o.path for o in analysis.safe_occurrences}
     # If a file only has a string occurrence, it should not appear in safe_occurrences
     # (documentation is a separate category)
+    assert "nexus/string_only.py" in string_paths
+    assert "nexus/string_only.py" not in safe_paths
+    assert string_paths.isdisjoint(safe_paths)
 
 
 def test_documentation_occurrence_classified(repo):
@@ -110,7 +134,9 @@ def test_dynamic_reference_warning_surfaced(repo):
     analysis = engine.analyze("compute_total", "calculate_total")
     dynamic_paths = [o.path for o in analysis.dynamic_occurrences]
     assert "nexus/dynamic_user.py" in dynamic_paths
-    assert any("dynamic" in w.lower() or "getattr" in w.lower() for w in analysis.unresolved_warnings)
+    assert any(
+        "dynamic" in w.lower() or "getattr" in w.lower() for w in analysis.unresolved_warnings
+    )
 
 
 def test_to_planned_changes_excludes_config(repo):

@@ -716,9 +716,7 @@ class PlanningEngine:
             "skills_needed": skills,
         }
 
-    def create_canonical_bundle(
-        self, goal: str, repo_summary: dict | None = None
-    ) -> dict:
+    def create_canonical_bundle(self, goal: str, repo_summary: dict | None = None) -> dict:
         """Create the canonical task, engineering-plan, critique and execution contracts.
 
         All production entry points use this adapter so the richer planning package is
@@ -737,9 +735,7 @@ class PlanningEngine:
             "task_contract": contract.to_dict(),
             "engineering_plan": engineering_plan.to_dict(),
             "critique": critique.to_dict(),
-            "execution_contract": (
-                execution_contract.to_dict() if execution_contract else None
-            ),
+            "execution_contract": (execution_contract.to_dict() if execution_contract else None),
         }
 
     @staticmethod
@@ -831,9 +827,7 @@ class PlanningEngine:
 
         for step in steps:
             step.permitted_files = list(permitted_files)
-            step.acceptance_criteria = list(
-                dict.fromkeys([*step.acceptance_criteria, *acceptance])
-            )
+            step.acceptance_criteria = list(dict.fromkeys([*step.acceptance_criteria, *acceptance]))
         plan = ExecutionPlan(
             id=plan_id,
             goal=goal,
@@ -853,9 +847,7 @@ class PlanningEngine:
             retry_policy={
                 "per_task": 3 if difficulty == Difficulty.MASSIVE else 2,
                 "total_repairs": (
-                    max(8, len(steps) // 2)
-                    if difficulty == Difficulty.MASSIVE
-                    else 5
+                    max(8, len(steps) // 2) if difficulty == Difficulty.MASSIVE else 5
                 ),
             },
             budgets={
@@ -1004,27 +996,27 @@ class PlanningEngine:
         subsystem_specs.extend(
             [
                 (
-                "api-and-integrations",
-                ["versioned API", "validation", "idempotency", "external adapters"],
-                ["API contract", "integration adapters", "contract tests"],
+                    "api-and-integrations",
+                    ["versioned API", "validation", "idempotency", "external adapters"],
+                    ["API contract", "integration adapters", "contract tests"],
                     ["identity-and-tenancy", "core-domain", "data-platform", *domain_names],
                 ),
                 (
-                "user-experience",
-                ["primary workflows", "responsive UI", "accessibility", "error recovery"],
-                ["routed UI", "typed client", "end-to-end user journeys"],
+                    "user-experience",
+                    ["primary workflows", "responsive UI", "accessibility", "error recovery"],
+                    ["routed UI", "typed client", "end-to-end user journeys"],
                     ["identity-and-tenancy", "api-and-integrations"],
                 ),
                 (
-                "async-workflows",
-                ["jobs", "queues", "retries", "dead-letter recovery"],
-                ["job contracts", "retry policy", "operational controls"],
+                    "async-workflows",
+                    ["jobs", "queues", "retries", "dead-letter recovery"],
+                    ["job contracts", "retry policy", "operational controls"],
                     ["core-domain", "data-platform", *domain_names],
                 ),
                 (
-                "platform-and-observability",
-                ["configuration", "secrets", "telemetry", "health", "deployment"],
-                ["deployment manifests", "dashboards", "runbooks", "rollback procedure"],
+                    "platform-and-observability",
+                    ["configuration", "secrets", "telemetry", "health", "deployment"],
+                    ["deployment manifests", "dashboards", "runbooks", "rollback procedure"],
                     [
                         "identity-and-tenancy",
                         "api-and-integrations",

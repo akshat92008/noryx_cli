@@ -9,7 +9,6 @@ and guarantees cleanup even on failure paths.
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 import subprocess
 import tempfile
@@ -93,8 +92,11 @@ class WorkerLifecycleManager:
             baseline_tree_hash=self._get_baseline_tree_hash(),
         )
         self._workers[worker_id] = record
-        logger.info("WorkerLifecycleManager: created worker %s for assignment %s",
-                    worker_id, assignment.assignment_id)
+        logger.info(
+            "WorkerLifecycleManager: created worker %s for assignment %s",
+            worker_id,
+            assignment.assignment_id,
+        )
         return record
 
     def prepare_workspace(
@@ -121,11 +123,22 @@ class WorkerLifecycleManager:
 
             # If ISOLATED_WORKTREE is requested and git repository exists, try git worktree
             created_worktree = False
-            if strategy == WorkspaceStrategy.ISOLATED_WORKTREE and (self._lead_root / ".git").exists():
+            if (
+                strategy == WorkspaceStrategy.ISOLATED_WORKTREE
+                and (self._lead_root / ".git").exists()
+            ):
                 try:
                     # SECURITY CLASSIFICATION: INTERNAL_GIT_OP
                     subprocess.run(
-                        ["git", "worktree", "add", "-b", f"worker-{worker_id[:8]}", str(workspace_dir), "HEAD"],
+                        [
+                            "git",
+                            "worktree",
+                            "add",
+                            "-b",
+                            f"worker-{worker_id[:8]}",
+                            str(workspace_dir),
+                            "HEAD",
+                        ],
                         cwd=str(self._lead_root),
                         check=True,
                         capture_output=True,
@@ -133,7 +146,9 @@ class WorkerLifecycleManager:
                     )
                     created_worktree = True
                 except Exception as exc:
-                    logger.warning("Git worktree creation failed, falling back to temp copy: %s", exc)
+                    logger.warning(
+                        "Git worktree creation failed, falling back to temp copy: %s", exc
+                    )
 
             if not created_worktree:
                 # Fall back to isolated copy
@@ -143,7 +158,12 @@ class WorkerLifecycleManager:
 
                 # Copy files excluding hidden / build dirs
                 for item in self._lead_root.iterdir():
-                    if item.name.startswith(".") or item.name in ("__pycache__", "build", "dist", "node_modules"):
+                    if item.name.startswith(".") or item.name in (
+                        "__pycache__",
+                        "build",
+                        "dist",
+                        "node_modules",
+                    ):
                         continue
                     dest = workspace_dir / item.name
                     if item.is_dir():
@@ -175,7 +195,9 @@ class WorkerLifecycleManager:
         record.state = WorkerState.PREPARING
         logger.info(
             "WorkerLifecycleManager: prepared workspace %s (strategy=%s) for worker %s",
-            workspace.workspace_id, strategy.value, worker_id,
+            workspace.workspace_id,
+            strategy.value,
+            worker_id,
         )
         return workspace
 
@@ -214,7 +236,10 @@ class WorkerLifecycleManager:
                     pass
 
                 # If git worktree was used, remove it
-                if workspace.strategy == WorkspaceStrategy.ISOLATED_WORKTREE and (self._lead_root / ".git").exists():
+                if (
+                    workspace.strategy == WorkspaceStrategy.ISOLATED_WORKTREE
+                    and (self._lead_root / ".git").exists()
+                ):
                     try:
                         # SECURITY CLASSIFICATION: INTERNAL_GIT_OP
                         subprocess.run(
@@ -229,8 +254,11 @@ class WorkerLifecycleManager:
                 if target.exists():
                     shutil.rmtree(target, ignore_errors=False)
 
-                logger.info("WorkerLifecycleManager: cleaned up workspace %s for worker %s",
-                            target, worker_id)
+                logger.info(
+                    "WorkerLifecycleManager: cleaned up workspace %s for worker %s",
+                    target,
+                    worker_id,
+                )
 
             record.state = WorkerState.CLEANED_UP
             return True

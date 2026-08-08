@@ -26,12 +26,10 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import Any
 
 from nexus.multifile.contracts import (
-    ChangeType,
     ChangeSetValidationResult,
-    ContractMismatch,
+    ChangeType,
     EngineeringChangeSet,
     ImpactCategory,
     MissingChange,
@@ -43,14 +41,16 @@ from nexus.multifile.contracts import (
 logger = logging.getLogger(__name__)
 
 # Files/dirs that are always protected from mutation
-_PROTECTED_PATHS = frozenset({
-    "pyproject.toml",
-    "setup.py",
-    "setup.cfg",
-    "SECURITY.md",
-    "LICENSE",
-    ".github/CODEOWNERS",
-})
+_PROTECTED_PATHS = frozenset(
+    {
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        "SECURITY.md",
+        "LICENSE",
+        ".github/CODEOWNERS",
+    }
+)
 
 
 class ChangeSetConsistencyValidator:
@@ -104,9 +104,8 @@ class ChangeSetConsistencyValidator:
     ) -> None:
         """Protected paths require explicit protection=True on the PlannedFileChange."""
         for fc in cs.file_changes:
-            is_protected = (
-                fc.path in _PROTECTED_PATHS
-                or any(fc.path.startswith(p) for p in _PROTECTED_PATHS if p.endswith("/"))
+            is_protected = fc.path in _PROTECTED_PATHS or any(
+                fc.path.startswith(p) for p in _PROTECTED_PATHS if p.endswith("/")
             )
             if is_protected and not fc.protected:
                 result.scope_violations.append(
@@ -202,12 +201,10 @@ class ChangeSetConsistencyValidator:
     ) -> None:
         """Schema changes should be accompanied by a migration file."""
         schema_changes = [
-            fc for fc in cs.file_changes
-            if fc.change_type == ChangeType.SCHEMA_CHANGE
+            fc for fc in cs.file_changes if fc.change_type == ChangeType.SCHEMA_CHANGE
         ]
         migration_paths = [
-            fc.path for fc in cs.file_changes
-            if fc.change_type == ChangeType.MIGRATION
+            fc.path for fc in cs.file_changes if fc.change_type == ChangeType.MIGRATION
         ]
 
         for sc in schema_changes:
@@ -256,16 +253,16 @@ class ChangeSetConsistencyValidator:
     ) -> None:
         """Functional changes (MODIFY, CREATE) should include test changes."""
         functional_changes = [
-            fc for fc in cs.file_changes
+            fc
+            for fc in cs.file_changes
             if fc.change_type in (ChangeType.MODIFY, ChangeType.CREATE)
-            and not any(
-                part in fc.path for part in ("test_", "/tests/", "test/", "_test.py")
-            )
+            and not any(part in fc.path for part in ("test_", "/tests/", "test/", "_test.py"))
             and not fc.path.endswith((".md", ".yaml", ".yml", ".toml", ".json"))
         ]
 
         test_changes = [
-            fc for fc in cs.file_changes
+            fc
+            for fc in cs.file_changes
             if any(part in fc.path for part in ("test_", "/tests/", "test/", "_test.py"))
             or fc.change_type == ChangeType.TEST_CHANGE
         ]
@@ -283,9 +280,7 @@ class ChangeSetConsistencyValidator:
     def _find_files_importing(self, module_name: str) -> list[str]:
         """Find Python files that import the given module name."""
         results: list[str] = []
-        pattern = re.compile(
-            rf"(?:from|import)\s+{re.escape(module_name)}(?:\s|\.|\Z)"
-        )
+        pattern = re.compile(rf"(?:from|import)\s+{re.escape(module_name)}(?:\s|\.|\Z)")
 
         for py_file in self.repo_root.rglob("*.py"):
             rel = str(py_file.relative_to(self.repo_root))

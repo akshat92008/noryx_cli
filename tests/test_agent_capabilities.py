@@ -99,6 +99,7 @@ def test_unregistered_role_returns_none(registry):
 
 def test_custom_profile_registration(registry):
     from nexus.collaboration.models import AgentCapabilityProfile
+
     custom = AgentCapabilityProfile(
         role=AgentRole.DEBUGGER,
         supported_task_types=("debugging", "tracing"),

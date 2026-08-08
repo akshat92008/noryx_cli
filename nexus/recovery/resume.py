@@ -1,12 +1,11 @@
 """
-Interruption and Session Resumption Engine for Nexus CLI Recovery Subsystem.
+Interruption and Session Resumption Engine for Noryx CLI Recovery Subsystem.
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
 
 from nexus.run_state import RunLedger
 
@@ -52,5 +51,5 @@ class SessionResumptionEngine:
             last_checkpoint=last_cp,
             external_changes_detected=ext_changes,
             stale_plan=False,
-            summary=f"Safe to resume from checkpoint '{last_cp or 'initial'}'."
+            summary=f"Safe to resume from checkpoint '{last_cp or 'initial'}'.",
         )

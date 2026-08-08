@@ -45,9 +45,7 @@ def test_extension_custom_path_field_is_scoped_by_declared_contract(tmp_path):
     agent.extensions.loaded = lambda group: [_FilesystemExtension()] if group == "tools" else []
     agent._register_external_tool_capabilities()
 
-    pending, success = agent._execute_tool_with_safety(
-        "custom_read", {"target": str(outside)}
-    )
+    pending, success = agent._execute_tool_with_safety("custom_read", {"target": str(outside)})
 
     assert success is False
     assert "PENDING_CONFIRMATION" in pending
@@ -58,15 +56,11 @@ def test_filesystem_extension_without_argument_contract_is_hidden(tmp_path):
     from nexus.agent import Agent
 
     agent = Agent(api_key="test", working_dir=str(tmp_path))
-    agent.extensions.loaded = (
-        lambda group: [_UndeclaredFilesystemExtension()] if group == "tools" else []
+    agent.extensions.loaded = lambda group: (
+        [_UndeclaredFilesystemExtension()] if group == "tools" else []
     )
     agent._register_external_tool_capabilities()
 
     assert "unsafe_custom_read" not in agent._tool_capabilities
-    names = {
-        item["function"]["name"]
-        for item in (agent._get_tools() or [])
-        if "function" in item
-    }
+    names = {item["function"]["name"] for item in (agent._get_tools() or []) if "function" in item}
     assert "unsafe_custom_read" not in names

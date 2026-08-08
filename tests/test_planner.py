@@ -78,9 +78,7 @@ def test_save_and_load_plan(tmp_path, monkeypatch):
     assert loaded.steps[0].title == "step 1"
 
 
-def test_massive_build_persists_product_architecture_and_subsystem_contracts(
-    tmp_path, monkeypatch
-):
+def test_massive_build_persists_product_architecture_and_subsystem_contracts(tmp_path, monkeypatch):
     from nexus import planner as planner_module
 
     monkeypatch.setattr(planner_module, "PLANS_DIR", tmp_path)
@@ -111,13 +109,12 @@ def test_massive_build_persists_product_architecture_and_subsystem_contracts(
     }
     assert all(step.phase for step in plan.steps)
     assert all("run_command" not in step.tools_needed for step in plan.steps)
-    assert plan.budgets["max_tool_calls"] >= sum(
-        step.max_tool_calls + 1 for step in plan.steps
-    )
+    assert plan.budgets["max_tool_calls"] >= sum(step.max_tool_calls + 1 for step in plan.steps)
     subsystem_steps = {step.subsystem: step for step in plan.steps if step.subsystem}
-    assert subsystem_steps["inventory-and-fulfillment"].id not in subsystem_steps[
-        "catalog-and-pricing"
-    ].depends_on
+    assert (
+        subsystem_steps["inventory-and-fulfillment"].id
+        not in subsystem_steps["catalog-and-pricing"].depends_on
+    )
     integration = next(step for step in plan.steps if step.phase == "integration")
     assert set(integration.depends_on) == {step.id for step in subsystem_steps.values()}
 

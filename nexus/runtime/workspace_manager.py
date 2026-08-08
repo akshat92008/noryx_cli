@@ -12,7 +12,6 @@ from nexus.safety import SafetyCheck
 logger = logging.getLogger(__name__)
 
 
-
 class WorkspaceManagerMixin:
     def _queue_edit(self, name: str, args: dict, diff: str) -> str:
         for edit_id, pending in self._pending_edits.items():
@@ -204,4 +203,3 @@ class WorkspaceManagerMixin:
             except (OSError, ValueError) as exc:
                 logger.debug("Repository graph refresh after rollback failed: %s", exc)
         return success, detail
-

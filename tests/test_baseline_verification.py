@@ -27,7 +27,9 @@ def test_identical_preexisting_test_failure_is_marked_inherited(tmp_path):
     _write_project(baseline)
     _write_project(workspace)
 
-    engine = VerificationEngine(str(workspace), {"test": "python -m pytest -q"}, allow_unisolated_host_process=True)
+    engine = VerificationEngine(
+        str(workspace), {"test": "python -m pytest -q"}, allow_unisolated_host_process=True
+    )
     report = engine.run_all([CheckType.TEST])
     assert report.all_passed is False
 
@@ -43,7 +45,9 @@ def test_changed_failure_output_remains_blocking_regression(tmp_path):
     _write_project(baseline)
     _write_project(workspace, add_new_failure=True)
 
-    engine = VerificationEngine(str(workspace), {"test": "python -m pytest -q"}, allow_unisolated_host_process=True)
+    engine = VerificationEngine(
+        str(workspace), {"test": "python -m pytest -q"}, allow_unisolated_host_process=True
+    )
     report = engine.run_all([CheckType.TEST])
     reconciled = engine.reconcile_with_baseline(report, baseline)
 

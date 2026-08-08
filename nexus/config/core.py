@@ -1,14 +1,18 @@
-import os
 import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
-from dataclasses import dataclass, field
+
+from nexus.env import noryx_env
+
 
 @dataclass
 class NexusConfig:
     model_settings: Dict[str, Any] = field(default_factory=dict)
     provider_settings: Dict[str, Any] = field(default_factory=dict)
-    execution_limits: Dict[str, int] = field(default_factory=lambda: {"max_steps": 50, "timeout_seconds": 300})
+    execution_limits: Dict[str, int] = field(
+        default_factory=lambda: {"max_steps": 50, "timeout_seconds": 300}
+    )
     security_settings: Dict[str, Any] = field(default_factory=lambda: {"sandbox_enabled": True})
     budget_settings: Dict[str, float] = field(default_factory=lambda: {"max_spend_usd": 10.0})
     workspace_settings: Dict[str, Any] = field(default_factory=lambda: {"use_git_worktree": False})
@@ -20,15 +24,20 @@ class NexusConfig:
         CLI arguments > project config > user config > environment > defaults
         """
         config = cls()
-        
+
         # 4. Environment
-        if "NEXUS_MODEL" in os.environ:
-            config.model_settings["default_model"] = os.environ["NEXUS_MODEL"]
-        if "NEXUS_MAX_STEPS" in os.environ:
-            config.execution_limits["max_steps"] = int(os.environ["NEXUS_MAX_STEPS"])
-            
-        # 3. User config (e.g. ~/.nexus/config.json)
-        user_config_path = Path.home() / ".nexus" / "config.json"
+        model = noryx_env("MODEL")
+        max_steps = noryx_env("MAX_STEPS")
+        if model:
+            config.model_settings["default_model"] = model
+        if max_steps:
+            config.execution_limits["max_steps"] = int(max_steps)
+
+        # 3. User config (e.g. ~/.noryx/config.json)
+        user_config_path = Path.home() / ".noryx" / "config.json"
+        legacy_user_config = Path.home() / ".nexus" / "config.json"
+        if not user_config_path.exists() and legacy_user_config.exists():
+            user_config_path = legacy_user_config
         if user_config_path.exists():
             try:
                 with open(user_config_path, "r") as f:
@@ -36,9 +45,12 @@ class NexusConfig:
                     config._merge(user_data)
             except Exception:
                 pass
-                
-        # 2. Project config (.nexus/config.json)
-        project_config_path = Path(".nexus") / "config.json"
+
+        # 2. Project config (.noryx/config.json)
+        project_config_path = Path(".noryx") / "config.json"
+        legacy_project_config = Path(".nexus") / "config.json"
+        if not project_config_path.exists() and legacy_project_config.exists():
+            project_config_path = legacy_project_config
         if project_config_path.exists():
             try:
                 with open(project_config_path, "r") as f:
@@ -46,11 +58,11 @@ class NexusConfig:
                     config._merge(project_data)
             except Exception:
                 pass
-                
+
         # 1. CLI args
         if cli_args:
             config._merge(cli_args)
-            
+
         return config
 
     def _merge(self, data: Dict[str, Any]) -> None:
@@ -67,8 +79,10 @@ class NexusConfig:
         if "workspace_settings" in data:
             self.workspace_settings.update(data["workspace_settings"])
 
+
 # Global singleton for current config
 _config_instance: Optional[NexusConfig] = None
+
 
 def get_config() -> NexusConfig:
     global _config_instance
@@ -76,6 +90,11 @@ def get_config() -> NexusConfig:
         _config_instance = NexusConfig.load()
     return _config_instance
 
+
 def set_config(config: NexusConfig) -> None:
     global _config_instance
     _config_instance = config
+
+
+# Canonical public spelling; NexusConfig remains for 3.x extension compatibility.
+NoryxConfig = NexusConfig

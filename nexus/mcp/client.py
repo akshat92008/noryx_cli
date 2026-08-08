@@ -121,7 +121,7 @@ class MCPConnection:
                 {
                     "protocolVersion": "2024-11-05",
                     "capabilities": {"tools": {}},
-                    "clientInfo": {"name": "NexusAI", "version": "3.0"},
+                    "clientInfo": {"name": "Noryx", "version": "3.0"},
                 },
             )
 
@@ -330,9 +330,7 @@ class MCPClient:
                     enabled=bool(server_data.get("enabled", True)),
                     workspace=str(server_data.get("workspace", "")),
                     network=bool(server_data.get("network", False)),
-                    require_os_isolation=bool(
-                        server_data.get("requireOsIsolation", True)
-                    ),
+                    require_os_isolation=bool(server_data.get("requireOsIsolation", True)),
                 )
                 self.add_server(config)
         except (FileNotFoundError, json.JSONDecodeError, OSError):

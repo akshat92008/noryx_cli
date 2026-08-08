@@ -2,18 +2,17 @@
 Canonical typed data model for multi-file coordinated repository changes.
 
 Sprint 8: EngineeringChangeSet is the authoritative representation for every
-multi-file operation Nexus executes. All multi-file paths MUST produce one
+multi-file operation Noryx executes. All multi-file paths MUST produce one
 before mutating the repository.
 """
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Enumerations
@@ -22,6 +21,7 @@ from typing import Any
 
 class ChangeType(str, Enum):
     """The kind of change a PlannedFileChange represents."""
+
     CREATE = "CREATE"
     MODIFY = "MODIFY"
     DELETE = "DELETE"
@@ -37,6 +37,7 @@ class ChangeType(str, Enum):
 
 class TaskType(str, Enum):
     """High-level classification of what the change set accomplishes."""
+
     FEATURE = "FEATURE"
     REFACTOR = "REFACTOR"
     BUG_FIX = "BUG_FIX"
@@ -55,6 +56,7 @@ class TaskType(str, Enum):
 
 class ContractType(str, Enum):
     """Category of a shared interface that can be broken."""
+
     PUBLIC_FUNCTION = "PUBLIC_FUNCTION"
     CLASS_METHOD = "CLASS_METHOD"
     ABSTRACT_BASE = "ABSTRACT_BASE"
@@ -76,6 +78,7 @@ class ContractType(str, Enum):
 
 class ContractScope(str, Enum):
     """Visibility scope of the contract being changed."""
+
     INTERNAL_PRIVATE = "INTERNAL_PRIVATE"
     REPOSITORY_PUBLIC = "REPOSITORY_PUBLIC"
     PACKAGE_PUBLIC = "PACKAGE_PUBLIC"
@@ -84,10 +87,11 @@ class ContractScope(str, Enum):
 
 class CompatibilityPolicy(str, Enum):
     """How to handle consumers of a changed contract."""
-    NONE = "NONE"                          # breaking change with no compatibility window
+
+    NONE = "NONE"  # breaking change with no compatibility window
     BACKWARD_COMPATIBLE = "BACKWARD_COMPATIBLE"
     DEPRECATION_WINDOW = "DEPRECATION_WINDOW"
-    DUAL_PATH = "DUAL_PATH"               # both old and new paths active during migration
+    DUAL_PATH = "DUAL_PATH"  # both old and new paths active during migration
     FEATURE_FLAG = "FEATURE_FLAG"
     VERSIONED_API = "VERSIONED_API"
     EXPLICIT_BREAKING = "EXPLICIT_BREAKING"  # user explicitly approved breaking change
@@ -95,6 +99,7 @@ class CompatibilityPolicy(str, Enum):
 
 class ImpactCategory(str, Enum):
     """How certain we are that a discovered file must change."""
+
     MUST_CHANGE = "MUST_CHANGE"
     MUST_VERIFY = "MUST_VERIFY"
     LIKELY_AFFECTED = "LIKELY_AFFECTED"
@@ -105,6 +110,7 @@ class ImpactCategory(str, Enum):
 
 class RollbackScope(str, Enum):
     """Granularity of a rollback operation."""
+
     NONE = "NONE"
     HUNK = "HUNK"
     FILE = "FILE"
@@ -135,6 +141,7 @@ class ValidationStatus(str, Enum):
 @dataclass
 class SymbolReference:
     """Pointer to a specific symbol within the repository."""
+
     path: str
     symbol: str
     line: int = 0
@@ -147,6 +154,7 @@ class SymbolReference:
 @dataclass
 class Reference:
     """Generic file/line reference."""
+
     path: str
     line: int = 0
     symbol: str = ""
@@ -168,17 +176,18 @@ class PlannedFileChange:
     Every file in a change set must have a reason. Files without reasons are
     rejected by ChangeSetConsistencyValidator.
     """
+
     path: str
     reason: str
     change_type: ChangeType = ChangeType.MODIFY
     relevant_symbols: list[str] = field(default_factory=list)
-    depends_on: list[str] = field(default_factory=list)      # paths this change depends on
-    expected_diff_scope: str = ""                            # e.g. "2-5 lines in function foo"
+    depends_on: list[str] = field(default_factory=list)  # paths this change depends on
+    expected_diff_scope: str = ""  # e.g. "2-5 lines in function foo"
     verification_requirements: list[str] = field(default_factory=list)
-    generated: bool = False        # True → must regenerate via generator, not direct edit
-    protected: bool = False        # True → requires explicit approval to touch
-    confidence: float = 1.0       # 0.0–1.0; <0.7 requires user review
-    file_hash_before: str = ""     # expected SHA256 of file before mutation
+    generated: bool = False  # True → must regenerate via generator, not direct edit
+    protected: bool = False  # True → requires explicit approval to touch
+    confidence: float = 1.0  # 0.0–1.0; <0.7 requires user review
+    file_hash_before: str = ""  # expected SHA256 of file before mutation
     notes: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -197,6 +206,7 @@ class PlannedFileChange:
 @dataclass
 class ContractChange:
     """Describes a single shared contract (interface, API, config key, etc.) being changed."""
+
     contract_id: str
     contract_type: ContractType
     definition: SymbolReference
@@ -230,10 +240,11 @@ class ContractChange:
 @dataclass
 class ChangeDependency:
     """Edge in the change dependency graph: `source` must complete before `target`."""
-    source_path: str   # PlannedFileChange.path that must happen first
-    target_path: str   # PlannedFileChange.path that depends on source
+
+    source_path: str  # PlannedFileChange.path that must happen first
+    target_path: str  # PlannedFileChange.path that depends on source
     reason: str = ""
-    conditional: bool = False   # True → dependency only applies when condition holds
+    conditional: bool = False  # True → dependency only applies when condition holds
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -242,17 +253,18 @@ class ChangeDependency:
 @dataclass
 class ChangeStage:
     """One bounded phase of a staged multi-file execution."""
+
     stage_id: str
     name: str
     description: str
-    file_paths: list[str] = field(default_factory=list)       # PlannedFileChange paths
-    required_state: str = ""     # expected repository state precondition
-    allowed_scope: list[str] = field(default_factory=list)    # permitted paths
+    file_paths: list[str] = field(default_factory=list)  # PlannedFileChange paths
+    required_state: str = ""  # expected repository state precondition
+    allowed_scope: list[str] = field(default_factory=list)  # permitted paths
     expected_outputs: list[str] = field(default_factory=list)
     verification_commands: list[str] = field(default_factory=list)
-    mandatory: bool = True       # if True, failure blocks all subsequent stages
+    mandatory: bool = True  # if True, failure blocks all subsequent stages
     checkpoint_required: bool = True
-    rollback_target: str = ""    # stage_id to roll back to on failure
+    rollback_target: str = ""  # stage_id to roll back to on failure
     status: ChangeStageStatus = ChangeStageStatus.PENDING
     started_at: str = ""
     completed_at: str = ""
@@ -269,6 +281,7 @@ class ChangeStage:
 @dataclass
 class RollbackPlan:
     """Describes how to undo an EngineeringChangeSet."""
+
     scope: RollbackScope = RollbackScope.FULL_CHANGE_SET
     checkpoint_id: str = ""
     stage_rollback_targets: dict[str, str] = field(default_factory=dict)  # stage_id → checkpoint
@@ -291,6 +304,7 @@ class RollbackPlan:
 @dataclass
 class ImpactTarget:
     """A repository entity affected by a contract change."""
+
     path: str
     symbol: str = ""
     category: ImpactCategory = ImpactCategory.MUST_CHANGE
@@ -307,6 +321,7 @@ class ImpactTarget:
 @dataclass
 class Risk:
     """An architectural or compatibility risk."""
+
     risk_id: str
     description: str
     severity: str = "MEDIUM"
@@ -316,6 +331,7 @@ class Risk:
 @dataclass
 class TestTarget:
     """A test that must be run for the change set."""
+
     path: str
     test_id: str = ""
     reason: str = ""
@@ -325,6 +341,7 @@ class TestTarget:
 @dataclass
 class ImpactReport:
     """Complete impact analysis for a proposed change set."""
+
     directly_affected: list[ImpactTarget] = field(default_factory=list)
     transitively_affected: list[ImpactTarget] = field(default_factory=list)
     potentially_affected: list[ImpactTarget] = field(default_factory=list)
@@ -359,6 +376,7 @@ class ImpactReport:
 @dataclass
 class MissingChange:
     """A required file change that is absent from the change set."""
+
     path: str
     reason: str
     category: ImpactCategory = ImpactCategory.MUST_CHANGE
@@ -368,6 +386,7 @@ class MissingChange:
 @dataclass
 class ContractMismatch:
     """A contract that was changed in definition but not updated in an implementation."""
+
     contract_id: str
     definition_path: str
     stale_implementation_path: str
@@ -377,6 +396,7 @@ class ContractMismatch:
 @dataclass
 class ScopeViolation:
     """A file in the change set that violates scope or protection rules."""
+
     path: str
     reason: str
     violation_type: str = "UNKNOWN_PATH"  # UNKNOWN_PATH | PROTECTED | UNEXPLAINED | GENERATED
@@ -385,6 +405,7 @@ class ScopeViolation:
 @dataclass
 class ChangeSetValidationResult:
     """Result of running ChangeSetConsistencyValidator against an EngineeringChangeSet."""
+
     status: ValidationStatus = ValidationStatus.PASS
     missing_changes: list[MissingChange] = field(default_factory=list)
     stale_references: list[Reference] = field(default_factory=list)
@@ -421,16 +442,15 @@ class ChangeSetValidationResult:
 class EngineeringChangeSet:
     """The authoritative representation of a repository-scale coordinated change.
 
-    Every multi-file operation in Nexus MUST be captured in an EngineeringChangeSet
+    Every multi-file operation in Noryx MUST be captured in an EngineeringChangeSet
     before any file in the repository is mutated. The change set is:
     - bound to a repository snapshot (stale snapshots are rejected)
     - bound to a plan version (stale plans are rejected)
     - a dependency-aware transaction (partial success is not complete success)
     - staged (large changes run through bounded stages with verification gates)
     """
-    change_set_id: str = field(
-        default_factory=lambda: f"cs-{uuid.uuid4().hex[:12]}"
-    )
+
+    change_set_id: str = field(default_factory=lambda: f"cs-{uuid.uuid4().hex[:12]}")
     run_id: str = ""
     plan_id: str = ""
     plan_version: int = 1
@@ -445,9 +465,7 @@ class EngineeringChangeSet:
     compatibility_policy: CompatibilityPolicy = CompatibilityPolicy.BACKWARD_COMPATIBLE
     rollback_plan: RollbackPlan = field(default_factory=RollbackPlan)
     risk_level: str = "MEDIUM"
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     schema_version: str = "nexus.changeset.v8"
 
     # Runtime state (mutable)

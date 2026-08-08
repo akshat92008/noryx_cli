@@ -1,4 +1,4 @@
-"""Release-environment validation against Nexus' declared dependency contract."""
+"""Release-environment validation against Noryx' declared dependency contract."""
 
 from __future__ import annotations
 
@@ -7,10 +7,11 @@ import json
 import platform
 import subprocess
 import sys
-import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+import tomllib
 
 try:
     from packaging.requirements import Requirement
@@ -95,7 +96,11 @@ def validate_release_constraints(root: str | Path) -> tuple[bool, tuple[str, ...
         if pin is None:
             issues.append(f"missing runtime pin for {name}")
             continue
-        exact = [item for item in pin.specifier if item.operator in {"==", "==="} and "*" not in item.version]
+        exact = [
+            item
+            for item in pin.specifier
+            if item.operator in {"==", "==="} and "*" not in item.version
+        ]
         if len(exact) != 1 or len(list(pin.specifier)) != 1:
             issues.append(f"runtime pin for {name} must be one exact == version")
             continue
@@ -118,9 +123,7 @@ def qualify_environment(root: str | Path) -> EnvironmentQualification:
         try:
             installed = importlib.metadata.version(requirement.name)
         except importlib.metadata.PackageNotFoundError:
-            checks.append(
-                DependencyCheck(raw, requirement.name, "", False, "not installed")
-            )
+            checks.append(DependencyCheck(raw, requirement.name, "", False, "not installed"))
             continue
         passed = requirement.specifier.contains(installed, prereleases=True)
         checks.append(
@@ -164,9 +167,13 @@ def qualify_environment(root: str | Path) -> EnvironmentQualification:
     )
 
 
-def write_environment_qualification(root: str | Path, output: str | Path) -> EnvironmentQualification:
+def write_environment_qualification(
+    root: str | Path, output: str | Path
+) -> EnvironmentQualification:
     report = qualify_environment(root)
     target = Path(output)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return report

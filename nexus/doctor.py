@@ -1,4 +1,4 @@
-"""Installation and runtime diagnostics for NexusAI.
+"""Installation and runtime diagnostics for Noryx.
 
 The doctor is intentionally side-effect free: it validates the current workspace,
 provider configuration, local Nova availability, and sandbox capabilities without
@@ -19,15 +19,17 @@ from nexus.preflight import BackendProbe, probe_hosted, probe_ollama
 from nexus.sandbox import SandboxBackend, SandboxRunner
 
 # Modes whose advertised workflow requires native filesystem and network isolation.
-_ISOLATION_REQUIRED_MODES = frozenset({
-    "review",
-    "workspace",
-    "autonomous",
-    "local-only",
-    "quality",
-    "budget",
-    "ci",
-})
+_ISOLATION_REQUIRED_MODES = frozenset(
+    {
+        "review",
+        "workspace",
+        "autonomous",
+        "local-only",
+        "quality",
+        "budget",
+        "ci",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -84,15 +86,13 @@ def _sandbox_check(workspace: Path, mode: str | None) -> DoctorCheck:
     if system == "linux":
         remediation = (
             "Install bubblewrap (Debian/Ubuntu: sudo apt-get install bubblewrap).",
-            "Re-run: nexus --doctor --mode autonomous",
+            "Re-run: noryx --doctor --mode autonomous",
         )
     elif system == "darwin":
-        remediation = (
-            "Ensure /usr/bin/sandbox-exec is available and permitted by system policy.",
-        )
+        remediation = ("Ensure /usr/bin/sandbox-exec is available and permitted by system policy.",)
     else:
         remediation = (
-            "Use plan/review mode, or run Nexus inside a trusted VM/container with OS isolation.",
+            "Use plan/review mode, or run Noryx inside a trusted VM/container with OS isolation.",
         )
     return DoctorCheck("Sandbox", "fail" if requires_native else "warn", detail, remediation)
 
@@ -131,7 +131,7 @@ def _render(checks: Iterable[DoctorCheck], mode: str | None) -> str:
     overall = _capability_status(rows, mode)
     return "\n".join(
         [
-            f"Nexus doctor — NexusAI {__version__}",
+            f"Noryx doctor — Noryx {__version__}",
             f"Status: {overall}",
             f"Mode: {(mode or 'auto')}",
             f"Python: {sys.version.split()[0]} ({platform.system()} {platform.machine()})",
@@ -141,7 +141,9 @@ def _render(checks: Iterable[DoctorCheck], mode: str | None) -> str:
     )
 
 
-def run_doctor(working_dir: str | os.PathLike[str] | None = None, mode: str | None = None) -> tuple[bool, str]:
+def run_doctor(
+    working_dir: str | os.PathLike[str] | None = None, mode: str | None = None
+) -> tuple[bool, str]:
     """Run deterministic diagnostics and return ``(ready, human_report)``.
 
     At least one model backend must be configured.  Local Nova is optional when a

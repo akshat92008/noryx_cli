@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from nexus.planning.engineering_plan import EngineeringPlan, PlanStep
-from nexus.planning.task_contract import TaskContract, RiskLevel
+from nexus.planning.engineering_plan import EngineeringPlan
+from nexus.planning.task_contract import RiskLevel, TaskContract
 
 
 class IssueSeverity(str, Enum):
@@ -37,7 +36,9 @@ class ValidationIssue:
 class DeterministicValidator:
     """Performs strict deterministic graph, file, policy, and schema validation on EngineeringPlan."""
 
-    def __init__(self, root_dir: Optional[str] = None, protected_patterns: Optional[List[str]] = None):
+    def __init__(
+        self, root_dir: Optional[str] = None, protected_patterns: Optional[List[str]] = None
+    ):
         self.root_dir = Path(root_dir).resolve() if root_dir else Path.cwd().resolve()
         self.protected_patterns = protected_patterns or [
             "pyproject.toml",
@@ -128,7 +129,10 @@ class DeterministicValidator:
                     )
 
             # High risk rollback check
-            if step.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL) and not step.rollback_strategy:
+            if (
+                step.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL)
+                and not step.rollback_strategy
+            ):
                 issues.append(
                     ValidationIssue(
                         code="MISSING_ROLLBACK",

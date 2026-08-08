@@ -1,4 +1,4 @@
-"""Deterministic SPDX SBOM generation for Nexus release qualification."""
+"""Deterministic SPDX SBOM generation for Noryx release qualification."""
 
 from __future__ import annotations
 
@@ -36,16 +36,16 @@ def _installed_version(name: str) -> str:
 def build_spdx_sbom(
     dependencies: Iterable[str],
     *,
-    document_name: str = "NexusAI CLI SBOM",
+    document_name: str = "Noryx CLI SBOM",
     created_at: str | None = None,
 ) -> dict[str, Any]:
-    """Build a deterministic SPDX 2.3 document for direct runtime dependencies."""
+    """Build a deterministic SPDX 2.3 document for locked runtime dependencies."""
     created = created_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    root_ref = "SPDXRef-Package-nexusai-cli"
+    root_ref = "SPDXRef-Package-noryx-cli"
     packages: list[dict[str, Any]] = [
         {
             "SPDXID": root_ref,
-            "name": "nexusai-cli",
+            "name": "noryx-cli",
             "versionInfo": __version__,
             "downloadLocation": "NOASSERTION",
             "filesAnalyzed": False,
@@ -104,10 +104,10 @@ def build_spdx_sbom(
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
         "name": document_name,
-        "documentNamespace": f"https://amaura.ai/nexus/sbom/{__version__}/{namespace_hash}",
+        "documentNamespace": f"https://amaura.ai/noryx/sbom/{__version__}/{namespace_hash}",
         "creationInfo": {
             "created": created,
-            "creators": ["Tool: NexusAI release qualification"],
+            "creators": ["Tool: Noryx release qualification"],
         },
         "documentDescribes": [root_ref],
         "packages": packages,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the deterministic checks required for a Nexus launch candidate."""
+"""Run the deterministic checks required for a Noryx launch candidate."""
 
 from __future__ import annotations
 
@@ -90,10 +90,7 @@ def assert_dependency_mirror(repo: Path = REPO) -> None:
             break
     if dependencies is None:
         raise RuntimeError("could not parse pyproject.toml project dependencies")
-    canonical = {
-        _requirement_name(item)
-        for item in dependencies
-    }
+    canonical = {_requirement_name(item) for item in dependencies}
     mirrored = {
         _requirement_name(line)
         for line in (repo / "requirements.txt").read_text(encoding="utf-8").splitlines()
@@ -134,7 +131,7 @@ def run_pytest_shards(
 ) -> tuple[int, int]:
     """Run test files in isolated processes and combine branch coverage.
 
-    Nexus intentionally exercises subprocesses, web servers, and background
+    Noryx intentionally exercises subprocesses, web servers, and background
     workers. Process-level sharding prevents one test's global runtime state
     from contaminating later tests while still enforcing aggregate coverage.
     """
@@ -148,7 +145,7 @@ def run_pytest_shards(
         if shard_count is not None
         else int(os.environ.get("NEXUS_TEST_SHARDS", "0"))
     )
-    # Default to one test module per process. Nexus tests deliberately create
+    # Default to one test module per process. Noryx tests deliberately create
     # subprocesses, web servers, and global agent state; module isolation makes
     # release results deterministic instead of order-dependent.
     count = len(test_files) if requested <= 0 else min(len(test_files), max(1, requested))
@@ -201,9 +198,7 @@ def run_pytest_shards(
                 timeout=timeout_seconds,
             )
         except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(
-                f"pytest shard {index} exceeded {timeout_seconds}s"
-            ) from exc
+            raise RuntimeError(f"pytest shard {index} exceeded {timeout_seconds}s") from exc
         print(result.stdout, end="")
         if result.returncode != 0:
             print(result.stderr, file=sys.stderr)
@@ -240,7 +235,7 @@ def main() -> int:
             f"failed={failed}; pip_check={environment.pip_check_output!r}"
         )
     run([python, "-m", "ruff", "check", "nexus", "tests", "scripts"], env=offline_env)
-    
+
     test_count, skipped_count = run_pytest_shards(
         python,
         env=offline_env,
@@ -271,7 +266,9 @@ def main() -> int:
         if not shared_payload.get("source_tree_stable"):
             raise RuntimeError("shared-process qualification changed the source tree")
         if shared_payload.get("clean_exit_observed") is not True:
-            raise RuntimeError("shared-process qualification did not observe a clean interpreter exit")
+            raise RuntimeError(
+                "shared-process qualification did not observe a clean interpreter exit"
+            )
 
         sandbox_workspace = runtime_root / "sandbox-workspace"
         sandbox_report = runtime_root / "sandbox-qualification.json"
@@ -327,19 +324,18 @@ def main() -> int:
             cwd=build_src,
         )
 
-        wheels = sorted(dist.glob("nexusai_cli-*.whl"))
+        wheels = sorted(dist.glob("noryx_cli-*.whl"))
         if len(wheels) != 1:
-            raise RuntimeError(f"expected one nexusai-cli wheel, found: {wheels}")
+            raise RuntimeError(f"expected one noryx-cli wheel, found: {wheels}")
 
-        expected_members = {
-            path.relative_to(build_src).as_posix()
-            for path in (build_src / "nexus").rglob("*")
-            if path.is_file()
-            and (
-                path.suffix == ".py"
-                or "nexus/webapp/static" in path.relative_to(build_src).as_posix()
-            )
-        }
+        expected_members = set()
+        for package_name in ("noryx", "nexus"):
+            for path in (build_src / package_name).rglob("*"):
+                if path.is_file() and (
+                    path.suffix == ".py"
+                    or "nexus/webapp/static" in path.relative_to(build_src).as_posix()
+                ):
+                    expected_members.add(path.relative_to(build_src).as_posix())
         with zipfile.ZipFile(wheels[0]) as archive:
             packaged_members = set(archive.namelist())
         missing_members = sorted(expected_members - packaged_members)
@@ -370,21 +366,34 @@ def main() -> int:
                     "import nexus.policy; import nexus.run_catalog; import nexus.sandbox; "
                     "from nexus.webapp.server import create_app; "
                     "assert create_app('release-smoke').routes; "
-                    "dist = importlib.metadata.distribution('nexusai-cli'); "
-                    "assert any(ep.name == 'nexus' for ep in dist.entry_points); "
+                    "dist = importlib.metadata.distribution('noryx-cli'); "
+                    "assert any(ep.name == 'noryx' for ep in dist.entry_points); "
                     "assert nexus.__version__ == dist.version"
                 ),
             ],
             cwd=root,
             env=smoke_env,
         )
-        run([python, "-m", "nexus", "--version"], cwd=root, env=smoke_env)
-        run([python,"-m","nexus","benchmark","--installed-core","--dry-run","--output",str(root/"installed-benchmark.json")],cwd=root,env=smoke_env)
+        run([python, "-m", "noryx", "--version"], cwd=root, env=smoke_env)
         run(
             [
                 python,
                 "-m",
-                "nexus",
+                "noryx",
+                "benchmark",
+                "--installed-core",
+                "--dry-run",
+                "--output",
+                str(root / "installed-benchmark.json"),
+            ],
+            cwd=root,
+            env=smoke_env,
+        )
+        run(
+            [
+                python,
+                "-m",
+                "noryx",
                 "benchmark",
                 "offline-reliability",
                 "--output",
@@ -424,7 +433,7 @@ def main() -> int:
         from nexus import __version__
 
         readiness_file = REPO / f"LAUNCH_READINESS_{__version__}.md"
-        readiness_content = f"""# Nexus {__version__} Launch Readiness
+        readiness_content = f"""# Noryx {__version__} Launch Readiness
 
 ## Automated Release Gates
 - **Tests Passed**: {test_count}

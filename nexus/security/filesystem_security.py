@@ -1,4 +1,4 @@
-"""Filesystem security enforcement for Nexus CLI.
+"""Filesystem security enforcement for Noryx CLI.
 
 Guarantees path canonicalization, workspace root containment, symlink escape prevention,
 null byte rejection, and protected credential path boundaries.
@@ -6,11 +6,9 @@ null byte rejection, and protected credential path boundaries.
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 from typing import Sequence
-
 
 PROTECTED_PATH_PATTERNS = (
     r".*\.env.*",
@@ -51,7 +49,7 @@ class FilesystemSecurity:
         allow_symlink_target: bool = False,
     ) -> Path:
         """Validate, canonicalize, and verify safety of a filesystem path.
-        
+
         Raises ValueError if path is invalid, traverses outside root, attempts symlink escape,
         or accesses protected credentials.
         """
@@ -64,11 +62,13 @@ class FilesystemSecurity:
         # 2. Protected Path Pattern Check
         for pattern in PROTECTED_PATH_PATTERNS:
             if re.search(pattern, path_str, re.IGNORECASE):
-                raise ValueError(f"Access to protected credential or system path is denied: {raw_path}")
+                raise ValueError(
+                    f"Access to protected credential or system path is denied: {raw_path}"
+                )
 
         # 3. Canonicalization
         candidate = Path(raw_path).expanduser()
-        
+
         # Check for path traversal before resolution if possible
         if ".." in candidate.parts:
             # Must ensure resolved path remains inside allowed roots
@@ -82,9 +82,13 @@ class FilesystemSecurity:
         # 4. Symlink Escape Detection
         if not allow_symlink_target and candidate.is_symlink():
             target = candidate.readlink()
-            target_resolved = target.resolve() if target.is_absolute() else (candidate.parent / target).resolve()
+            target_resolved = (
+                target.resolve() if target.is_absolute() else (candidate.parent / target).resolve()
+            )
             if not self._is_under_any_root(target_resolved, self.allowed_read_roots):
-                raise ValueError(f"Symlink {raw_path} points outside approved workspace: {target_resolved}")
+                raise ValueError(
+                    f"Symlink {raw_path} points outside approved workspace: {target_resolved}"
+                )
 
         # 5. Root Containment Check
         valid_roots = self.allowed_write_roots if for_write else self.allowed_read_roots

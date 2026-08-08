@@ -1,17 +1,14 @@
 """
-Unit Test Suite for Nexus CLI Recovery Intelligence (Sprint 7).
+Unit Test Suite for Noryx CLI Recovery Intelligence (Sprint 7).
 """
 
 from __future__ import annotations
 
-import json
-from decimal import Decimal
 import pytest
 
 from nexus.recovery import (
     AttemptSignature,
     BaselineAnalyzer,
-    BuildLintTypeDiagnoser,
     DiagnosisEngine,
     EnvironmentDiagnoser,
     FailureCategory,
@@ -19,8 +16,6 @@ from nexus.recovery import (
     FailureNormalizer,
     FailureRecord,
     FailureRelation,
-    FailureSeverity,
-    HypothesisStatus,
     LoopDetector,
     PatchQualityDiagnoser,
     RecoveryBudget,
@@ -31,8 +26,6 @@ from nexus.recovery import (
     StrategyRegistry,
     TerminalState,
     TerminalStateGovernance,
-    TestFailureDiagnoser,
-    UserInterventionManager,
 )
 
 
@@ -53,17 +46,19 @@ def test_failure_taxonomy_records():
 
 
 def test_failure_normalizer():
-    raw_py = "FAILED tests/test_demo.py::test_fn - AssertionError: assert 1 == 2\nFile \"nexus/demo.py\", line 42"
+    raw_py = 'FAILED tests/test_demo.py::test_fn - AssertionError: assert 1 == 2\nFile "nexus/demo.py", line 42'
     record = FailureNormalizer.normalize(raw_py, command="pytest", exit_code=1)
     assert record.category == FailureCategory.VERIFICATION
     assert record.kind == FailureKind.TARGETED_TEST_FAILED
-    assert "test_fn" in record.failing_tests or "test_demo.py" in record.file_paths or record.summary
+    assert (
+        "test_fn" in record.failing_tests or "test_demo.py" in record.file_paths or record.summary
+    )
 
 
 def test_signal_extractor():
     raw_stack = (
         "Traceback (most recent call last):\n"
-        "  File \"nexus/core.py\", line 15, in run\n"
+        '  File "nexus/core.py", line 15, in run\n'
         "    result = process()\n"
         "TypeError: process() missing 1 required positional argument: 'config'"
     )
@@ -158,9 +153,13 @@ def test_environment_diagnoser():
 
 def test_terminal_state_governance():
     with pytest.raises(PermissionError):
-        TerminalStateGovernance.validate_terminal_state(TerminalState.VERIFIED, is_canonical_verifier=False)
+        TerminalStateGovernance.validate_terminal_state(
+            TerminalState.VERIFIED, is_canonical_verifier=False
+        )
 
-    val = TerminalStateGovernance.validate_terminal_state(TerminalState.VERIFIED, is_canonical_verifier=True)
+    val = TerminalStateGovernance.validate_terminal_state(
+        TerminalState.VERIFIED, is_canonical_verifier=True
+    )
     assert val == TerminalState.VERIFIED
 
 
@@ -172,4 +171,4 @@ def test_recovery_controller_flow(tmp_path):
     )
     assert strat is not None
     assert diag is not None
-    assert (tmp_path / ".nexus" / "runs" / "test-run-1" / "failures" / "failure-001.json").exists()
+    assert (tmp_path / ".noryx" / "runs" / "test-run-1" / "failures" / "failure-001.json").exists()

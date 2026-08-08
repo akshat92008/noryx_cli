@@ -107,6 +107,7 @@ class NovaProvider(ModelProvider):
             )
 
         if stream:
+
             def _stream():
                 delta = SimpleNamespace(content=content, tool_calls=tool_calls)
                 yield SimpleNamespace(choices=[SimpleNamespace(delta=delta)], usage=None)

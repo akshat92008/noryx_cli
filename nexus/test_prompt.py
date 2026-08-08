@@ -3,6 +3,7 @@
 This module is safe to import; the interactive demo runs only when executed as a
 script so release import-all qualification cannot block on stdin.
 """
+
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import InMemoryHistory

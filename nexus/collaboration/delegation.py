@@ -9,13 +9,11 @@ and model-assisted CollaborationDecision.
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import List, Optional, Sequence
 
 from nexus.collaboration.models import (
-    AgentRole,
     CollaborationBudget,
     CollaborationDecision,
     CollaborationMode,
@@ -28,6 +26,7 @@ from nexus.collaboration.models import (
 @dataclass
 class TaskCharacteristics:
     """Caller-provided signals describing the engineering task."""
+
     task_id: str
     description: str
     estimated_files_affected: int
@@ -38,7 +37,7 @@ class TaskCharacteristics:
     estimated_context_tokens: int
     requires_security_review: bool
     requires_architecture_review: bool
-    dependency_coupling_score: float   # 0.0 = independent, 1.0 = fully coupled
+    dependency_coupling_score: float  # 0.0 = independent, 1.0 = fully coupled
     time_budget_seconds: Optional[int]
     financial_budget_usd: Optional[float]
     local_only: bool
@@ -136,7 +135,9 @@ class DelegationPlanner:
             )
 
         if task.dependency_coupling_score > _MAX_COUPLING_FOR_PARALLEL:
-            reasons.append(f"Task coupling score ({task.dependency_coupling_score:.2f}) exceeds threshold.")
+            reasons.append(
+                f"Task coupling score ({task.dependency_coupling_score:.2f}) exceeds threshold."
+            )
             return CollaborationDecision(
                 use_collaboration=False,
                 recommended_mode=CollaborationMode.SINGLE_AGENT,
@@ -168,7 +169,9 @@ class DelegationPlanner:
             and not task.requires_architecture_review
             and len(task.independent_workstreams) < 2
         ):
-            reasons.append("Task is small or single-file fix; single-agent execution is more efficient.")
+            reasons.append(
+                "Task is small or single-file fix; single-agent execution is more efficient."
+            )
             return CollaborationDecision(
                 use_collaboration=False,
                 recommended_mode=CollaborationMode.SINGLE_AGENT,
@@ -196,7 +199,9 @@ class DelegationPlanner:
         elif len(task.packages_involved) >= 2 and len(task.independent_workstreams) >= 2:
             mode = CollaborationMode.PARALLEL_IMPLEMENTATION
             benefit_score += 0.45
-            reasons.append("Task spans multiple independent packages suitable for parallel implementation.")
+            reasons.append(
+                "Task spans multiple independent packages suitable for parallel implementation."
+            )
         elif len(task.independent_workstreams) >= 2:
             mode = CollaborationMode.PARALLEL_ANALYSIS
             benefit_score += 0.30
@@ -208,7 +213,9 @@ class DelegationPlanner:
 
         # Final decision calculation
         use_collab = benefit_score >= 0.25
-        est_cost = Decimal(str(round(0.20 * (2 if mode == CollaborationMode.REVIEW_PAIR else 3), 2)))
+        est_cost = Decimal(
+            str(round(0.20 * (2 if mode == CollaborationMode.REVIEW_PAIR else 3), 2))
+        )
 
         return CollaborationDecision(
             use_collaboration=use_collab,
@@ -242,7 +249,9 @@ class DelegationPlanner:
             elif decision.recommended_mode == CollaborationMode.SPECIALIST_TEAM:
                 max_workers = min(4, self._budget.maximum_workers if self._budget else 4)
             else:
-                max_workers = min(len(parallelizable), self._budget.maximum_workers if self._budget else 4)
+                max_workers = min(
+                    len(parallelizable), self._budget.maximum_workers if self._budget else 4
+                )
 
         return DelegationAssessment(
             collaboration_recommended=decision.use_collaboration,

@@ -35,9 +35,10 @@ class HiddenBenchmarkEvaluation:
 def evaluate_hidden_results(
     results: Iterable[dict[str, Any]],
     *,
-    thresholds: HiddenBenchmarkThresholds = HiddenBenchmarkThresholds(),
+    thresholds: HiddenBenchmarkThresholds | None = None,
 ) -> HiddenBenchmarkEvaluation:
     """Evaluate independently oracle-checked task results without trusting agent prose."""
+    thresholds = thresholds or HiddenBenchmarkThresholds()
     records = [dict(item) for item in results]
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for item in records:
@@ -45,15 +46,13 @@ def evaluate_hidden_results(
 
     total = len(records)
     passed = sum(
-        item.get("status") == "PASSED"
-        and item.get("external_verification_passed") is True
+        item.get("status") == "PASSED" and item.get("external_verification_passed") is True
         for item in records
     )
     false_verified = sum(
         str(item.get("agent_status")) == "VERIFIED"
         and not (
-            item.get("status") == "PASSED"
-            and item.get("external_verification_passed") is True
+            item.get("status") == "PASSED" and item.get("external_verification_passed") is True
         )
         for item in records
     )

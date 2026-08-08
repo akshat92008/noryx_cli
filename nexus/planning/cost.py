@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, Optional
+from dataclasses import asdict, dataclass
+from typing import Any, Dict
+
 from nexus.planning.engineering_plan import EngineeringPlan
 
 

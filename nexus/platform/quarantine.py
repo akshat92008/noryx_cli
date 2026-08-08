@@ -64,8 +64,7 @@ class QuarantineManager:
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
             return {
-                e["extension_name"]: QuarantineEntry.from_dict(e)
-                for e in data.get("entries", [])
+                e["extension_name"]: QuarantineEntry.from_dict(e) for e in data.get("entries", [])
             }
         except (json.JSONDecodeError, OSError, KeyError):
             return {}
@@ -131,7 +130,8 @@ class QuarantineManager:
     def _check_auto_releases(self) -> None:
         now = time.time()
         to_release = [
-            name for name, entry in self._entries.items()
+            name
+            for name, entry in self._entries.items()
             if entry.auto_release_at and now > entry.auto_release_at
         ]
         for name in to_release:

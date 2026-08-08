@@ -1,8 +1,8 @@
-"""Matched direct-vs-Nexus benchmark analysis.
+"""Matched direct-vs-Noryx benchmark analysis.
 
 A valid comparison keeps task, model, source revision, and authorized budget
 identical.  This prevents a stronger model or larger budget from being credited
-to the Nexus control plane.
+to the Noryx control plane.
 """
 
 from __future__ import annotations
@@ -101,8 +101,12 @@ def compare_matched(
     direct_by_key = {item.key: item for item in direct_trials}
     nexus_by_key = {item.key: item for item in nexus_trials}
     keys = sorted(set(direct_by_key) & set(nexus_by_key))
-    unmatched_direct = [item.task_id for key, item in direct_by_key.items() if key not in nexus_by_key]
-    unmatched_nexus = [item.task_id for key, item in nexus_by_key.items() if key not in direct_by_key]
+    unmatched_direct = [
+        item.task_id for key, item in direct_by_key.items() if key not in nexus_by_key
+    ]
+    unmatched_nexus = [
+        item.task_id for key, item in nexus_by_key.items() if key not in direct_by_key
+    ]
 
     direct = [direct_by_key[key] for key in keys]
     nexus = [nexus_by_key[key] for key in keys]
@@ -115,7 +119,9 @@ def compare_matched(
     false_completions = sum(item.claimed_success and not item.verified for item in nexus)
     false_rate = false_completions / count if count else 0.0
     regression_rate = sum(item.regressions > 0 for item in nexus) / count if count else 0.0
-    budget_compliance = sum(item.cost_usd <= item.budget_usd for item in nexus) / count if count else 0.0
+    budget_compliance = (
+        sum(item.cost_usd <= item.budget_usd for item in nexus) / count if count else 0.0
+    )
     nexus_cost = sum(item.cost_usd for item in nexus) / count if count else 0.0
     direct_cost = sum(item.cost_usd for item in direct) / count if count else 0.0
 
@@ -131,7 +137,9 @@ def compare_matched(
             f"false_completion_rate:{false_rate:.4f}>{limits.maximum_false_completion_rate:.4f}"
         )
     if regression_rate > limits.maximum_regression_rate:
-        failures.append(f"regression_rate:{regression_rate:.4f}>{limits.maximum_regression_rate:.4f}")
+        failures.append(
+            f"regression_rate:{regression_rate:.4f}>{limits.maximum_regression_rate:.4f}"
+        )
     if budget_compliance < limits.minimum_budget_compliance:
         failures.append(
             f"budget_compliance:{budget_compliance:.4f}<{limits.minimum_budget_compliance:.4f}"
@@ -139,7 +147,11 @@ def compare_matched(
     if unmatched_direct or unmatched_nexus:
         failures.append("unmatched_trials_present")
 
-    status = "PASS" if not failures else ("INSUFFICIENT_EVIDENCE" if count < limits.minimum_trials else "FAIL")
+    status = (
+        "PASS"
+        if not failures
+        else ("INSUFFICIENT_EVIDENCE" if count < limits.minimum_trials else "FAIL")
+    )
     return MatchedComparisonReport(
         status=status,
         passed=not failures,

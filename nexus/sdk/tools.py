@@ -15,7 +15,7 @@ from nexus.extensions import ToolContext
 
 
 class BaseTool(ABC):
-    """Canonical Nexus tool base class with capability declarations."""
+    """Canonical Noryx tool base class with capability declarations."""
 
     capabilities: tuple[str, ...] = ("pure",)
     filesystem: dict[str, list[str]] = {
@@ -69,7 +69,7 @@ class BaseTool(ABC):
 
 
 class FunctionTool(BaseTool):
-    """Wrap a Python callable as a canonical Nexus extension tool."""
+    """Wrap a Python callable as a canonical Noryx extension tool."""
 
     def __init__(
         self,
@@ -97,9 +97,7 @@ class FunctionTool(BaseTool):
 
     @property
     def parameters(self) -> dict[str, Any]:
-        return self._schema["function"].get(
-            "parameters", {"type": "object", "properties": {}}
-        )
+        return self._schema["function"].get("parameters", {"type": "object", "properties": {}})
 
     def execute(self, **kwargs: Any) -> Any:
         return self._func(**kwargs)
@@ -140,5 +138,5 @@ class ToolRegistry:
             result = tool.execute(**args_dict)
             rendered = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
             return True, rendered
-        except (TypeError, ValueError) as exc:# extension boundary must return a diagnostic
+        except (TypeError, ValueError) as exc:  # extension boundary must return a diagnostic
             return False, f"❌ Tool '{name}' failed: {exc}"

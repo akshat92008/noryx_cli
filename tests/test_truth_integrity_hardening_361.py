@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -8,7 +7,7 @@ import pytest
 
 from nexus.agent import Agent
 from nexus.capabilities import ToolCapability
-from nexus.planner import Difficulty, IntentType, PlanType, PlanningEngine, classify_intent
+from nexus.planner import Difficulty, IntentType, PlanningEngine, PlanType, classify_intent
 from nexus.tools import TOOL_DEFINITIONS, ToolResult, ToolStatus, execute_tool
 from nexus.workspace_journal import (
     ContentAddressedWorkspaceJournal,
@@ -75,12 +74,9 @@ def test_external_tools_execute_through_agent_with_structured_truth(agent: Agent
     assert output == "permission denied"
     assert success is False
 
-    output, success = agent._execute_tool_with_safety(
-        "mcp_fail", {}, _user_confirmed=True
-    )
+    output, success = agent._execute_tool_with_safety("mcp_fail", {}, _user_confirmed=True)
     assert output == "permission denied"
     assert success is False
-
 
 
 def test_unknown_external_status_fails_closed():
@@ -93,7 +89,6 @@ def test_unknown_external_status_fails_closed():
     assert converted.status == ToolStatus.FAILURE
     assert converted.success is False
     assert "Invalid extension status" in converted.error
-
 
 
 def test_boolean_structured_status_fails_closed():
@@ -253,14 +248,10 @@ def test_failed_command_rolls_back_multi_path_transaction(agent: Agent):
     assert modified.read_text(encoding="utf-8") == "before-modified"
     assert deleted.read_text(encoding="utf-8") == "before-deleted"
     assert not created.exists()
-    assert all(
-        item.get("transaction_id") == ""
-        for item in agent.history.changes
-    )
+    assert all(item.get("transaction_id") == "" for item in agent.history.changes)
     evidence_records = agent.evidence.records()
     assert not any(
-        item.get("kind") == "file_mutation"
-        and item.get("metadata", {}).get("transaction_id")
+        item.get("kind") == "file_mutation" and item.get("metadata", {}).get("transaction_id")
         for item in evidence_records
     )
     verified, detail = agent.evidence.verify_recent(50)
@@ -312,9 +303,7 @@ def test_canonical_plan_uses_only_live_tools(tmp_path: Path, monkeypatch: pytest
     plan = planner.create_plan(request, analysis)
     live = {definition.name for definition in TOOL_DEFINITIONS}
     requested = {
-        tool
-        for step in plan.canonical_plan["steps"]
-        for tool in step.get("allowed_tools", [])
+        tool for step in plan.canonical_plan["steps"] for tool in step.get("allowed_tools", [])
     }
     assert requested <= live
     assert plan.canonical_planning_error == ""
@@ -334,7 +323,9 @@ def test_risky_build_requests_do_not_bypass_planning(task_text: str):
     assert analysis["plan_type"] == PlanType.PLANNED
 
 
-def test_canonical_security_action_matches_legacy_security_intent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_canonical_security_action_matches_legacy_security_intent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setenv("NEXUS_HOME", str(tmp_path / "state"))
     planner = PlanningEngine()
     request = "Harden authentication middleware and add regression tests"

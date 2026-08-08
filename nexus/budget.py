@@ -59,14 +59,21 @@ class BudgetLimits:
             value = getattr(self, name)
             if value is not None and value < 0:
                 raise ValueError(f"{name} must be non-negative")
-        for name in ("max_cost_usd", "max_cost_inr", "input_price_per_million", "output_price_per_million"):
+        for name in (
+            "max_cost_usd",
+            "max_cost_inr",
+            "input_price_per_million",
+            "output_price_per_million",
+        ):
             value = getattr(self, name)
             if value is not None and value < 0:
                 raise ValueError(f"{name} must be non-negative")
         if (self.max_cost_usd is not None or self.max_cost_inr is not None) and (
             self.input_price_per_million is None or self.output_price_per_million is None
         ):
-            raise ValueError("Currency budget enforcement requires explicit input and output prices.")
+            raise ValueError(
+                "Currency budget enforcement requires explicit input and output prices."
+            )
 
 
 @dataclass
@@ -136,8 +143,13 @@ class BudgetController:
 
             cost_limit = self.limits.max_cost_usd
             if cost_limit is not None:
-                if self.limits.input_price_per_million is None or self.limits.output_price_per_million is None:
-                    raise ValueError("Currency budget enforcement requires explicit input and output prices.")
+                if (
+                    self.limits.input_price_per_million is None
+                    or self.limits.output_price_per_million is None
+                ):
+                    raise ValueError(
+                        "Currency budget enforcement requires explicit input and output prices."
+                    )
                 projected_input_cost = (
                     self.usage.estimated_cost_usd
                     + prompt_upper_bound * float(self.limits.input_price_per_million) / 1_000_000
@@ -159,7 +171,7 @@ class BudgetController:
             return allowed_tokens
 
     def reset(self) -> None:
-        """Start a fresh accounting window for the next Nexus run."""
+        """Start a fresh accounting window for the next Noryx run."""
         with self._lock:
             self.usage = BudgetUsage()
 
@@ -239,7 +251,7 @@ class BudgetedClient:
     """Transparent proxy that enforces call limits across all hosted nodes.
 
     Provider-reported usage is preferred.  When a compatible endpoint omits
-    usage, Nexus records conservative local estimates so currency and token
+    usage, Noryx records conservative local estimates so currency and token
     budgets do not silently become ineffective.
     """
 

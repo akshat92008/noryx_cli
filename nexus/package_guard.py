@@ -66,9 +66,7 @@ class PackageGuard:
         if not registry:
             return []
         proposed = set(self._extract_file_packages(p.name, content))
-        current = set(
-            self._extract_file_packages(p.name, current_content or "")
-        )
+        current = set(self._extract_file_packages(p.name, current_content or ""))
         return self._check_names(registry, sorted(proposed - current))
 
     def check_command(self, command: str) -> list[PackageCheck]:
@@ -232,7 +230,7 @@ class PackageGuard:
             "go": f"https://proxy.golang.org/{quoted}/@v/list",
         }
         url = urls[registry]
-        request = urllib.request.Request(url, headers={"User-Agent": "NexusAI-PackageGuard/1.0"})
+        request = urllib.request.Request(url, headers={"User-Agent": "Noryx-PackageGuard/1.0"})
         try:
             with urllib.request.urlopen(request, timeout=8) as response:
                 raw = response.read(1_000_000)

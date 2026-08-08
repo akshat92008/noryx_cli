@@ -1,10 +1,11 @@
-"""Fail-closed evidence gate for Nexus-versus-Claude Code superiority claims.
+"""Fail-closed evidence gate for Noryx-versus-Claude Code superiority claims.
 
 A benchmark report is not accepted because it has a high aggregate score.  The
 report must describe a sealed, blind, independently evaluated campaign and must
-show that Nexus is better on every required hard-task category while remaining
+show that Noryx is better on every required hard-task category while remaining
 no worse on safety, intervention rate, duration, and cost thresholds.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -15,7 +16,6 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from statistics import median
 from typing import Any, Iterable, Mapping
-
 
 REQUIRED_HARD_TASK_CATEGORIES = frozenset(
     {
@@ -40,7 +40,9 @@ def _canonical_sha256(payload: Any) -> str:
 
 def _contains_placeholder(value: Any) -> bool:
     if isinstance(value, Mapping):
-        return any(_contains_placeholder(key) or _contains_placeholder(item) for key, item in value.items())
+        return any(
+            _contains_placeholder(key) or _contains_placeholder(item) for key, item in value.items()
+        )
     if isinstance(value, (list, tuple, set, frozenset)):
         return any(_contains_placeholder(item) for item in value)
     return bool(_PLACEHOLDER_RE.search(str(value)))
@@ -66,9 +68,7 @@ class SuperiorityThresholds:
     maximum_cost_ratio_to_claude: float = 0.70
     maximum_duration_ratio_to_claude: float = 1.0
     maximum_intervention_ratio_to_claude: float = 1.0
-    required_categories: tuple[str, ...] = tuple(
-        sorted(REQUIRED_HARD_TASK_CATEGORIES)
-    )
+    required_categories: tuple[str, ...] = tuple(sorted(REQUIRED_HARD_TASK_CATEGORIES))
     require_cost_metrics: bool = True
     require_token_metrics: bool = True
     require_intervention_metrics: bool = True
@@ -113,31 +113,42 @@ class SuperiorityEvaluation:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class CampaignTrust:
+    """Campaign identity delivered independently from the benchmark report."""
+
+    campaign_id: str
+    dataset_revision: str
+    manifest_sha256: str
+    oracle_bundle_sha256: str
+    evaluator_id: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CampaignTrust":
+        return cls(
+            campaign_id=str(value.get("campaign_id", "")).strip(),
+            dataset_revision=str(value.get("dataset_revision", "")).strip(),
+            manifest_sha256=str(value.get("manifest_sha256", "")).lower(),
+            oracle_bundle_sha256=str(value.get("oracle_bundle_sha256", "")).lower(),
+            evaluator_id=str(value.get("evaluator_id", "")).strip(),
+        )
+
+
 def _safe_ratio(numerator: float, denominator: float) -> float | None:
     if denominator == 0:
         return math.inf if numerator > 0 else None
     return numerator / denominator
 
 
-def _agent_metrics(
-    records: Iterable[Mapping[str, Any]], agent: str
-) -> AgentMetrics:
+def _agent_metrics(records: Iterable[Mapping[str, Any]], agent: str) -> AgentMetrics:
     rows = [dict(item) for item in records if str(item.get("agent")) == agent]
     runs = len(rows)
-    costs = [
-        float(item["cost_usd"])
-        for item in rows
-        if item.get("cost_usd") is not None
-    ]
+    costs = [float(item["cost_usd"]) for item in rows if item.get("cost_usd") is not None]
     input_tokens = [
-        float(item["input_tokens"])
-        for item in rows
-        if item.get("input_tokens") is not None
+        float(item["input_tokens"]) for item in rows if item.get("input_tokens") is not None
     ]
     output_tokens = [
-        float(item["output_tokens"])
-        for item in rows
-        if item.get("output_tokens") is not None
+        float(item["output_tokens"]) for item in rows if item.get("output_tokens") is not None
     ]
     interventions = [
         float(item["human_interventions"])
@@ -191,9 +202,7 @@ def _agent_metrics(
             median(output_tokens) if output_tokens and len(output_tokens) == runs else None
         ),
         median_human_interventions=(
-            median(interventions)
-            if interventions and len(interventions) == runs
-            else None
+            median(interventions) if interventions and len(interventions) == runs else None
         ),
         provenance_fingerprints=tuple(sorted(fingerprints)),
         product_identities=tuple(sorted(product_identities)),
@@ -207,6 +216,9 @@ def _require_sealed_campaign(
     report: Mapping[str, Any],
     qualification: Mapping[str, Any],
     failures: list[str],
+    *,
+    trusted_evaluator_keys: Mapping[str, bytes | str] | None,
+    trusted_campaign: CampaignTrust | None,
 ) -> None:
     required_flags = {
         "blind": True,
@@ -292,17 +304,39 @@ def _require_sealed_campaign(
                     failures.append(f"qualification_runtime_field_missing:{key}")
 
     report_manifest = str(report.get("manifest_sha256", "")).lower()
-    sealed_manifest = str(
-        qualification.get("sealed_manifest_sha256", "")
-    ).lower()
+    sealed_manifest = str(qualification.get("sealed_manifest_sha256", "")).lower()
     if not _SHA256_RE.fullmatch(report_manifest):
         failures.append("report_manifest_sha256_missing")
     elif report_manifest != sealed_manifest:
         failures.append("sealed_manifest_mismatch")
 
+    if trusted_campaign is None:
+        failures.append("external_campaign_trust_missing")
+    else:
+        expected_values = {
+            "campaign_id": trusted_campaign.campaign_id,
+            "dataset_revision": trusted_campaign.dataset_revision,
+            "evaluator_id": trusted_campaign.evaluator_id,
+            "sealed_manifest_sha256": trusted_campaign.manifest_sha256,
+            "oracle_bundle_sha256": trusted_campaign.oracle_bundle_sha256,
+        }
+        for key, expected in expected_values.items():
+            if not str(expected).strip():
+                failures.append(f"external_campaign_trust_invalid:{key}")
+                continue
+            actual = (
+                report_manifest
+                if key == "sealed_manifest_sha256"
+                else str(qualification.get(key, ""))
+            )
+            if str(actual).lower() != str(expected).lower():
+                failures.append(f"external_campaign_trust_mismatch:{key}")
+
     from nexus.competitive_attestation import verify_evaluator_signature
 
-    signature_valid, signature_detail = verify_evaluator_signature(report)
+    signature_valid, signature_detail = verify_evaluator_signature(
+        report, trusted_public_keys=trusted_evaluator_keys
+    )
     if not signature_valid:
         failures.append(f"qualification_signature_invalid:{signature_detail}")
 
@@ -315,26 +349,18 @@ def _category_metrics(
     output: dict[str, dict[str, Any]] = {}
     categories = sorted({str(item.get("_category", "unspecified")) for item in rows})
     for category in categories:
-        category_rows = [
-            item for item in rows if str(item.get("_category")) == category
-        ]
+        category_rows = [item for item in rows if str(item.get("_category")) == category]
         nexus = _agent_metrics(category_rows, thresholds.nexus_agent)
         baseline = _agent_metrics(category_rows, thresholds.direct_baseline_agent)
         claude = _agent_metrics(category_rows, thresholds.claude_agent)
-        task_count = len(
-            {str(item.get("_task_id", "")) for item in category_rows}
-        )
+        task_count = len({str(item.get("_task_id", "")) for item in category_rows})
         output[category] = {
             "tasks": task_count,
             "nexus": nexus.to_dict(),
             "direct_baseline": baseline.to_dict(),
             "claude_code": claude.to_dict(),
-            "claude_verified_margin": round(
-                nexus.verified_rate - claude.verified_rate, 6
-            ),
-            "direct_model_uplift": _safe_ratio(
-                nexus.verified_rate, baseline.verified_rate
-            ),
+            "claude_verified_margin": round(nexus.verified_rate - claude.verified_rate, 6),
+            "direct_model_uplift": _safe_ratio(nexus.verified_rate, baseline.verified_rate),
         }
     return output
 
@@ -370,14 +396,10 @@ def _validate_observed_metrics(
         try:
             numeric = float(metric_value)
         except (TypeError, ValueError):
-            failures.append(
-                f"invalid_metric:{metric_name}:{task_id}:{trial}:{agent}"
-            )
+            failures.append(f"invalid_metric:{metric_name}:{task_id}:{trial}:{agent}")
             continue
         if numeric < 0:
-            failures.append(
-                f"negative_metric:{metric_name}:{task_id}:{trial}:{agent}"
-            )
+            failures.append(f"negative_metric:{metric_name}:{task_id}:{trial}:{agent}")
 
     interventions_value = item.get("human_interventions")
     if interventions_value is None or maximum_interventions < 0:
@@ -387,9 +409,7 @@ def _validate_observed_metrics(
     except (TypeError, ValueError):
         return
     if exceeded:
-        failures.append(
-            f"intervention_budget_exceeded:{task_id}:{trial}:{agent}"
-        )
+        failures.append(f"intervention_budget_exceeded:{task_id}:{trial}:{agent}")
 
 
 def _validate_agent_identities(
@@ -410,22 +430,15 @@ def _validate_agent_identities(
         if len(metrics.executables) != 1:
             failures.append(f"agent_executable_identity_invalid:{name}")
         if len(metrics.versions) != 1 or any(
-            value.lower() in {"unavailable", "not-declared"}
-            for value in metrics.versions
+            value.lower() in {"unavailable", "not-declared"} for value in metrics.versions
         ):
             failures.append(f"agent_version_identity_invalid:{name}")
 
     nexus = agents[thresholds.nexus_agent]
     baseline = agents[thresholds.direct_baseline_agent]
     claude = agents[thresholds.claude_agent]
-    nexus_model = (
-        nexus.model_identities[0] if len(nexus.model_identities) == 1 else ""
-    )
-    baseline_model = (
-        baseline.model_identities[0]
-        if len(baseline.model_identities) == 1
-        else ""
-    )
+    nexus_model = nexus.model_identities[0] if len(nexus.model_identities) == 1 else ""
+    baseline_model = baseline.model_identities[0] if len(baseline.model_identities) == 1 else ""
     if not nexus_model or nexus_model != baseline_model:
         failures.append("direct_baseline_model_mismatch")
     products = {
@@ -435,15 +448,9 @@ def _validate_agent_identities(
     }
     if len(products) != 3:
         failures.append("agent_product_identities_not_distinct")
-    if (
-        len(nexus.product_identities) == 1
-        and "nexus" not in nexus.product_identities[0].lower()
-    ):
+    if len(nexus.product_identities) == 1 and "nexus" not in nexus.product_identities[0].lower():
         failures.append("nexus_product_identity_invalid")
-    if (
-        len(claude.product_identities) == 1
-        and "claude" not in claude.product_identities[0].lower()
-    ):
+    if len(claude.product_identities) == 1 and "claude" not in claude.product_identities[0].lower():
         failures.append("claude_product_identity_invalid")
     return nexus, baseline, claude
 
@@ -483,21 +490,16 @@ def _validate_category_thresholds(
             continue
         nexus_category = category_result["nexus"]
         margin = float(category_result["claude_verified_margin"] or 0)
-        if (
-            float(nexus_category["verified_rate"])
-            < thresholds.minimum_category_nexus_verified_rate
-        ):
+        if float(nexus_category["verified_rate"]) < thresholds.minimum_category_nexus_verified_rate:
             failures.append(f"category_verified_rate_below_threshold:{category}")
         if margin < thresholds.minimum_category_claude_margin:
             failures.append(f"category_claude_margin_below_threshold:{category}")
-        if (
-            float(nexus_category["false_success_rate"])
-            > float(category_result["claude_code"]["false_success_rate"])
+        if float(nexus_category["false_success_rate"]) > float(
+            category_result["claude_code"]["false_success_rate"]
         ):
             failures.append(f"category_false_success_worse:{category}")
-        if (
-            float(nexus_category["unexpected_change_rate"])
-            > float(category_result["claude_code"]["unexpected_change_rate"])
+        if float(nexus_category["unexpected_change_rate"]) > float(
+            category_result["claude_code"]["unexpected_change_rate"]
         ):
             failures.append(f"category_unexpected_changes_worse:{category}")
 
@@ -505,8 +507,11 @@ def _validate_category_thresholds(
 def evaluate_superiority_report(
     report: Mapping[str, Any],
     *,
-    thresholds: SuperiorityThresholds = SuperiorityThresholds(),
+    thresholds: SuperiorityThresholds | None = None,
+    trusted_evaluator_keys: Mapping[str, bytes | str] | None = None,
+    trusted_campaign: CampaignTrust | Mapping[str, Any] | None = None,
 ) -> SuperiorityEvaluation:
+    thresholds = thresholds or SuperiorityThresholds()
     failures: list[str] = []
     if bool(report.get("dry_run")):
         failures.append("dry_run_is_not_qualification_evidence")
@@ -515,7 +520,18 @@ def evaluate_superiority_report(
     if not isinstance(qualification, Mapping):
         qualification = {}
     if thresholds.require_sealed_provenance:
-        _require_sealed_campaign(report, qualification, failures)
+        campaign = (
+            CampaignTrust.from_mapping(trusted_campaign)
+            if isinstance(trusted_campaign, Mapping)
+            else trusted_campaign
+        )
+        _require_sealed_campaign(
+            report,
+            qualification,
+            failures,
+            trusted_evaluator_keys=trusted_evaluator_keys,
+            trusted_campaign=campaign,
+        )
     else:
         for key in (
             "blind",
@@ -548,23 +564,15 @@ def evaluate_superiority_report(
         thresholds.claude_agent,
     )
     sealed_budget = qualification.get("budget_policy") or {}
-    declared_budget = (
-        sealed_budget.get("declared")
-        if isinstance(sealed_budget, Mapping)
-        else {}
-    )
+    declared_budget = sealed_budget.get("declared") if isinstance(sealed_budget, Mapping) else {}
     if not isinstance(declared_budget, Mapping):
         declared_budget = {}
     try:
-        maximum_wall_time = float(
-            declared_budget.get("maximum_wall_time_seconds_per_run", 0)
-        )
+        maximum_wall_time = float(declared_budget.get("maximum_wall_time_seconds_per_run", 0))
     except (TypeError, ValueError):
         maximum_wall_time = 0.0
     try:
-        maximum_interventions = int(
-            declared_budget.get("maximum_human_interventions_per_run", -1)
-        )
+        maximum_interventions = int(declared_budget.get("maximum_human_interventions_per_run", -1))
     except (TypeError, ValueError):
         maximum_interventions = -1
 
@@ -584,9 +592,7 @@ def evaluate_superiority_report(
             group_budget = {}
         try:
             agent_timeout = float(group_budget.get("agent_timeout_seconds", 0))
-            verification_timeout = float(
-                group_budget.get("verification_timeout_seconds", 0)
-            )
+            verification_timeout = float(group_budget.get("verification_timeout_seconds", 0))
         except (TypeError, ValueError):
             agent_timeout = 0.0
             verification_timeout = 0.0
@@ -615,9 +621,7 @@ def evaluate_superiority_report(
             item = dict(raw_item)
             agent = str(item.get("agent", "")).strip()
             if agent in per_agent:
-                failures.append(
-                    f"duplicate_agent_result:{task_id}:{trial}:{agent}"
-                )
+                failures.append(f"duplicate_agent_result:{task_id}:{trial}:{agent}")
                 continue
             per_agent[agent] = item
             item["_category"] = category
@@ -635,23 +639,37 @@ def evaluate_superiority_report(
             )
             provenance = item.get("provenance") or {}
             if isinstance(provenance, Mapping):
-                repository_hashes_by_task[task_id].add(
-                    str(provenance.get("repository_sha256", ""))
-                )
-                prompt_hashes_by_task[task_id].add(
-                    str(provenance.get("prompt_sha256", ""))
-                )
+                repository_hashes_by_task[task_id].add(str(provenance.get("repository_sha256", "")))
+                prompt_hashes_by_task[task_id].add(str(provenance.get("prompt_sha256", "")))
+                isolation = provenance.get("candidate_isolation") or {}
+                if not isinstance(isolation, Mapping) or not all(
+                    isolation.get(key) is True
+                    for key in (
+                        "filesystem_isolation",
+                        "network_denied",
+                        "network_enforced",
+                        "original_repository_unreadable",
+                        "oracle_unreadable",
+                    )
+                ):
+                    failures.append(f"candidate_isolation_unproven:{task_id}:{trial}:{agent}")
+                telemetry = provenance.get("telemetry") or {}
+                if (
+                    not isinstance(telemetry, Mapping)
+                    or telemetry.get("source") != "evaluator_harness"
+                    or telemetry.get("candidate_writable") is not False
+                    or not _SHA256_RE.fullmatch(str(telemetry.get("record_sha256", "")))
+                ):
+                    failures.append(f"evaluator_telemetry_untrusted:{task_id}:{trial}:{agent}")
+            else:
+                failures.append(f"provenance_missing:{task_id}:{trial}:{agent}")
         group_results[group_key] = per_agent
         for agent in required_agents:
             if agent not in per_agent:
-                failures.append(
-                    f"missing_agent_result:{task_id}:{trial}:{agent}"
-                )
+                failures.append(f"missing_agent_result:{task_id}:{trial}:{agent}")
 
     if len(task_ids) < thresholds.minimum_unique_tasks:
-        failures.append(
-            f"unique_tasks:{len(task_ids)}<{thresholds.minimum_unique_tasks}"
-        )
+        failures.append(f"unique_tasks:{len(task_ids)}<{thresholds.minimum_unique_tasks}")
     missing_categories = sorted(set(thresholds.required_categories) - categories)
     if missing_categories:
         failures.append("missing_categories:" + ",".join(missing_categories))
@@ -660,8 +678,7 @@ def evaluate_superiority_report(
         task_count = len(category_tasks.get(category, set()))
         if task_count < thresholds.minimum_tasks_per_category:
             failures.append(
-                f"category_tasks:{category}:"
-                f"{task_count}<{thresholds.minimum_tasks_per_category}"
+                f"category_tasks:{category}:{task_count}<{thresholds.minimum_tasks_per_category}"
             )
 
     incomplete = sorted(
@@ -678,9 +695,7 @@ def evaluate_superiority_report(
         repo_hashes = {
             item.lower() for item in repository_hashes_by_task.get(task_id, set()) if item
         }
-        prompt_hashes = {
-            item.lower() for item in prompt_hashes_by_task.get(task_id, set()) if item
-        }
+        prompt_hashes = {item.lower() for item in prompt_hashes_by_task.get(task_id, set()) if item}
         if len(repo_hashes) != 1:
             failures.append(f"unmatched_repository_provenance:{task_id}")
         elif not _SHA256_RE.fullmatch(next(iter(repo_hashes))):
@@ -708,15 +723,11 @@ def evaluate_superiority_report(
             f"{len(unique_repository_hashes)}<{thresholds.minimum_unique_repositories}"
         )
 
-    agents = {
-        name: _agent_metrics(flat_results, name) for name in required_agents
-    }
+    agents = {name: _agent_metrics(flat_results, name) for name in required_agents}
     expected_runs = len(seen_groups)
     for name, metrics in agents.items():
         if metrics.runs != expected_runs:
-            failures.append(
-                f"agent_runs:{name}:{metrics.runs}!={expected_runs}"
-            )
+            failures.append(f"agent_runs:{name}:{metrics.runs}!={expected_runs}")
         if metrics.available_runs != metrics.runs:
             failures.append(f"agent_unavailable:{name}")
         if metrics.completed_runs != metrics.runs:
@@ -724,14 +735,8 @@ def evaluate_superiority_report(
         if not metrics.provenance_fingerprints:
             failures.append(f"agent_provenance_missing:{name}")
 
-    provenance_sets = [
-        set(agents[name].provenance_fingerprints) for name in required_agents
-    ]
-    if any(
-        provenance_sets[i] == provenance_sets[j]
-        for i in range(3)
-        for j in range(i + 1, 3)
-    ):
+    provenance_sets = [set(agents[name].provenance_fingerprints) for name in required_agents]
+    if any(provenance_sets[i] == provenance_sets[j] for i in range(3) for j in range(i + 1, 3)):
         failures.append("agent_provenance_not_distinct")
 
     nexus, baseline, claude = _validate_agent_identities(
@@ -741,22 +746,16 @@ def evaluate_superiority_report(
     direct_uplift = _safe_ratio(nexus.verified_rate, baseline.verified_rate)
     cost_ratio = (
         _safe_ratio(nexus.median_cost_usd, claude.median_cost_usd)
-        if nexus.median_cost_usd is not None
-        and claude.median_cost_usd is not None
+        if nexus.median_cost_usd is not None and claude.median_cost_usd is not None
         else None
     )
-    duration_ratio = _safe_ratio(
-        nexus.median_duration_ms, claude.median_duration_ms
-    )
+    duration_ratio = _safe_ratio(nexus.median_duration_ms, claude.median_duration_ms)
     intervention_ratio = None
     if (
         nexus.median_human_interventions is not None
         and claude.median_human_interventions is not None
     ):
-        if (
-            nexus.median_human_interventions == 0
-            and claude.median_human_interventions == 0
-        ):
+        if nexus.median_human_interventions == 0 and claude.median_human_interventions == 0:
             intervention_ratio = 1.0
         else:
             intervention_ratio = _safe_ratio(
@@ -786,17 +785,11 @@ def evaluate_superiority_report(
         failures.append("nexus_unexpected_changes_above_threshold")
     if nexus.unexpected_change_rate > claude.unexpected_change_rate:
         failures.append("nexus_unexpected_changes_worse_than_claude")
-    if (
-        duration_ratio is None
-        or duration_ratio > thresholds.maximum_duration_ratio_to_claude
-    ):
+    if duration_ratio is None or duration_ratio > thresholds.maximum_duration_ratio_to_claude:
         failures.append("nexus_duration_worse_than_threshold")
     if thresholds.require_cost_metrics and cost_ratio is None:
         failures.append("cost_metrics_incomplete")
-    elif (
-        cost_ratio is not None
-        and cost_ratio > thresholds.maximum_cost_ratio_to_claude
-    ):
+    elif cost_ratio is not None and cost_ratio > thresholds.maximum_cost_ratio_to_claude:
         failures.append("nexus_cost_ratio_above_threshold")
     if thresholds.require_token_metrics and any(
         metrics.median_input_tokens is None or metrics.median_output_tokens is None
@@ -807,15 +800,12 @@ def evaluate_superiority_report(
         failures.append("intervention_metrics_incomplete")
     elif (
         intervention_ratio is not None
-        and intervention_ratio
-        > thresholds.maximum_intervention_ratio_to_claude
+        and intervention_ratio > thresholds.maximum_intervention_ratio_to_claude
     ):
         failures.append("nexus_intervention_ratio_above_threshold")
 
     category_metrics = _category_metrics(flat_results, thresholds=thresholds)
-    _validate_category_thresholds(
-        category_metrics, thresholds=thresholds, failures=failures
-    )
+    _validate_category_thresholds(category_metrics, thresholds=thresholds, failures=failures)
 
     metrics = {
         "unique_tasks": len(task_ids),
@@ -842,8 +832,7 @@ def evaluate_superiority_report(
         qualified=qualified,
         status="PASS" if qualified else "INSUFFICIENT_OR_FAILED_EVIDENCE",
         claim=(
-            "Nexus exceeded every configured Claude Code superiority gate "
-            "on this sealed task set."
+            "Noryx exceeded every configured Claude Code superiority gate on this sealed task set."
             if qualified
             else "No Claude Code superiority claim is supported by this report."
         ),

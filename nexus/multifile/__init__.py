@@ -8,43 +8,35 @@ repository-scale coordinated changes.
 from __future__ import annotations
 
 from nexus.multifile.contracts import (
+    ChangeDependency,
+    ChangeSetValidationResult,
+    ChangeStage,
+    ChangeStageStatus,
     ChangeType,
     CompatibilityPolicy,
     ContractChange,
+    ContractMismatch,
     ContractScope,
     ContractType,
-    ChangeDependency,
-    ChangeStage,
-    ChangeStageStatus,
     EngineeringChangeSet,
     ImpactCategory,
     ImpactReport,
     ImpactTarget,
     MissingChange,
-    ContractMismatch,
-    ScopeViolation,
     PlannedFileChange,
     RollbackPlan,
     RollbackScope,
+    ScopeViolation,
     TaskType,
-    ChangeSetValidationResult,
     ValidationStatus,
 )
-
-from nexus.multifile.orchestrator import (
-    CompletionAssessment,
-    FileObligation,
-    MultiFileCompletionContract,
-    MultiFileOrchestrator,
-)
-
 from nexus.multifile.events import (
     CallerMigrationStarted,
     ChangeSetCreated,
     ChangeSetRolledBack,
     ChangeSetValidated,
-    ChangeStageFailed,
     ChangeStageCompleted,
+    ChangeStageFailed,
     ChangeStageStarted,
     CompatibilityDecisionRequired,
     ContractChanged,
@@ -55,6 +47,12 @@ from nexus.multifile.events import (
     IntermediateVerificationStarted,
     MultiFileVerificationCompleted,
     ScopeExpansionRequested,
+)
+from nexus.multifile.orchestrator import (
+    CompletionAssessment,
+    FileObligation,
+    MultiFileCompletionContract,
+    MultiFileOrchestrator,
 )
 
 __all__ = [

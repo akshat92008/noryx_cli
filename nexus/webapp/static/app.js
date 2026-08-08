@@ -1,5 +1,5 @@
 /**
- * NexusAI Web App — WebSocket chat client with file tree, tool visualization,
+ * Noryx Web App — WebSocket chat client with file tree, tool visualization,
  * markdown rendering, and real-time streaming.
  */
 

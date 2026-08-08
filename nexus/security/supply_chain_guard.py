@@ -1,4 +1,4 @@
-"""Supply-chain security guard for Nexus CLI.
+"""Supply-chain security guard for Noryx CLI.
 
 Audits dependency installation, lockfile integrity, package sources,
 typosquatting risks, and lifecycle script execution.
@@ -55,14 +55,20 @@ class SupplyChainGuard:
         if is_url:
             risk_notes.append("Direct URL or Git dependency requested")
         if "--ignore-scripts" not in full_line and cmd == "npm":
-            risk_notes.append("Package installation may run lifecycle scripts (e.g., preinstall/postinstall)")
+            risk_notes.append(
+                "Package installation may run lifecycle scripts (e.g., preinstall/postinstall)"
+            )
 
         # Extract target package name if available
         pkg_name = argv[-1] if len(argv) > 1 and not argv[-1].startswith("-") else "unknown"
 
         # Typosquatting check
         for target in TYPOSQUATTING_TARGETS:
-            if pkg_name != target and abs(len(pkg_name) - len(target)) <= 1 and target[:3] in pkg_name:
+            if (
+                pkg_name != target
+                and abs(len(pkg_name) - len(target)) <= 1
+                and target[:3] in pkg_name
+            ):
                 risk_notes.append(f"Possible typosquatting risk against popular package '{target}'")
 
         requires_approval = bool(risk_notes or is_url or is_git)

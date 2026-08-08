@@ -91,8 +91,10 @@ def test_openrouter_only_configuration_is_supported(monkeypatch):
     assert str(client.client.base_url) == "https://openrouter.ai/api/v1/"
 
 
-def test_groq_fallback_execution():
+def test_groq_fallback_execution(monkeypatch):
     """Verify that when NVIDIA attempts fail, it automatically falls back to Groq."""
+    monkeypatch.delenv("NORYX_DISABLE_NETWORK", raising=False)
+    monkeypatch.delenv("NEXUS_DISABLE_NETWORK", raising=False)
     client = NvidiaClient()
 
     # Mock _get_nvidia_client to raise TimeoutError
@@ -117,8 +119,10 @@ def test_groq_fallback_execution():
             assert resp.choices[0].message.content == "Groq fallback success!"
 
 
-def test_active_round_robin_key_rotation():
+def test_active_round_robin_key_rotation(monkeypatch):
     """Verify that successful requests advance current_key_idx in a Round-Robin cycle."""
+    monkeypatch.delenv("NORYX_DISABLE_NETWORK", raising=False)
+    monkeypatch.delenv("NEXUS_DISABLE_NETWORK", raising=False)
     client = NvidiaClient()
     client.nvidia_keys = ["key1", "key2", "key3"]
     client.current_key_idx = 0
@@ -146,9 +150,10 @@ def test_active_round_robin_key_rotation():
 
 def test_cloud_api_exhaustion_falls_back_to_local_nova():
     """Verify that when all cloud APIs fail, agent.run falls back to local Nova turn."""
+    import sys
+
     from nexus.agent import Agent
 
-    import sys
     print("Setting up agent...", file=sys.stderr, flush=True)
     with Agent(
         api_key="nvapi-test",
@@ -161,10 +166,17 @@ def test_cloud_api_exhaustion_falls_back_to_local_nova():
 
         print("Patching client...", file=sys.stderr, flush=True)
         # Mock client.stream to simulate cloud rate limit exhaustion on a chat query.
-        with patch.object(
-            agent.client, "stream", side_effect=RuntimeError("Rate limited after multiple retries")
-        ), patch.object(
-            agent.client, "chat", side_effect=RuntimeError("Rate limited after multiple retries")
+        with (
+            patch.object(
+                agent.client,
+                "stream",
+                side_effect=RuntimeError("Rate limited after multiple retries"),
+            ),
+            patch.object(
+                agent.client,
+                "chat",
+                side_effect=RuntimeError("Rate limited after multiple retries"),
+            ),
         ):
             with patch.object(
                 agent, "_run_nova_turn", return_value=("Local Nova fallback response", [])
@@ -231,9 +243,7 @@ def test_timed_out_ceiling_transport_cannot_block_process_shutdown():
     caller.start()
     caller.join(timeout=0.5)
 
-    transports = [
-        thread for thread in threading.enumerate() if thread.name == "nexus-ceiling-call"
-    ]
+    transports = [thread for thread in threading.enumerate() if thread.name == "nexus-ceiling-call"]
     try:
         assert not caller.is_alive()
         assert "daemonized transport" in result["error"]

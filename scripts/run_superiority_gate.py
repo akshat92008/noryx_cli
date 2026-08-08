@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fail closed unless a real competitive report proves every superiority gate."""
+
 from __future__ import annotations
 
 import argparse
@@ -17,6 +18,7 @@ from nexus.competitive_qualification import SuperiorityThresholds, evaluate_supe
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("report", type=Path)
+    parser.add_argument("--trust-policy", type=Path, required=True)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--minimum-tasks", type=int, default=50)
     parser.add_argument("--minimum-repositories", type=int, default=10)
@@ -28,7 +30,15 @@ def main() -> int:
         minimum_unique_repositories=args.minimum_repositories,
         minimum_trials_per_task=args.trials,
     )
-    evaluation = evaluate_superiority_report(payload, thresholds=thresholds)
+    from nexus.competitive_attestation import load_trust_policy
+
+    trusted_keys, trusted_campaign = load_trust_policy(args.trust_policy)
+    evaluation = evaluate_superiority_report(
+        payload,
+        thresholds=thresholds,
+        trusted_evaluator_keys=trusted_keys,
+        trusted_campaign=trusted_campaign,
+    )
     rendered = json.dumps(evaluation.to_dict(), indent=2, sort_keys=True)
     print(rendered)
     if args.output:

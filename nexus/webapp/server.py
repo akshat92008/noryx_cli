@@ -162,6 +162,7 @@ def _require_web_token(request) -> Response | None:
     against other local processes, not an internet exposure.
     """
     from starlette.responses import JSONResponse as _JR
+
     if not _is_allowed_web_origin(request.headers.get("origin")):
         return _JR({"error": "Unauthorized origin"}, status_code=403)
     token_header = request.headers.get("X-CSRF-Token", "")
@@ -332,7 +333,9 @@ async def api_chat(request):
         agent.set_model(model)
 
     if _agent_busy.get(session_id, False):
-        return JSONResponse({"error": "Agent is currently busy processing another request"}, status_code=429)
+        return JSONResponse(
+            {"error": "Agent is currently busy processing another request"}, status_code=429
+        )
 
     # Run synchronously in a thread
     loop = asyncio.get_event_loop()
@@ -505,7 +508,9 @@ async def ws_chat(websocket: WebSocket):
                 message = message.strip()
 
                 if _agent_busy.get(session_id, False):
-                    await websocket.send_json({"type": "error", "content": "Agent is currently busy"})
+                    await websocket.send_json(
+                        {"type": "error", "content": "Agent is currently busy"}
+                    )
                     continue
 
                 agent = _get_agent(session_id)

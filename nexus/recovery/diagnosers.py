@@ -1,5 +1,5 @@
 """
-Specialized Diagnosers for Nexus CLI Recovery Subsystem.
+Specialized Diagnosers for Noryx CLI Recovery Subsystem.
 """
 
 from __future__ import annotations
@@ -69,9 +69,9 @@ class PatchQualityDiagnoser:
     def _is_pure_no_op(cls, patch: str) -> bool:
         # Check if patch only contains comments or whitespace changes
         non_comment_lines = [
-            l.strip()
-            for l in patch.splitlines()
-            if l.strip() and not l.strip().startswith("#")
+            line.strip()
+            for line in patch.splitlines()
+            if line.strip() and not line.strip().startswith("#")
         ]
         return len(non_comment_lines) == 0
 
@@ -95,7 +95,7 @@ class BuildLintTypeDiagnoser:
 
     @classmethod
     def analyze_type_failure(cls, output: str) -> str:
-        match = re.search(r'error:\s*(.*)', output)
+        match = re.search(r"error:\s*(.*)", output)
         return match.group(1) if match else "Type signature mismatch detected."
 
 

@@ -1,5 +1,5 @@
 """
-Deterministic Failure Signal Extraction for Nexus CLI.
+Deterministic Failure Signal Extraction for Noryx CLI.
 """
 
 from __future__ import annotations
@@ -28,7 +28,9 @@ class SignalExtractor:
         lines = output.splitlines()
 
         # Exception type extraction
-        exc_match = re.search(r"([A-Za-z_][A-Za-z0-9_]*(?:Error|Exception|Panic|Fault)):?\s*(.*)", output)
+        exc_match = re.search(
+            r"([A-Za-z_][A-Za-z0-9_]*(?:Error|Exception|Panic|Fault)):?\s*(.*)", output
+        )
         exception_type = exc_match.group(1) if exc_match else ""
         primary_msg = exc_match.group(0) if exc_match else (lines[0] if lines else "")
 
@@ -38,16 +40,26 @@ class SignalExtractor:
         # Assertion diff
         assertion_diff = ""
         if "AssertionError" in output or "assert " in output:
-            diff_lines = [line for line in lines if line.startswith(">") or line.startswith("E ") or "assert" in line]
+            diff_lines = [
+                line
+                for line in lines
+                if line.startswith(">") or line.startswith("E ") or "assert" in line
+            ]
             assertion_diff = "\n".join(diff_lines[:10])
 
         # Paths
-        paths = re.findall(r'[a-zA-Z0-9_\-\./]+\.(?:py|js|ts|json)', output)
+        paths = re.findall(r"[a-zA-Z0-9_\-\./]+\.(?:py|js|ts|json)", output)
         uniq_paths = list(dict.fromkeys(paths))
 
         # Cascades & secondary signals
-        secondary = [line.strip() for line in lines if "During handling of the above exception" in line or "Caused by" in line]
-        cascades = [line.strip() for line in lines if "ModuleNotFoundError" in line or "ImportError" in line]
+        secondary = [
+            line.strip()
+            for line in lines
+            if "During handling of the above exception" in line or "Caused by" in line
+        ]
+        cascades = [
+            line.strip() for line in lines if "ModuleNotFoundError" in line or "ImportError" in line
+        ]
 
         return ExtractedSignal(
             primary_signal=primary_msg[:200],

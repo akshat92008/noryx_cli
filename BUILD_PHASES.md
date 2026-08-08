@@ -1,4 +1,4 @@
-# Nexus CLI 3.7.0 — Cognitive Reliability and External Proof
+# Noryx CLI 3.7.0 — Cognitive Reliability and External Proof
 
 ## Completed in this release
 
@@ -6,7 +6,7 @@
 2. Dependency-propagated, risk-aware repository context selection.
 3. Hard multi-file completion obligations and preserved-non-goal enforcement.
 4. Evidence-delta intelligent recovery with bounded terminal states.
-5. Blind matched-repository Nexus-versus-Claude duel harness.
+5. Blind matched-repository Noryx-versus-Claude duel harness.
 6. Behavioral native-sandbox qualification and three-OS CI matrix.
 7. Shared-process state registry, cleanup, watchdog, and source-hash-bound qualification.
 
@@ -19,7 +19,7 @@
 
 ---
 
-# Nexus CLI 3.6.0 — Truth Integrity and Deployment Hardening
+# Noryx CLI 3.6.0 — Truth Integrity and Deployment Hardening
 
 ## Completed in this release
 
@@ -45,16 +45,16 @@
 
 ---
 
-# Historical: Nexus CLI 3.5.0 — Engineering Brain Build
+# Historical: Noryx CLI 3.5.0 — Engineering Brain Build
 
 ## Product north star
 
-Nexus is the verification and reliability operating layer for any coding model. The model proposes; Nexus establishes repository context, constrains scope, executes through policy, verifies externally, records evidence, and refuses unsupported completion claims.
+Noryx is the verification and reliability operating layer for any coding model. The model proposes; Noryx establishes repository context, constrains scope, executes through policy, verifies externally, records evidence, and refuses unsupported completion claims.
 
 The flagship workflow remains:
 
 ```bash
-nexus fix "repair the regression without changing the schema" \
+noryx fix "repair the regression without changing the schema" \
   --budget-inr 20 --model auto --proof
 ```
 
@@ -85,7 +85,7 @@ nexus fix "repair the regression without changing the schema" \
 - Every mutation is checked beneath the model against permitted files and forbidden patterns.
 - Changed-file and changed-line budgets are enforced before and after editing.
 - Unplanned files require an evidence-backed scope-expansion reason and consume a bounded expansion budget.
-- Secret, credential, environment, Git-internal, and Nexus-state paths remain prohibited by default.
+- Secret, credential, environment, Git-internal, and Noryx-state paths remain prohibited by default.
 
 ## Sprint 4 — Senior-engineer planning discipline — Complete for controlled beta
 
@@ -109,7 +109,7 @@ nexus fix "repair the regression without changing the schema" \
 
 ## Sprint 7 — Matched-model proof gate — Complete
 
-- `nexus benchmark compare-matched` requires identical task, model, source revision, and authorized budget.
+- `noryx benchmark compare-matched` requires identical task, model, source revision, and authorized budget.
 - The gate measures verified success, uplift, false completion, regressions, budget compliance, cost, latency, and intervention metadata.
 - Unmatched trials, insufficient samples, false completion, regressions, or budget violations fail the gate.
 
@@ -128,11 +128,11 @@ External evidence still required before release-candidate or Claude Code-equival
 
 - repeated real-provider trials on fresh repositories;
 - Linux native sandbox, macOS, and Windows CI;
-- same-model direct-versus-Nexus uplift on at least two affordable models;
+- same-model direct-versus-Noryx uplift on at least two affordable models;
 - selected repair success at or above the public-beta target;
 - false verified completion below the target with zero known false passes in the release corpus;
 - long-horizon interruption, dirty-worktree, provider-chaos, and rollback qualification on real tasks.
 
 ## Current designation
 
-Nexus 3.5.0 is a hardened controlled beta for supervised Verified Repair evaluation. The release contains stronger engineering discipline and measurable parity gates, but it does not claim proprietary-model intelligence equivalence or universal reliability without the external evidence above.
+Noryx 3.5.0 is a hardened controlled beta for supervised Verified Repair evaluation. The release contains stronger engineering discipline and measurable parity gates, but it does not claim proprietary-model intelligence equivalence or universal reliability without the external evidence above.

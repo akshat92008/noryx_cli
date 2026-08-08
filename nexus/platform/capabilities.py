@@ -6,53 +6,59 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 # Well-known extension capabilities
-EXTENSION_CAPABILITIES = frozenset({
-    "fs_read",
-    "fs_write",
-    "network",
-    "shell",
-    "env_read",
-    "tool_invoke",
-    "provider_call",
-    "context_read",
-    "context_write",
-    "verification_run",
-    "planning_read",
-    "planning_write",
-    "routing_read",
-    "routing_write",
-    "event_subscribe",
-    "event_publish",
-    "mcp_connect",
-    "mcp_serve",
-    "pure",
-})
+EXTENSION_CAPABILITIES = frozenset(
+    {
+        "fs_read",
+        "fs_write",
+        "network",
+        "shell",
+        "env_read",
+        "tool_invoke",
+        "provider_call",
+        "context_read",
+        "context_write",
+        "verification_run",
+        "planning_read",
+        "planning_write",
+        "routing_read",
+        "routing_write",
+        "event_subscribe",
+        "event_publish",
+        "mcp_connect",
+        "mcp_serve",
+        "pure",
+    }
+)
 
 # Capabilities that require explicit user approval
-SENSITIVE_CAPABILITIES = frozenset({
-    "fs_write",
-    "network",
-    "shell",
-    "env_read",
-    "tool_invoke",
-    "provider_call",
-    "context_write",
-    "routing_write",
-    "event_publish",
-    "mcp_connect",
-    "mcp_serve",
-})
+SENSITIVE_CAPABILITIES = frozenset(
+    {
+        "fs_write",
+        "network",
+        "shell",
+        "env_read",
+        "tool_invoke",
+        "provider_call",
+        "context_write",
+        "routing_write",
+        "event_publish",
+        "mcp_connect",
+        "mcp_serve",
+    }
+)
 
 # Capabilities that are never grantable to untrusted extensions
-FORBIDDEN_CAPABILITIES = frozenset({
-    "bypass_tool_gateway",
-    "bypass_transaction_engine",
-    "modify_nexus_internals",
-    "unrestricted_fs",
-    "unrestricted_env",
-    "auto_install",
-    "auto_enable",
-})
+FORBIDDEN_CAPABILITIES = frozenset(
+    {
+        "bypass_tool_gateway",
+        "bypass_transaction_engine",
+        "modify_nexus_internals",
+        "unrestricted_fs",
+        "unrestricted_env",
+        "auto_install",
+        "auto_enable",
+    }
+)
 
 
 @dataclass(frozen=True)

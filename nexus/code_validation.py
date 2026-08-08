@@ -124,6 +124,7 @@ class GeneratedCodeValidator:
             )
 
         from nexus.process_gateway import ProcessExecutionGateway, ProcessRequest
+
         # ``node --check`` parses the explicitly selected source file without
         # executing it or resolving imports. Treat that static parser as an
         # explicit trusted-host operation; native compilers may resolve include
@@ -143,10 +144,14 @@ class GeneratedCodeValidator:
                 str(path), command, False, f"compiler timed out after {self.timeout}s", None
             )
         if result.blocked_reason:
-            return CodeCheck(str(path), command, False, f"compiler could not run: {result.blocked_reason}", None)
+            return CodeCheck(
+                str(path), command, False, f"compiler could not run: {result.blocked_reason}", None
+            )
         if result.exit_code is None and not result.success:
-            return CodeCheck(str(path), command, False, f"compiler could not run: {result.stderr}", None)
-            
+            return CodeCheck(
+                str(path), command, False, f"compiler could not run: {result.stderr}", None
+            )
+
         output = (result.stdout + "\n" + result.stderr).strip() or "compiler produced no output"
         return CodeCheck(str(path), command, result.success, output, result.exit_code)
 

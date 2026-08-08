@@ -1,13 +1,13 @@
-"""Canonical Engineering Plan Model for Nexus CLI (Sprint 6)."""
+"""Canonical Engineering Plan Model for Noryx CLI (Sprint 6)."""
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from nexus.planning.task_contract import RiskLevel, Assumption
+from nexus.planning.task_contract import Assumption, RiskLevel
 
 
 class ActionType(str, Enum):
@@ -60,7 +60,9 @@ class Hypothesis:
             "contradicting_evidence": [e.to_dict() for e in self.contradicting_evidence],
             "confidence": self.confidence,
             "validation_action": self.validation_action,
-            "status": self.status.value if isinstance(self.status, HypothesisStatus) else self.status,
+            "status": self.status.value
+            if isinstance(self.status, HypothesisStatus)
+            else self.status,
         }
 
     @classmethod
@@ -68,11 +70,17 @@ class Hypothesis:
         return cls(
             hypothesis_id=data["hypothesis_id"],
             statement=data["statement"],
-            supporting_evidence=[EvidenceReference.from_dict(e) for e in data.get("supporting_evidence", [])],
-            contradicting_evidence=[EvidenceReference.from_dict(e) for e in data.get("contradicting_evidence", [])],
+            supporting_evidence=[
+                EvidenceReference.from_dict(e) for e in data.get("supporting_evidence", [])
+            ],
+            contradicting_evidence=[
+                EvidenceReference.from_dict(e) for e in data.get("contradicting_evidence", [])
+            ],
             confidence=data.get("confidence", 0.5),
             validation_action=data.get("validation_action", ""),
-            status=HypothesisStatus(data["status"]) if "status" in data else HypothesisStatus.PROPOSED,
+            status=HypothesisStatus(data["status"])
+            if "status" in data
+            else HypothesisStatus.PROPOSED,
         )
 
 
@@ -99,13 +107,17 @@ class PlanStep:
             "step_id": self.step_id,
             "title": self.title,
             "objective": self.objective,
-            "action_type": self.action_type.value if isinstance(self.action_type, ActionType) else self.action_type,
+            "action_type": self.action_type.value
+            if isinstance(self.action_type, ActionType)
+            else self.action_type,
             "dependencies": self.dependencies,
             "evidence_inputs": [e.to_dict() for e in self.evidence_inputs],
             "intended_targets": self.intended_targets,
             "allowed_tools": self.allowed_tools,
             "mutation_scope": self.mutation_scope,
-            "risk_level": self.risk_level.value if isinstance(self.risk_level, RiskLevel) else self.risk_level,
+            "risk_level": self.risk_level.value
+            if isinstance(self.risk_level, RiskLevel)
+            else self.risk_level,
             "expected_outcome": self.expected_outcome,
             "completion_condition": self.completion_condition,
             "verification_method": self.verification_method,
@@ -119,9 +131,13 @@ class PlanStep:
             step_id=data["step_id"],
             title=data["title"],
             objective=data["objective"],
-            action_type=ActionType(data["action_type"]) if "action_type" in data else ActionType.MUTATE,
+            action_type=ActionType(data["action_type"])
+            if "action_type" in data
+            else ActionType.MUTATE,
             dependencies=data.get("dependencies", []),
-            evidence_inputs=[EvidenceReference.from_dict(e) for e in data.get("evidence_inputs", [])],
+            evidence_inputs=[
+                EvidenceReference.from_dict(e) for e in data.get("evidence_inputs", [])
+            ],
             intended_targets=data.get("intended_targets", []),
             allowed_tools=data.get("allowed_tools", []),
             mutation_scope=data.get("mutation_scope", []),
@@ -187,7 +203,9 @@ class EngineeringPlan:
             repository_snapshot_id=data.get("repository_snapshot_id", "snap-initial"),
             context_bundle_id=data.get("context_bundle_id", "bundle-1"),
             objective=data.get("objective", ""),
-            root_cause_hypotheses=[Hypothesis.from_dict(h) for h in data.get("root_cause_hypotheses", [])],
+            root_cause_hypotheses=[
+                Hypothesis.from_dict(h) for h in data.get("root_cause_hypotheses", [])
+            ],
             affected_scope=data.get("affected_scope", []),
             architecture_constraints=data.get("architecture_constraints", []),
             steps=[PlanStep.from_dict(s) for s in data.get("steps", [])],

@@ -1,6 +1,6 @@
 """Plugin Worker — isolated subprocess execution for untrusted plugin code.
 
-Plugins MUST NOT run in the primary Nexus process.  This module provides
+Plugins MUST NOT run in the primary Noryx process.  This module provides
 a subprocess-based RPC worker with a narrow protocol:
 
 1. Parent sends ``{"action": "setup"}`` → worker loads and initialises the plugin.
@@ -295,7 +295,7 @@ class PluginWorker:
             str(self.plugin_dir),
             self.manifest.entry_point,
         ]
-        
+
         cwd_path = Path(self.workspace_root or self.plugin_dir).resolve()
         spec = CommandSpec(
             argv=argv,
@@ -304,7 +304,7 @@ class PluginWorker:
             env=env,
             require_os_isolation=True,
         )
-        
+
         runner = SandboxRunner(cwd_path)
         command, self._cleanup_path = runner.build_command(spec, cwd_path)
 

@@ -1,5 +1,5 @@
 """
-Concurrent and stress tests for Nexus CLI internal components.
+Concurrent and stress tests for Noryx CLI internal components.
 
 These tests run without provider credentials and without network access.
 They exercise thread-safety, memory stability, and budget controller

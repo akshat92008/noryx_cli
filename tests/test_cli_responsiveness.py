@@ -37,7 +37,14 @@ def test_non_interactive_command_env():
         if os.name == "nt"
         else "$CI $PAGER $DEBIAN_FRONTEND $TERM"
     )
-    res = execute_tool("run_command", {"command": f"echo {variables}", "require_os_isolation": False, "allow_unisolated_host_process": True})
+    res = execute_tool(
+        "run_command",
+        {
+            "command": f"echo {variables}",
+            "require_os_isolation": False,
+            "allow_unisolated_host_process": True,
+        },
+    )
     assert "true" in res.output
     assert "cat" in res.output
     assert "noninteractive" in res.output

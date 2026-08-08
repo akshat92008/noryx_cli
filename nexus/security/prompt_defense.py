@@ -1,4 +1,4 @@
-"""Prompt-injection defense and instruction trust hierarchy for Nexus CLI.
+"""Prompt-injection defense and instruction trust hierarchy for Noryx CLI.
 
 Enforces strict authority layering beneath the model:
 1. System Policy (Immutable)
@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Sequence
 
 
 class TrustLevel(int, Enum):
@@ -26,7 +25,10 @@ class TrustLevel(int, Enum):
 
 
 SUSPICIOUS_INSTRUCTION_PATTERNS = [
-    (r"ignore\s+(all\s+)?(previous|prior|system)\s+(instructions|policy|rules)", "Prompt Injection (Ignore Instructions)"),
+    (
+        r"ignore\s+(all\s+)?(previous|prior|system)\s+(instructions|policy|rules)",
+        "Prompt Injection (Ignore Instructions)",
+    ),
     (r"disregard\s+(all\s+)?(system|policy)\s+rules", "Prompt Injection (Disregard Rules)"),
     (r"read\s+~?/\.ssh/", "Prompt Injection (SSH Key Access)"),
     (r"read\s+~?/\.aws/", "Prompt Injection (AWS Credential Access)"),

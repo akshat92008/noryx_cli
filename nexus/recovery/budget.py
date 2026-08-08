@@ -1,5 +1,5 @@
 """
-Recovery Budget Governance for Nexus CLI.
+Recovery Budget Governance for Noryx CLI.
 """
 
 from __future__ import annotations
@@ -33,21 +33,42 @@ class RecoveryBudget:
 
     def is_exhausted(self) -> tuple[bool, str]:
         if self.command_retries >= self.max_command_retries:
-            return True, f"Command retry limit reached ({self.command_retries}/{self.max_command_retries})."
+            return (
+                True,
+                f"Command retry limit reached ({self.command_retries}/{self.max_command_retries}).",
+            )
         if self.tool_retries >= self.max_tool_retries:
             return True, f"Tool retry limit reached ({self.tool_retries}/{self.max_tool_retries})."
         if self.plan_revisions >= self.max_plan_revisions:
-            return True, f"Plan revision limit reached ({self.plan_revisions}/{self.max_plan_revisions})."
+            return (
+                True,
+                f"Plan revision limit reached ({self.plan_revisions}/{self.max_plan_revisions}).",
+            )
         if self.context_expansions >= self.max_context_expansions:
-            return True, f"Context expansion limit reached ({self.context_expansions}/{self.max_context_expansions})."
+            return (
+                True,
+                f"Context expansion limit reached ({self.context_expansions}/{self.max_context_expansions}).",
+            )
         if self.mutation_cycles >= self.max_mutation_cycles:
-            return True, f"Mutation cycle limit reached ({self.mutation_cycles}/{self.max_mutation_cycles})."
+            return (
+                True,
+                f"Mutation cycle limit reached ({self.mutation_cycles}/{self.max_mutation_cycles}).",
+            )
         if self.verification_cycles >= self.max_verification_cycles:
-            return True, f"Verification cycle limit reached ({self.verification_cycles}/{self.max_verification_cycles})."
+            return (
+                True,
+                f"Verification cycle limit reached ({self.verification_cycles}/{self.max_verification_cycles}).",
+            )
         if self.model_escalations >= self.max_model_escalations:
-            return True, f"Model escalation limit reached ({self.model_escalations}/{self.max_model_escalations})."
+            return (
+                True,
+                f"Model escalation limit reached ({self.model_escalations}/{self.max_model_escalations}).",
+            )
         if self.max_elapsed_seconds and self.elapsed_seconds >= self.max_elapsed_seconds:
-            return True, f"Elapsed time limit reached ({self.elapsed_seconds:.1f}s/{self.max_elapsed_seconds}s)."
+            return (
+                True,
+                f"Elapsed time limit reached ({self.elapsed_seconds:.1f}s/{self.max_elapsed_seconds}s).",
+            )
         if self.max_cost and self.accumulated_cost >= self.max_cost:
             return True, f"Cost limit reached (${self.accumulated_cost}/${self.max_cost})."
 

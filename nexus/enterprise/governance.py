@@ -32,49 +32,57 @@ class Role(str, Enum):
 
 ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
     Role.VIEWER: frozenset({"read_repository", "run_analysis"}),
-    Role.DEVELOPER: frozenset({
-        "read_repository",
-        "run_analysis",
-        "request_edits",
-        "execute_commands",
-    }),
-    Role.MAINTAINER: frozenset({
-        "read_repository",
-        "run_analysis",
-        "request_edits",
-        "execute_commands",
-        "install_packages",
-        "apply_transactions",
-        "roll_back",
-        "manage_extensions",
-    }),
+    Role.DEVELOPER: frozenset(
+        {
+            "read_repository",
+            "run_analysis",
+            "request_edits",
+            "execute_commands",
+        }
+    ),
+    Role.MAINTAINER: frozenset(
+        {
+            "read_repository",
+            "run_analysis",
+            "request_edits",
+            "execute_commands",
+            "install_packages",
+            "apply_transactions",
+            "roll_back",
+            "manage_extensions",
+        }
+    ),
     Role.APPROVER: frozenset({"approve_edits", "apply_transactions", "view_audit_records"}),
-    Role.SECURITY_REVIEWER: frozenset({
-        "read_repository",
-        "run_analysis",
-        "access_network",
-        "view_audit_records",
-        "export_compliance_data",
-    }),
+    Role.SECURITY_REVIEWER: frozenset(
+        {
+            "read_repository",
+            "run_analysis",
+            "access_network",
+            "view_audit_records",
+            "export_compliance_data",
+        }
+    ),
     Role.AUDITOR: frozenset({"view_audit_records", "export_compliance_data"}),
-    Role.ORG_ADMIN: frozenset({
-        "read_repository",
-        "run_analysis",
-        "request_edits",
-        "approve_edits",
-        "execute_commands",
-        "access_network",
-        "install_packages",
-        "access_credentials",
-        "use_cloud_models",
-        "run_autonomous_mode",
-        "apply_transactions",
-        "roll_back",
-        "manage_policies",
-        "manage_extensions",
-        "view_audit_records",
-        "export_compliance_data",
-    }),
+    Role.ORG_ADMIN: frozenset(
+        {
+            "read_repository",
+            "run_analysis",
+            "request_edits",
+            "approve_edits",
+            "execute_commands",
+            "access_network",
+            "install_packages",
+            "access_credentials",
+            "use_cloud_models",
+            "run_autonomous_mode",
+            "apply_transactions",
+            "roll_back",
+            "manage_policies",
+            "manage_extensions",
+            "view_audit_records",
+            "export_compliance_data",
+        }
+    ),
     Role.SERVICE: frozenset({"read_repository", "run_analysis"}),
 }
 
@@ -276,9 +284,9 @@ class EnterpriseAuditService:
     def _records(self) -> list[EnterpriseAuditRecord]:
         return [
             EnterpriseAuditRecord(**item)
-            for item in self.store.read("audit", {"version": ENTERPRISE_STATE_VERSION, "records": []})[
-                "records"
-            ]
+            for item in self.store.read(
+                "audit", {"version": ENTERPRISE_STATE_VERSION, "records": []}
+            )["records"]
         ]
 
     def append(
@@ -315,7 +323,9 @@ class EnterpriseAuditService:
         for record in self._records():
             if record.previous_hash != previous_hash:
                 return False
-            digest = hashlib.sha256(json.dumps(record.payload(), sort_keys=True).encode()).hexdigest()
+            digest = hashlib.sha256(
+                json.dumps(record.payload(), sort_keys=True).encode()
+            ).hexdigest()
             if digest != record.record_hash:
                 return False
             previous_hash = record.record_hash
@@ -339,10 +349,15 @@ class IdentityService:
         roles: tuple[Role, ...] = (Role.VIEWER,),
         project_ids: tuple[str, ...] = (),
     ) -> Identity:
-        identities = {item["identity_id"]: item for item in self.store.read("identities", {"items": []})["items"]}
+        identities = {
+            item["identity_id"]: item
+            for item in self.store.read("identities", {"items": []})["items"]
+        }
         identity = Identity(identity_id, display_name, kind, organization_id, roles, project_ids)
         identities[identity_id] = identity.to_dict()
-        self.store.write("identities", {"version": ENTERPRISE_STATE_VERSION, "items": list(identities.values())})
+        self.store.write(
+            "identities", {"version": ENTERPRISE_STATE_VERSION, "items": list(identities.values())}
+        )
         return identity
 
     def get(self, identity_id: str) -> Identity | None:
@@ -364,7 +379,10 @@ class OrganizationService:
         return organization
 
     def list(self) -> list[Organization]:
-        return [Organization(**item) for item in self.store.read("organizations", {"items": []})["items"]]
+        return [
+            Organization(**item)
+            for item in self.store.read("organizations", {"items": []})["items"]
+        ]
 
 
 class ProjectService:
@@ -380,10 +398,18 @@ class ProjectService:
         sensitivity: str = "internal",
         project_id: str | None = None,
     ) -> Project:
-        project = Project(project_id or f"entproj_{uuid.uuid4().hex[:10]}", organization_id, name, repository, sensitivity)
+        project = Project(
+            project_id or f"entproj_{uuid.uuid4().hex[:10]}",
+            organization_id,
+            name,
+            repository,
+            sensitivity,
+        )
         items = self.store.read("enterprise_projects", {"items": []})["items"]
         items.append(asdict(project))
-        self.store.write("enterprise_projects", {"version": ENTERPRISE_STATE_VERSION, "items": items})
+        self.store.write(
+            "enterprise_projects", {"version": ENTERPRISE_STATE_VERSION, "items": items}
+        )
         return project
 
     def get(self, project_id: str) -> Project | None:
@@ -411,14 +437,18 @@ class AuthorizationService:
 class PolicyEngine:
     """Declarative policy-as-code evaluator with deny precedence."""
 
-    def __init__(self, store: EnterpriseStore | None = None, audit: EnterpriseAuditService | None = None):
+    def __init__(
+        self, store: EnterpriseStore | None = None, audit: EnterpriseAuditService | None = None
+    ):
         self.store = store or EnterpriseStore()
         self.audit = audit or EnterpriseAuditService(self.store)
 
     def load_rules(self) -> list[PolicyRule]:
         return [
             PolicyRule.from_dict(item)
-            for item in self.store.read("policies", {"version": ENTERPRISE_STATE_VERSION, "rules": []})["rules"]
+            for item in self.store.read(
+                "policies", {"version": ENTERPRISE_STATE_VERSION, "rules": []}
+            )["rules"]
         ]
 
     def activate_rules(self, rules: list[PolicyRule], *, actor_id: str = "system") -> None:
@@ -426,7 +456,10 @@ class PolicyEngine:
             "policies",
             {
                 "version": ENTERPRISE_STATE_VERSION,
-                "rules": [rule.to_dict() for rule in sorted(rules, key=lambda item: (item.priority, item.rule_id))],
+                "rules": [
+                    rule.to_dict()
+                    for rule in sorted(rules, key=lambda item: (item.priority, item.rule_id))
+                ],
             },
         )
         self.audit.append("policy.activate", actor_id, details={"rule_count": len(rules)})
@@ -439,7 +472,10 @@ class PolicyEngine:
         for rule in sorted(self.load_rules(), key=lambda item: (item.priority, item.rule_id)):
             if not rule.active:
                 continue
-            if all(_matches_condition(context.get(key), value) for key, value in rule.conditions.items()):
+            if all(
+                _matches_condition(context.get(key), value)
+                for key, value in rule.conditions.items()
+            ):
                 matched.append(rule.rule_id)
                 effects.append(rule.effect)
                 reasons.append(rule.reason or rule.rule_id)
@@ -465,7 +501,11 @@ class PolicyEngine:
             reason_codes=tuple(reasons),
             constraints=constraints,
             matched_rules=tuple(matched),
-            evidence={"context_hash": hashlib.sha256(json.dumps(context, sort_keys=True).encode()).hexdigest()},
+            evidence={
+                "context_hash": hashlib.sha256(
+                    json.dumps(context, sort_keys=True).encode()
+                ).hexdigest()
+            },
         )
         self.audit.append(
             "policy.decision",
@@ -478,7 +518,9 @@ class PolicyEngine:
 
 
 class ApprovalWorkflowService:
-    def __init__(self, store: EnterpriseStore | None = None, auth: AuthorizationService | None = None):
+    def __init__(
+        self, store: EnterpriseStore | None = None, auth: AuthorizationService | None = None
+    ):
         self.store = store or EnterpriseStore()
         self.auth = auth or AuthorizationService(IdentityService(self.store))
 
@@ -498,9 +540,13 @@ class ApprovalWorkflowService:
         self.store.write("approvals", data)
         return request
 
-    def decide(self, request_id: str, approver_id: str, decision: str, *, reason: str = "") -> ApprovalDecision:
+    def decide(
+        self, request_id: str, approver_id: str, decision: str, *, reason: str = ""
+    ) -> ApprovalDecision:
         data = self.store.read("approvals", {"requests": [], "decisions": []})
-        request = next((item for item in data["requests"] if item["request_id"] == request_id), None)
+        request = next(
+            (item for item in data["requests"] if item["request_id"] == request_id), None
+        )
         if not request:
             raise ValueError(f"Approval request not found: {request_id}")
         if request["requester_id"] == approver_id:
@@ -516,30 +562,45 @@ class ApprovalWorkflowService:
         return result
 
     def list_requests(self) -> list[ApprovalRequest]:
-        return [ApprovalRequest(**item) for item in self.store.read("approvals", {"requests": []})["requests"]]
+        return [
+            ApprovalRequest(**item)
+            for item in self.store.read("approvals", {"requests": []})["requests"]
+        ]
 
 
 class SecretBroker:
-    def __init__(self, store: EnterpriseStore | None = None, auth: AuthorizationService | None = None):
+    def __init__(
+        self, store: EnterpriseStore | None = None, auth: AuthorizationService | None = None
+    ):
         self.store = store or EnterpriseStore()
         self.auth = auth or AuthorizationService(IdentityService(self.store))
 
-    def put(self, name: str, value: str, *, project_id: str, provider: str = "", purpose: str = "") -> None:
+    def put(
+        self, name: str, value: str, *, project_id: str, provider: str = "", purpose: str = ""
+    ) -> None:
         digest = hashlib.sha256(value.encode()).hexdigest()
         data = self.store.read("secrets", {"items": []})
-        data["items"] = [item for item in data["items"] if not (item["name"] == name and item["project_id"] == project_id)]
-        data["items"].append({
-            "name": name,
-            "project_id": project_id,
-            "provider": provider,
-            "purpose": purpose,
-            "value": value,
-            "digest": digest,
-            "created_at": time.time(),
-        })
+        data["items"] = [
+            item
+            for item in data["items"]
+            if not (item["name"] == name and item["project_id"] == project_id)
+        ]
+        data["items"].append(
+            {
+                "name": name,
+                "project_id": project_id,
+                "provider": provider,
+                "purpose": purpose,
+                "value": value,
+                "digest": digest,
+                "created_at": time.time(),
+            }
+        )
         self.store.write("secrets", data)
 
-    def request(self, name: str, *, identity_id: str, project_id: str, provider: str = "", purpose: str = "") -> str:
+    def request(
+        self, name: str, *, identity_id: str, project_id: str, provider: str = "", purpose: str = ""
+    ) -> str:
         if not self.auth.is_allowed(identity_id, "access_credentials", project_id=project_id):
             raise PermissionError("Identity lacks access_credentials permission")
         for item in self.store.read("secrets", {"items": []})["items"]:
@@ -554,7 +615,8 @@ class SecretBroker:
     def list_redacted(self, project_id: str = "") -> list[dict[str, Any]]:
         items = self.store.read("secrets", {"items": []})["items"]
         return [
-            {key: value for key, value in item.items() if key != "value"} | {"value": SECRET_REDACTION}
+            {key: value for key, value in item.items() if key != "value"}
+            | {"value": SECRET_REDACTION}
             for item in items
             if not project_id or item["project_id"] == project_id
         ]
@@ -569,23 +631,44 @@ class BudgetGovernanceService:
         data["items"] = [
             item
             for item in data["items"]
-            if not (item["subject_type"] == limit.subject_type and item["subject_id"] == limit.subject_id and item["period"] == limit.period)
+            if not (
+                item["subject_type"] == limit.subject_type
+                and item["subject_id"] == limit.subject_id
+                and item["period"] == limit.period
+            )
         ]
         data["items"].append(asdict(limit))
         self.store.write("budgets", data)
 
-    def charge(self, subject_type: str, subject_id: str, amount_usd: float, *, period: str = "monthly") -> PolicyDecision:
+    def charge(
+        self, subject_type: str, subject_id: str, amount_usd: float, *, period: str = "monthly"
+    ) -> PolicyDecision:
         data = self.store.read("budgets", {"items": []})
         for item in data["items"]:
-            if item["subject_type"] == subject_type and item["subject_id"] == subject_id and item["period"] == period:
+            if (
+                item["subject_type"] == subject_type
+                and item["subject_id"] == subject_id
+                and item["period"] == period
+            ):
                 projected = float(item["spent_usd"]) + amount_usd
                 if projected > float(item["limit_usd"]):
-                    return PolicyDecision("deny", False, ("budget_hard_limit",), evidence={"projected": projected})
-                if item.get("approval_threshold_usd") and projected > float(item["approval_threshold_usd"]):
-                    return PolicyDecision("require_approval", False, ("budget_approval_threshold",), evidence={"projected": projected})
+                    return PolicyDecision(
+                        "deny", False, ("budget_hard_limit",), evidence={"projected": projected}
+                    )
+                if item.get("approval_threshold_usd") and projected > float(
+                    item["approval_threshold_usd"]
+                ):
+                    return PolicyDecision(
+                        "require_approval",
+                        False,
+                        ("budget_approval_threshold",),
+                        evidence={"projected": projected},
+                    )
                 item["spent_usd"] = projected
                 self.store.write("budgets", data)
-                return PolicyDecision("allow", True, ("budget_available",), evidence={"spent": projected})
+                return PolicyDecision(
+                    "allow", True, ("budget_available",), evidence={"spent": projected}
+                )
         return PolicyDecision("deny", False, ("budget_missing",))
 
 

@@ -1,5 +1,5 @@
 """
-Typed event system for the Nexus execution engine.
+Typed event system for the Noryx execution engine.
 
 Provides structured events emitted during an agent's run lifecycle.
 """
@@ -120,6 +120,8 @@ class WarningEvent(BaseEvent):
 class ErrorEvent(BaseEvent):
     type: EventType = EventType.ERROR
     message: str = ""
+
+
 @dataclass
 class FailureEvent(BaseEvent):
     type: EventType = EventType.ERROR
@@ -127,4 +129,3 @@ class FailureEvent(BaseEvent):
     message: str = ""
     # Additional fields can be added for detailed failure evidence
     # e.g., error_category: FailureKind, raw_output: str, timestamp, etc.
-

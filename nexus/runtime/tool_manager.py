@@ -21,7 +21,6 @@ from nexus.tools import TOOL_DEFINITIONS
 logger = logging.getLogger(__name__)
 
 
-
 class ToolManagerMixin:
     @staticmethod
     def _coerce_capabilities(values: Any) -> frozenset[ToolCapability]:
@@ -81,7 +80,9 @@ class ToolManagerMixin:
             manifest = getattr(plugin, "_manifest", None)
             declared = self._coerce_capabilities(getattr(manifest, "capabilities", ()))
             for definition in plugin.get_tools():
-                function = definition.get("function", definition) if isinstance(definition, dict) else {}
+                function = (
+                    definition.get("function", definition) if isinstance(definition, dict) else {}
+                )
                 name = str(function.get("name", "")) if isinstance(function, dict) else ""
                 if not name:
                     continue
@@ -215,7 +216,6 @@ class ToolManagerMixin:
         name = tc.get("name", "")
         raw_args = tc.get("arguments", "")
 
-
         m_path = re.search(r'"(?:path|file_path|file)"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)', raw_args)
         path_str = m_path.group(1) if m_path else ""
 
@@ -312,4 +312,3 @@ class ToolManagerMixin:
             successes.append(success)
 
         return results, successes
-

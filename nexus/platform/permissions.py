@@ -13,10 +13,10 @@ from typing import Any
 class PermissionScope(str, Enum):
     """Scope of a permission grant."""
 
-    ONCE = "once"           # Single invocation
-    RUN = "run"             # Current agent run
+    ONCE = "once"  # Single invocation
+    RUN = "run"  # Current agent run
     REPOSITORY = "repository"  # Current repository
-    GLOBAL = "global"       # All repositories (requires explicit opt-in)
+    GLOBAL = "global"  # All repositories (requires explicit opt-in)
 
 
 @dataclass
@@ -121,7 +121,8 @@ class PermissionStore:
         before = len(self._grants)
         if capability:
             self._grants = [
-                g for g in self._grants
+                g
+                for g in self._grants
                 if not (g.extension_name == extension_name and g.capability == capability)
             ]
         else:

@@ -1,15 +1,17 @@
 """Tests for SignatureChangeOrchestrator (Sprint 8)."""
+
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 
+import pytest
+
+from nexus.multifile.contracts import CompatibilityPolicy
 from nexus.multifile.signature import (
     ParameterDiff,
     SignatureChange,
     SignatureChangeOrchestrator,
 )
-from nexus.multifile.contracts import CompatibilityPolicy
 
 
 def _write(path: Path, content: str) -> None:
@@ -19,29 +21,41 @@ def _write(path: Path, content: str) -> None:
 
 @pytest.fixture()
 def repo(tmp_path: Path) -> Path:
-    _write(tmp_path / "nexus" / "auth.py", """\
+    _write(
+        tmp_path / "nexus" / "auth.py",
+        """\
 def authenticate(username: str, password: str) -> bool:
     return username == "admin" and password == "secret"
-""")
-    _write(tmp_path / "nexus" / "login.py", """\
+""",
+    )
+    _write(
+        tmp_path / "nexus" / "login.py",
+        """\
 from nexus.auth import authenticate
 
 def login(user, pwd):
     return authenticate(user, pwd)
-""")
-    _write(tmp_path / "nexus" / "admin.py", """\
+""",
+    )
+    _write(
+        tmp_path / "nexus" / "admin.py",
+        """\
 from nexus.auth import authenticate
 
 class AdminPanel:
     def check(self, u, p):
         return authenticate(u, p)
-""")
-    _write(tmp_path / "tests" / "test_auth.py", """\
+""",
+    )
+    _write(
+        tmp_path / "tests" / "test_auth.py",
+        """\
 from nexus.auth import authenticate
 
 def test_authenticate():
     assert authenticate("admin", "secret") is True
-""")
+""",
+    )
     return tmp_path
 
 
@@ -70,9 +84,7 @@ def test_removed_parameter_is_breaking(repo):
         definition_path="nexus/auth.py",
         signature_before="authenticate(username: str, password: str) -> bool",
         signature_after="authenticate(username: str) -> bool",
-        parameter_diffs=[
-            ParameterDiff(kind="REMOVED", name_before="password", breaking=True)
-        ],
+        parameter_diffs=[ParameterDiff(kind="REMOVED", name_before="password", breaking=True)],
     )
     policy = change.assess_compatibility()
     assert policy == CompatibilityPolicy.EXPLICIT_BREAKING
@@ -87,9 +99,7 @@ def test_renamed_parameter_inventory(repo):
         definition_path="nexus/auth.py",
         signature_before="authenticate(username, password)",
         signature_after="authenticate(user, password)",
-        parameter_diffs=[
-            ParameterDiff(kind="RENAMED", name_before="username", name_after="user")
-        ],
+        parameter_diffs=[ParameterDiff(kind="RENAMED", name_before="username", name_after="user")],
     )
     impact = orchestrator.inventory(change)
     assert impact.callers  # should find nexus/login.py and nexus/admin.py
@@ -110,13 +120,15 @@ def test_caller_not_updated_detected(repo):
     # Planned paths only include the definition, not the callers
     impact = orchestrator.inventory(change, planned_paths=["nexus/auth.py"])
     assert impact.stale_callers
-    assert any(w for w in impact.warnings if "stale" in w.lower() or "not in" in w.lower() or "NOT in" in w)
+    assert any(
+        w for w in impact.warnings if "stale" in w.lower() or "not in" in w.lower() or "NOT in" in w
+    )
 
 
 def test_interface_implementation_found(repo):
     """Abstract method rename: implementations are in the inventory."""
     orchestrator = SignatureChangeOrchestrator(repo)
-    impact = orchestrator.inventory(
+    orchestrator.inventory(
         SignatureChange(
             symbol="authenticate",
             definition_path="nexus/auth.py",

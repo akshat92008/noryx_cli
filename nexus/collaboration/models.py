@@ -14,8 +14,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence, Tuple
-
+from typing import Any, Mapping, Optional, Tuple
 
 from nexus.routing.models import ModelTier
 
@@ -264,9 +263,11 @@ class AgentAssignment:
     acceptance_criteria: Tuple[str, ...] = ()
     expected_deliverables: Tuple[str, ...] = ()
     allowed_tools: Tuple[str, ...] = ()
-    model_requirements: Dict[str, Any] = field(default_factory=dict)
+    model_requirements: dict[str, Any] = field(default_factory=dict)
     model_id: Optional[str] = None
-    budget: WorkerBudget = field(default_factory=lambda: WorkerBudget(10, 20, 50000, Decimal("1.00"), 300))
+    budget: WorkerBudget = field(
+        default_factory=lambda: WorkerBudget(10, 20, 50000, Decimal("1.00"), 300)
+    )
     timeout_seconds: int = 300
     retry_limit: int = 2
     is_optional: bool = False
@@ -573,7 +574,9 @@ class CollaborationRunState:
         calls = sum(r.cost.model_calls for r in self.worker_results.values())
         tools = sum(r.cost.tool_calls for r in self.worker_results.values())
         tokens = sum(r.cost.tokens_used for r in self.worker_results.values())
-        costs = [r.cost.cost_usd for r in self.worker_results.values() if r.cost.cost_usd is not None]
+        costs = [
+            r.cost.cost_usd for r in self.worker_results.values() if r.cost.cost_usd is not None
+        ]
         total_cost = sum(costs, Decimal("0")) if costs else None
         wall = sum(r.cost.wall_clock_seconds for r in self.worker_results.values())
         return ResourceUsage(

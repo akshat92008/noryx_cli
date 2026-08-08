@@ -52,27 +52,26 @@ def print_banner():
 [bold #00f0ff]█▀███████▀█[/]
 [bold #00f0ff]█ [bold #fbbf24]█▀   ▀█[/] █[/]
   [bold #d946ef]▀▀   ▀▀[/]  
-"""
+""",
     ]
-    
-    welcome_text = "Welcome to Nexus!"
-    
+
+    welcome_text = "Welcome to Noryx!"
+
     with Live(refresh_per_second=15, transient=False, console=console) as live:
         for i in range(12):
             frame_idx = i % 2
-            
+
             # Typewriter effect for welcome text
             text_len = min(len(welcome_text), int((i / 8) * len(welcome_text)))
             current_text = welcome_text[:text_len]
-            
+
             output = frames[frame_idx] + f"\n[bold white]{current_text}[/]"
             live.update(Align.center(Text.from_markup(output)))
             time.sleep(0.06)
-            
+
         # Final state
         final_output = (
-            frames[0] + 
-            f"\n[bold white]{welcome_text}[/]\n\n"
+            frames[0] + f"\n[bold white]{welcome_text}[/]\n\n"
             f"[dim]Run /help for commands. /status for setup info.[/]\n"
         )
         live.update(Align.center(Text.from_markup(final_output)))
@@ -154,13 +153,13 @@ def print_help():
         ("/verify project", "Run real workspace lint/test/build commands"),
         ("/permissions <mode>", "Set default, acceptEdits, or read-only plan mode"),
         ("/trust [approve|reject] <path>", "Review and approve an exact config digest"),
-        ("/init", "Create a project NEXUS.md instructions file"),
+        ("/init", "Create a project NORYX.md instructions file"),
         ("/context", "Show architecture and active context summaries"),
         ("/plan", "Enter read-only plan mode"),
         ("/mcp", "List connected Model Context Protocol servers"),
         ("/plugins", "List loaded plugins and extensions"),
-        ("/rules", "Display project instructions loaded from NEXUS.md"),
-        ("/exit, /quit", "Close session and exit NexusAI"),
+        ("/rules", "Display project instructions loaded from NORYX.md"),
+        ("/exit, /quit", "Close session and exit Noryx"),
     ]
     for cmd, desc in commands:
         table.add_row(cmd, desc)
@@ -218,8 +217,8 @@ def print_tools_table():
         ("repo_models", "RepoGraph", "Discover database and ORM models"),
         ("repo_navigate", "Language Intel", "Use LSP, Tree-sitter, or RepoGraph navigation"),
         ("run_process", "Sandbox", "Run a typed argv command without a shell"),
-        ("process_status", "Sandbox", "Poll a Nexus-managed background process"),
-        ("process_stop", "Sandbox", "Stop a Nexus-managed background process"),
+        ("process_status", "Sandbox", "Poll a Noryx-managed background process"),
+        ("process_stop", "Sandbox", "Stop a Noryx-managed background process"),
         ("api_check", "Verification", "Validate a local HTTP API contract"),
         ("database_check", "Verification", "Validate SQLite integrity and foreign keys"),
         ("security_scan", "Verification", "Run bounded deterministic security checks"),
@@ -306,7 +305,7 @@ def print_models_table():
         )
     console.print(
         f"  [{DIM}]🔒 = native sandbox required (bubblewrap on Linux / sandbox-exec on macOS). "
-        "Run [bold]nexus --doctor[/] to check your sandbox status.[/]"
+        "Run [bold]noryx --doctor[/] to check your sandbox status.[/]"
     )
     console.print()
 

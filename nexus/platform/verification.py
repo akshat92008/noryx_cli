@@ -25,15 +25,17 @@ class PackageVerifier:
     """Verify extension package integrity and safety."""
 
     ALLOWED_EXTENSIONS = frozenset({".py", ".json", ".md", ".txt", ".yaml", ".yml"})
-    FORBIDDEN_PATTERNS = frozenset({
-        "__pycache__",
-        ".git",
-        ".env",
-        "credentials",
-        "secret",
-        ".pem",
-        ".key",
-    })
+    FORBIDDEN_PATTERNS = frozenset(
+        {
+            "__pycache__",
+            ".git",
+            ".env",
+            "credentials",
+            "secret",
+            ".pem",
+            ".key",
+        }
+    )
     MAX_PACKAGE_BYTES = 50 * 1024 * 1024  # 50 MB
     MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB per file
 

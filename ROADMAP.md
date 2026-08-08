@@ -1,47 +1,47 @@
-# Nexus roadmap
+# Noryx roadmap
 
-## Nexus 3.7.0 Cognitive Reliability milestone
+## Noryx 3.7.0 Cognitive Reliability milestone
 
 Implemented locally: hypothesis-driven deliberation, graph-propagated context selection, enforceable multi-file completion, evidence-delta recovery, blind duel infrastructure, behavioral sandbox qualification, and shared-process lifecycle cleanup.
 
 Promotion gates still external: execute at least 50 private unseen matched tasks against a real Claude Code installation and a same-model minimal harness; publish signed Linux/macOS/Windows sandbox artifacts; demonstrate repeatability, bounded intervention, cost, latency, regression, and false-success thresholds.
 
-## Nexus 3.6.0 Truth Integrity milestone
+## Noryx 3.6.0 Truth Integrity milestone
 
 The P0 correctness contract is implemented: no stale repository cache reuse, no prose-based acceptance, no unsupported scope expansion, typed user prohibitions, authenticated engineering state, optimistic concurrency, and executable installed-artifact reliability evidence.
 
 The next milestone is external performance qualification rather than another governance subsystem: hidden real-provider tasks, cross-platform execution, repeatability, and blind matched comparisons. Autonomous production remains blocked until those thresholds are met.
 
 
-## Nexus 3.5.0 Engineering Brain milestone
+## Noryx 3.5.0 Engineering Brain milestone
 
 - Enforce repository-aware task contracts before mutation.
 - Preserve authenticated task, phase, and failure state plus corruption-evident change logs across long runs.
 - Make surgical scope and semantic acceptance runtime authorities beneath the model.
-- Compare identical models directly versus Nexus before making uplift claims.
+- Compare identical models directly versus Noryx before making uplift claims.
 - Keep release-candidate and parity promotion blocked until real-provider and cross-platform evidence passes.
 
-# Nexus CLI product contract and roadmap
+# Noryx CLI product contract and roadmap
 
 Updated: 2026-08-06
 
 ## North star
 
-Nexus CLI is an open-source, multi-provider coding CLI focused on verification, worktree safety, and extensibility.
+Noryx CLI is an open-source, multi-provider coding CLI focused on verification, worktree safety, and extensibility.
 
 The long-term product promise is:
 
-> Give Nexus a goal. Nexus understands the repository, creates a plan,
+> Give Noryx a goal. Noryx understands the repository, creates a plan,
 > implements the change, verifies the result, repairs failures, and returns a
 > reviewable working diff.
 
-Nexus is the product. Nova V11 is one low-cost local execution worker within
+Noryx is the product. Nova V11 is one low-cost local execution worker within
 the product. Hosted models may plan, review, or handle difficult subtasks, but
 no model is the source of truth.
 
 ## Non-negotiable engineering principles
 
-1. **Models propose; Nexus verifies.** The repository, compiler, tests, static
+1. **Models propose; Noryx verifies.** The repository, compiler, tests, static
    analysis, and runtime evidence determine success.
 2. **No success without evidence.** Generated code alone is never a verified
    result.
@@ -58,7 +58,7 @@ no model is the source of truth.
 ## Version 3.8 implementation boundary
 
 `Implemented` means the package contains the behavior and deterministic tests
-exercise its critical path. `Host-dependent` means Nexus contains the adapter
+exercise its critical path. `Host-dependent` means Noryx contains the adapter
 and correctly reports availability, but the external compiler, language
 server, browser, service, database, credentials, or sandbox must exist on the
 machine. No unavailable adapter is presented as verified.
@@ -79,7 +79,7 @@ machine. No unavailable adapter is presented as verified.
 | Recovery | Implemented | Canonical state, verified checkpoints, task-aware continuation, inspection, replay, and rollback commands |
 | Repository intelligence | Implemented / host-dependent | Persistent RepoGraph plus routes, models, config, ownership, Git relevance, LSP clients, Tree-sitter fallback, and task-local context |
 | Extensions | Implemented | Versioned provider/tool/policy protocols, skills, hooks, plugins, subagents, and stdio MCP |
-| Headless operation | Implemented | `nexus run`, JSON/JSONL, CI policy preset, meaningful process status, and diagnostics |
+| Headless operation | Implemented | `noryx run`, JSON/JSONL, CI policy preset, meaningful process status, and diagnostics |
 | Web interface | Implemented | Loopback-only Starlette/WebSocket UI with automatic workspace and sensitive-file controls |
 | Cost controls | Implemented | Separate logical hosted-call and physical provider-attempt ceilings, token and configured-currency limits, plus attempt-level persisted usage reports |
 | Run contract and final report | Implemented | Complete canonical artifact layout and transparent objective, checks, permissions, network, provider, cost, assumption, and risk fields |
@@ -170,7 +170,7 @@ Required capabilities:
 - return a working diff plus evidence and remaining risks.
 
 This phase does not mean one model generates an application in one response.
-Nexus manages a checkpointed software-development lifecycle across models and
+Noryx manages a checkpointed software-development lifecycle across models and
 deterministic tools.
 
 Version 3.0 supplies that lifecycle, including API, database, browser, security,
@@ -180,7 +180,7 @@ visible in the final report.
 
 ## Phase 5 — Platform ecosystem
 
-Objective: make Nexus an extensible engineering platform.
+Objective: make Noryx an extensible engineering platform.
 
 Required capabilities:
 
@@ -230,7 +230,7 @@ registry outages, or skipped checks into a false success.
 
 ## Reliability and benchmark targets
 
-Nexus will optimize for:
+Noryx will optimize for:
 
 - verified task-completion rate;
 - regression-free completion rate;
@@ -245,11 +245,11 @@ Nexus will optimize for:
 
 The primary KPI is:
 
-> How often does Nexus declare success when every acceptance criterion is
+> How often does Noryx declare success when every acceptance criterion is
 > genuinely satisfied?
 
 The false-success rate should approach zero. Public capability claims must be
-tied to a Nexus version and reproducible evidence.
+tied to a Noryx version and reproducible evidence.
 
 ## End-state flow
 
@@ -269,7 +269,7 @@ Automatic testing and repair
 Verified working result
 ```
 
-This contract describes the integrated Nexus 3.0 runtime. It is not a claim
+This contract describes the integrated Noryx 3.0 runtime. It is not a claim
 that external models, compilers, browsers, services, or deployment platforms
 are present, nor that every broad prompt succeeds. Current measured behavior
 and all host-dependent boundaries remain documented in

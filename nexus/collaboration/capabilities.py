@@ -20,6 +20,7 @@ from nexus.collaboration.models import (
 # Default capability profiles
 # ---------------------------------------------------------------------------
 
+
 def _default_profiles() -> Dict[AgentRole, AgentCapabilityProfile]:
     return {
         AgentRole.PLANNER: AgentCapabilityProfile(
@@ -27,8 +28,13 @@ def _default_profiles() -> Dict[AgentRole, AgentCapabilityProfile]:
             supported_task_types=("planning", "orchestration", "review", "finalization"),
             supported_languages=("*",),
             allowed_tool_capabilities=(
-                "read_file", "write_file", "run_command", "search_code",
-                "transaction_gateway", "approve", "verify",
+                "read_file",
+                "write_file",
+                "run_command",
+                "search_code",
+                "transaction_gateway",
+                "approve",
+                "verify",
             ),
             mutation_allowed=True,
             maximum_risk_level=RiskLevel.CRITICAL,
@@ -62,7 +68,11 @@ def _default_profiles() -> Dict[AgentRole, AgentCapabilityProfile]:
             supported_task_types=("implementation", "refactoring", "bug_fix"),
             supported_languages=("python", "javascript", "typescript", "go", "rust"),
             allowed_tool_capabilities=(
-                "read_file", "write_file", "run_command", "search_code", "transaction_gateway",
+                "read_file",
+                "write_file",
+                "run_command",
+                "search_code",
+                "transaction_gateway",
             ),
             mutation_allowed=True,
             maximum_risk_level=RiskLevel.HIGH,
@@ -80,7 +90,11 @@ def _default_profiles() -> Dict[AgentRole, AgentCapabilityProfile]:
             supported_task_types=("test_writing", "test_discovery", "coverage_analysis"),
             supported_languages=("python", "javascript", "typescript"),
             allowed_tool_capabilities=(
-                "read_file", "write_file", "run_command", "search_code", "transaction_gateway",
+                "read_file",
+                "write_file",
+                "run_command",
+                "search_code",
+                "transaction_gateway",
             ),
             mutation_allowed=True,
             maximum_risk_level=RiskLevel.LOW,
@@ -184,7 +198,9 @@ class AgentCapabilityRegistry:
         profile = self.get_profile(role)
         if not profile:
             return False
-        task_ok = ("*" in profile.supported_task_types) or (task_type in profile.supported_task_types)
+        task_ok = ("*" in profile.supported_task_types) or (
+            task_type in profile.supported_task_types
+        )
         lang_ok = ("*" in profile.supported_languages) or (language in profile.supported_languages)
         return task_ok and lang_ok
 
@@ -195,14 +211,26 @@ class AgentCapabilityRegistry:
         profile = self.get_profile(role)
         if not profile:
             return False
-        return ("*" in profile.allowed_tool_capabilities) or (tool_name in profile.allowed_tool_capabilities)
+        return ("*" in profile.allowed_tool_capabilities) or (
+            tool_name in profile.allowed_tool_capabilities
+        )
 
-    def validate_assignment_role(self, role: AgentRole, task_type: str, requires_mutation: bool = False) -> tuple[bool, str]:
+    def validate_assignment_role(
+        self, role: AgentRole, task_type: str, requires_mutation: bool = False
+    ) -> tuple[bool, str]:
         profile = self.get_profile(role)
         if not profile:
             return False, f"Role {role} is not registered"
-        if ("*" not in profile.supported_task_types) and (task_type not in profile.supported_task_types):
-            return False, f"Role {role.value if hasattr(role, 'value') else role} does not support task type {task_type}"
+        if ("*" not in profile.supported_task_types) and (
+            task_type not in profile.supported_task_types
+        ):
+            return (
+                False,
+                f"Role {role.value if hasattr(role, 'value') else role} does not support task type {task_type}",
+            )
         if requires_mutation and not profile.mutation_allowed:
-            return False, f"Role {role.value if hasattr(role, 'value') else role} does not allow mutation"
+            return (
+                False,
+                f"Role {role.value if hasattr(role, 'value') else role} does not allow mutation",
+            )
         return True, ""

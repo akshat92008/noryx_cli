@@ -34,6 +34,7 @@ class TestSandboxBackendProbe:
         if _SYSTEM != "linux":
             pytest.skip("Linux-only assertion")
         import shutil
+
         runner = SandboxRunner(tmp_path)
         backend = runner.backend()
         if shutil.which("bwrap"):
@@ -216,7 +217,10 @@ class TestWorkspaceBoundary:
         )
         result = runner.run(spec)
         assert result.backend == SandboxBackend.BLOCKED
-        assert "outside" in result.blocked_reason.lower() or "workspace" in result.blocked_reason.lower()
+        assert (
+            "outside" in result.blocked_reason.lower()
+            or "workspace" in result.blocked_reason.lower()
+        )
 
     def test_nonexistent_cwd_is_blocked(self, tmp_path):
         runner = SandboxRunner(tmp_path)

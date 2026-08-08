@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Generate the Nexus direct-dependency SPDX SBOM from pyproject.toml."""
+"""Generate the Noryx runtime SPDX SBOM from the qualified dependency lock."""
 
 from __future__ import annotations
 
 import argparse
 import sys
-import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,8 +15,12 @@ from nexus.sbom import write_spdx_sbom
 
 
 def runtime_dependencies(root: Path = ROOT) -> list[str]:
-    payload = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
-    return [str(item) for item in payload.get("project", {}).get("dependencies", [])]
+    lock = root / "requirements.lock"
+    return [
+        line.strip()
+        for line in lock.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith(("#", "-"))
+    ]
 
 
 def main() -> int:

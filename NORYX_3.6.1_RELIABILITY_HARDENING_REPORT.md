@@ -1,12 +1,12 @@
-# Nexus CLI 3.6.1 Reliability Hardening Report
+# Noryx CLI 3.6.1 Reliability Hardening Report
 
 Release date: 2026-08-06  
-Source baseline: Nexus CLI 3.6.0 Truth Integrity Production Preview  
+Source baseline: Noryx CLI 3.6.0 Truth Integrity Production Preview  
 Release classification: supervised, isolated Verified Repair candidate
 
 ## Executive decision
 
-Nexus 3.6.1 closes the independently identified canonical tool-dispatch, false-success, command-mutation, rollback, and planner/tool-contract defects in the 3.6.0 preview. The repaired runtime now uses structured execution truth and content-addressed command transactions through the normal Agent boundary.
+Noryx 3.6.1 closes the independently identified canonical tool-dispatch, false-success, command-mutation, rollback, and planner/tool-contract defects in the 3.6.0 preview. The repaired runtime now uses structured execution truth and content-addressed command transactions through the normal Agent boundary.
 
 This release materially improves reliability, but it does **not** claim that orchestration alone has produced Claude Code-equivalent model intelligence. That claim remains blocked until blind hidden-repository trials demonstrate competitive verified completion, low false-success rates, and low human intervention using comparable models and budgets.
 
@@ -44,13 +44,13 @@ The union diff detects:
 - file/symlink type transitions;
 - symlink-target changes.
 
-Nexus internal state and preimage storage are excluded even when `NEXUS_HOME` is nested inside the working directory.
+Noryx internal state and preimage storage are excluded even when `NEXUS_HOME` is nested inside the working directory.
 
 ### 4. Transactional failed-command rollback
 
-A synchronous command now starts only after Nexus can establish a complete bounded pre-command file/symlink snapshot. Unreadable directory enumeration fails closed instead of silently producing a partial journal. Every transaction uses a collision-resistant UUID.
+A synchronous command now starts only after Noryx can establish a complete bounded pre-command file/symlink snapshot. Unreadable directory enumeration fails closed instead of silently producing a partial journal. Every transaction uses a collision-resistant UUID.
 
-If the command fails after mutating the workspace, Nexus validates every stored preimage before touching the live tree, restores the complete tracked snapshot as one transaction, and verifies the resulting digest tree. The transaction handles simultaneous creation, modification, and deletion, including a file being replaced by a directory. History metadata is committed atomically in one batch; transaction entries are removed only after independent rollback verification succeeds.
+If the command fails after mutating the workspace, Noryx validates every stored preimage before touching the live tree, restores the complete tracked snapshot as one transaction, and verifies the resulting digest tree. The transaction handles simultaneous creation, modification, and deletion, including a file being replaced by a directory. History metadata is committed atomically in one batch; transaction entries are removed only after independent rollback verification succeeds.
 
 Snapshot limits fail closed and are configurable through:
 
@@ -101,7 +101,7 @@ Canonical planning now:
 
 ## Qualification evidence
 
-The final source tree is qualified using test-module process isolation because Nexus deliberately exercises provider registries, subprocesses, background workers, servers, environment state, and extension registries. This prevents one module's global state from creating either a false green or a false red in later modules.
+The final source tree is qualified using test-module process isolation because Noryx deliberately exercises provider registries, subprocesses, background workers, servers, environment state, and extension registries. This prevents one module's global state from creating either a false green or a false red in later modules.
 
 The process-isolated gate records module outcomes, test totals, runtime, the source-tree SHA-256 before and after qualification, and whether the qualified tree remained stable. Exact final values are recorded in `release_evidence/isolated-pytest-3.6.1.json` and the delivery manifest. The release also requires:
 
@@ -110,7 +110,7 @@ The process-isolated gate records module outcomes, test totals, runtime, the sou
 - targeted canonical boundary tests;
 - source distribution and wheel builds;
 - clean installed-wheel import of every packaged module;
-- installed `nexus --version` and `nexus --doctor` smoke tests;
+- installed `noryx --version` and `noryx --doctor` smoke tests;
 - SHA-256 manifests for all delivered artifacts.
 
 ## Operational boundary
@@ -136,4 +136,4 @@ The runtime integrity blockers from the audits are closed. Remaining parity work
 - cross-platform native-sandbox qualification;
 - demonstrated low false-success and low human-intervention rates.
 
-Nexus 3.6.1 should therefore be described as a hardened, model-agnostic engineering runtime and supervised Verified Repair candidate—not as proven Claude Code parity.
+Noryx 3.6.1 should therefore be described as a hardened, model-agnostic engineering runtime and supervised Verified Repair candidate—not as proven Claude Code parity.

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
 from pathlib import Path
+from typing import Any, Dict
+
 from nexus.events import EventBus, EventType
 from nexus.intelligence.repository.engine import RepositoryIntelligence
 
@@ -34,6 +35,9 @@ class ContextSelector:
             EventType.CONTEXT_SELECTED,
             run_id="global",
             component="ContextSelector",
-            metadata={"items_found": len(context_data["relevant_files"]), "intent": bundle.task_intent.value},
+            metadata={
+                "items_found": len(context_data["relevant_files"]),
+                "intent": bundle.task_intent.value,
+            },
         )
         return context_data

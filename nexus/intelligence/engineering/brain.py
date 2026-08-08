@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
+from nexus.intelligence.deliberation import DeliberationCompiler, DeliberationContract
+from nexus.intelligence.engineering.constraints import ConstraintCompiler
 from nexus.intelligence.engineering.failure_learning import FailureLearningStore, FailureLesson
 from nexus.intelligence.engineering.long_horizon import LongHorizonController
 from nexus.intelligence.engineering.memory import (
@@ -18,7 +20,6 @@ from nexus.intelligence.engineering.memory import (
     EngineeringMemoryStore,
     EngineeringTaskMemory,
 )
-from nexus.intelligence.engineering.constraints import ConstraintCompiler
 from nexus.intelligence.engineering.scope import (
     ScopeDecision,
     ScopeEvidenceType,
@@ -30,7 +31,6 @@ from nexus.intelligence.repository.engine import RepositoryIntelligence
 from nexus.intelligence.repository.evidence import FailureEvidenceExtractor
 from nexus.intelligence.repository.model import ContextBundle
 from nexus.intelligence.repository.snapshot import workspace_revision
-from nexus.intelligence.deliberation import DeliberationCompiler, DeliberationContract
 from nexus.intelligence.task_profiles import TaskProfile, TaskProfiler
 from nexus.multifile.ledger import CompletionLedger
 from nexus.multifile.orchestrator import (
@@ -38,7 +38,6 @@ from nexus.multifile.orchestrator import (
     MultiFileCompletionContract,
     MultiFileOrchestrator,
 )
-
 
 _RISK_TERMS = {
     "critical": ("credential", "encryption", "payment", "billing", "authorization", "supply chain"),
@@ -73,8 +72,6 @@ def _risk_level(objective: str) -> str:
     return "medium"
 
 
-
-
 def _explicit_paths(objective: str) -> list[str]:
     """Extract user-named repository paths, including files that do not exist yet."""
     candidates = re.findall(
@@ -83,6 +80,7 @@ def _explicit_paths(objective: str) -> list[str]:
         flags=re.IGNORECASE,
     )
     return list(dict.fromkeys(item.strip("`'\"") for item in candidates if item.strip()))
+
 
 def _extract_non_goals(objective: str) -> list[str]:
     matches = re.findall(r"(?:do not|don't|without)\s+([^.;\n]+)", objective, flags=re.IGNORECASE)
@@ -144,7 +142,9 @@ class EngineeringBrain:
         task_type = self.task_profile.legacy_task_type
         risk_order = {"low": 0, "medium": 1, "high": 2, "critical": 3}
         keyword_risk = _risk_level(objective)
-        risk = max((self.task_profile.risk_level, keyword_risk), key=lambda item: risk_order.get(item, 1))
+        risk = max(
+            (self.task_profile.risk_level, keyword_risk), key=lambda item: risk_order.get(item, 1)
+        )
         max_files = min(64, self.task_profile.max_files + (8 if strict else 0))
         max_tokens = min(128_000, self.task_profile.max_tokens + (16_000 if strict else 0))
         bundle = self.repository.context_bundle(
@@ -155,27 +155,38 @@ class EngineeringBrain:
             candidate_multiplier=5 if self.task_profile.max_graph_hops >= 5 else 4,
         )
         compilation = ConstraintCompiler.compile(objective)
-        decisive_candidates = list(dict.fromkeys([
-            *(item.path for item in bundle.files),
-            *_explicit_paths(objective),
-        ]))
+        decisive_candidates = list(
+            dict.fromkeys(
+                [
+                    *(item.path for item in bundle.files),
+                    *_explicit_paths(objective),
+                ]
+            )
+        )
         decisive = ConstraintCompiler.remove_forbidden(decisive_candidates, compilation)
         related_tests = list(dict.fromkeys(item.test_file for item in bundle.tests))
         callers: dict[str, list[str]] = {}
         symbol_limit = 40 if self.task_profile.max_graph_hops >= 5 else 16
         caller_limit = 250 if self.task_profile.max_graph_hops >= 5 else 40
         for symbol in bundle.symbols[:symbol_limit]:
-            paths = [item["path"] for item in self.repository.find_callers(symbol.name, limit=caller_limit)]
+            paths = [
+                item["path"]
+                for item in self.repository.find_callers(symbol.name, limit=caller_limit)
+            ]
             if paths:
                 callers[symbol.name] = paths
         architecture_constraints = [
             f"Respect {item.layer_name} boundary ({len(item.files)} files)"
             for item in bundle.constraints
         ]
-        non_goals = list(dict.fromkeys([
-            *_extract_non_goals(objective),
-            *(item.source_text for item in compilation.constraints),
-        ]))
+        non_goals = list(
+            dict.fromkeys(
+                [
+                    *_extract_non_goals(objective),
+                    *(item.source_text for item in compilation.constraints),
+                ]
+            )
+        )
         self.scope_guard = SurgicalScopeGuard.from_repository_context(
             self.root,
             objective=objective,
@@ -218,15 +229,16 @@ class EngineeringBrain:
             task_type=task_type,
             decisive_files=list(self.scope_guard.contract.allowed_files),
             related_tests=[
-                path for path in related_tests
-                if path in self.scope_guard.contract.allowed_files
+                path for path in related_tests if path in self.scope_guard.contract.allowed_files
             ],
             callers=callers,
             non_goals=non_goals,
             risk_level=risk,
         )
         allowed_decisive = list(self.scope_guard.contract.allowed_files)
-        allowed_tests = [path for path in related_tests if path in self.scope_guard.contract.allowed_files]
+        allowed_tests = [
+            path for path in related_tests if path in self.scope_guard.contract.allowed_files
+        ]
         caller_paths = list(dict.fromkeys(path for paths in callers.values() for path in paths))
         self.deliberation = DeliberationCompiler.compile(
             objective,
@@ -254,11 +266,15 @@ class EngineeringBrain:
             profile=self.task_profile,
         )
         critic["task_profile"] = self.task_profile.to_dict()
-        critic["required_steps"] = list(dict.fromkeys([
-            *critic.get("required_steps", []),
-            *self.task_profile.required_investigations,
-            *self.task_profile.verification_layers,
-        ]))
+        critic["required_steps"] = list(
+            dict.fromkeys(
+                [
+                    *critic.get("required_steps", []),
+                    *self.task_profile.required_investigations,
+                    *self.task_profile.verification_layers,
+                ]
+            )
+        )
         self._inspected_files.clear()
         self._verified_files.clear()
         self.memory = self.memory_store.create(
@@ -271,8 +287,7 @@ class EngineeringBrain:
             non_goals=non_goals,
             decisive_files=list(self.scope_guard.contract.allowed_files),
             related_tests=[
-                path for path in related_tests
-                if path in self.scope_guard.contract.allowed_files
+                path for path in related_tests if path in self.scope_guard.contract.allowed_files
             ],
         )
         self.long_horizon = LongHorizonController(self.root, task_id, objective)
@@ -284,8 +299,7 @@ class EngineeringBrain:
             repository_tree_hash=bundle.repository_tree_hash,
             decisive_files=list(self.scope_guard.contract.allowed_files),
             related_tests=[
-                path for path in related_tests
-                if path in self.scope_guard.contract.allowed_files
+                path for path in related_tests if path in self.scope_guard.contract.allowed_files
             ],
             callers=callers,
             architecture_constraints=architecture_constraints,
@@ -348,11 +362,13 @@ class EngineeringBrain:
             dict.fromkeys([*self.contract.decisive_files, *expanded_paths])
         )
         self.contract.related_tests = list(
-            dict.fromkeys([
-                *self.contract.related_tests,
-                *(item.test_file for item in expanded.tests),
-                *signals.tests,
-            ])
+            dict.fromkeys(
+                [
+                    *self.contract.related_tests,
+                    *(item.test_file for item in expanded.tests),
+                    *signals.tests,
+                ]
+            )
         )
 
         # Runtime paths are eligible for scope expansion only when they were
@@ -379,7 +395,9 @@ class EngineeringBrain:
             if evidence_type is None:
                 continue
             evidence_id = hashlib.sha256(
-                f"runtime:{revision}:{evidence_type.value}:{path}:{signals.raw_excerpt}".encode("utf-8")
+                f"runtime:{revision}:{evidence_type.value}:{path}:{signals.raw_excerpt}".encode(
+                    "utf-8"
+                )
             ).hexdigest()
             scope_evidence = ScopeExpansionEvidence(
                 evidence_type=evidence_type,
@@ -387,7 +405,7 @@ class EngineeringBrain:
                 evidence_id=f"runtime:{evidence_id[:24]}",
                 source_revision=revision,
                 details=(
-                    "Path was extracted by Nexus from deterministic runtime verification "
+                    "Path was extracted by Noryx from deterministic runtime verification "
                     "or compiler output and confirmed in the repository index."
                 ),
             )
@@ -438,25 +456,31 @@ class EngineeringBrain:
             "review the final diff against the objective and non-goals",
         ]
         if not decisive_files:
-            blocking.append("No decisive repository files were established; mutation must wait for context expansion.")
+            blocking.append(
+                "No decisive repository files were established; mutation must wait for context expansion."
+            )
         if task_type in {"bug_repair", "security_remediation"} and not related_tests:
-            warnings.append("No related test was discovered; add or identify a behavioral acceptance check.")
+            warnings.append(
+                "No related test was discovered; add or identify a behavioral acceptance check."
+            )
         if risk_level in {"high", "critical"}:
             required_steps.append("run a bounded security or architecture-specific check")
         if not callers:
-            warnings.append("No callers were identified; explicitly search interfaces before changing a public symbol.")
+            warnings.append(
+                "No callers were identified; explicitly search interfaces before changing a public symbol."
+            )
         if non_goals:
             required_steps.append("prove prohibited areas remained unchanged")
         return {
-            "decision": "REVISE" if blocking else ("APPROVE_WITH_WARNINGS" if warnings else "APPROVE"),
+            "decision": "REVISE"
+            if blocking
+            else ("APPROVE_WITH_WARNINGS" if warnings else "APPROVE"),
             "blocking_issues": blocking,
             "warnings": warnings,
             "required_steps": required_steps,
         }
 
-    def _derive_scope_evidence(
-        self, paths: Iterable[str | Path]
-    ) -> list[ScopeExpansionEvidence]:
+    def _derive_scope_evidence(self, paths: Iterable[str | Path]) -> list[ScopeExpansionEvidence]:
         """Derive scope expansion from the current content-hashed repository graph."""
         if self.scope_guard is None:
             return []
@@ -525,9 +549,14 @@ class EngineeringBrain:
 
         Model-provided tool arguments are deliberately not a trust source.  Human
         approval must arrive through the confirmation subsystem, and repository
-        evidence must be generated or revalidated by Nexus itself.
+        evidence must be generated or revalidated by Noryx itself.
         """
-        if trusted_source not in {"repository_index", "verification_engine", "compiler", "human_confirmation"}:
+        if trusted_source not in {
+            "repository_index",
+            "verification_engine",
+            "compiler",
+            "human_confirmation",
+        }:
             raise ValueError(f"Untrusted scope-evidence source: {trusted_source}")
         current_revision = __import__(
             "nexus.intelligence.repository.snapshot",
@@ -553,16 +582,10 @@ class EngineeringBrain:
                 # Outside-scope files are validated by repository evidence first.
                 # Capture their current content as the expansion precondition.
                 self._expected_file_hashes[relative] = (
-                    hashlib.sha256(target.read_bytes()).hexdigest()
-                    if target.is_file()
-                    else None
+                    hashlib.sha256(target.read_bytes()).hexdigest() if target.is_file() else None
                 )
                 continue
-            current = (
-                hashlib.sha256(target.read_bytes()).hexdigest()
-                if target.is_file()
-                else None
-            )
+            current = hashlib.sha256(target.read_bytes()).hexdigest() if target.is_file() else None
             if current != expected:
                 return (
                     f"Concurrent modification detected for {relative}: repository content "
@@ -608,7 +631,6 @@ class EngineeringBrain:
             reason=reason,
         )
 
-
     def _relative_path(self, path: str | Path) -> str:
         target = Path(path)
         if not target.is_absolute():
@@ -622,15 +644,21 @@ class EngineeringBrain:
         normalized = [self._relative_path(path) for path in paths]
         self._inspected_files.update(normalized)
         if self.completion_ledger is not None:
-            self.completion_ledger.record("inspect", normalized, "Repository file inspected by runtime.")
+            self.completion_ledger.record(
+                "inspect", normalized, "Repository file inspected by runtime."
+            )
 
     def record_verified_files(self, paths: Iterable[str | Path]) -> None:
         normalized = [self._relative_path(path) for path in paths]
         self._verified_files.update(normalized)
         if self.completion_ledger is not None:
-            self.completion_ledger.record("verify", normalized, "Verification evidence recorded by runtime.")
+            self.completion_ledger.record(
+                "verify", normalized, "Verification evidence recorded by runtime."
+            )
 
-    def completion_assessment(self, changed_files: Iterable[str | Path]) -> CompletionAssessment | None:
+    def completion_assessment(
+        self, changed_files: Iterable[str | Path]
+    ) -> CompletionAssessment | None:
         if self.completion_contract is None:
             return None
         normalized = [self._relative_path(path) for path in changed_files]
@@ -641,27 +669,38 @@ class EngineeringBrain:
         )
         if self.completion_ledger is None:
             return assessment
-        self.completion_ledger.record("change", normalized, "File content changed in the active transaction.")
+        self.completion_ledger.record(
+            "change", normalized, "File content changed in the active transaction."
+        )
         ledger = self.completion_ledger.assess()
         if ledger.complete:
             return assessment
         unresolved_inspection = {
-            item.path for item in self.completion_ledger.obligations.values()
+            item.path
+            for item in self.completion_ledger.obligations.values()
             if item.blocking and item.state.value == "pending" and item.action == "inspect"
         }
         unresolved_changes = {
-            item.path for item in self.completion_ledger.obligations.values()
+            item.path
+            for item in self.completion_ledger.obligations.values()
             if item.blocking and item.state.value == "pending" and item.action == "change"
         }
         unresolved_verification = {
-            item.path for item in self.completion_ledger.obligations.values()
+            item.path
+            for item in self.completion_ledger.obligations.values()
             if item.blocking and item.state.value == "pending" and item.action == "verify"
         }
         return CompletionAssessment(
             complete=False,
-            missing_inspection=tuple(sorted(set(assessment.missing_inspection).union(unresolved_inspection))),
-            missing_changes=tuple(sorted(set(assessment.missing_changes).union(unresolved_changes))),
-            missing_verification=tuple(sorted(set(assessment.missing_verification).union(unresolved_verification))),
+            missing_inspection=tuple(
+                sorted(set(assessment.missing_inspection).union(unresolved_inspection))
+            ),
+            missing_changes=tuple(
+                sorted(set(assessment.missing_changes).union(unresolved_changes))
+            ),
+            missing_verification=tuple(
+                sorted(set(assessment.missing_verification).union(unresolved_verification))
+            ),
             unexpected_changes=assessment.unexpected_changes,
             preserved_file_violations=assessment.preserved_file_violations,
             changed_files=assessment.changed_files,
@@ -711,16 +750,24 @@ class EngineeringBrain:
             self.memory = candidate
         self._expected_file_hashes.update(expected_hashes)
         if self.completion_ledger is not None:
-            self.completion_ledger.record("change", expected_hashes, "Authenticated engineering change recorded.")
+            self.completion_ledger.record(
+                "change", expected_hashes, "Authenticated engineering change recorded."
+            )
 
     def record_change(self, path: str | Path, *, reason: str, lines_changed: int = 0) -> None:
         self.record_changes([(path, reason, lines_changed)])
 
-    def record_decision(self, statement: str, *, rationale: str = "", evidence: list[str] | None = None) -> None:
+    def record_decision(
+        self, statement: str, *, rationale: str = "", evidence: list[str] | None = None
+    ) -> None:
         if self.memory is None:
             return
         self.memory.decisions.append(
-            EngineeringDecision(statement=statement[:1000], rationale=rationale[:2000], evidence=list(evidence or []))
+            EngineeringDecision(
+                statement=statement[:1000],
+                rationale=rationale[:2000],
+                evidence=list(evidence or []),
+            )
         )
         self.memory_store.save(self.memory)
 
@@ -783,7 +830,9 @@ class EngineeringBrain:
                 f"type={self.contract.task_type}, risk={self.contract.risk_level}, "
                 f"tree={self.contract.repository_tree_hash}, confidence={self.contract.context_confidence:.2f}"
             )
-            sections.append("Decisive files: " + (", ".join(self.contract.decisive_files) or "none"))
+            sections.append(
+                "Decisive files: " + (", ".join(self.contract.decisive_files) or "none")
+            )
             sections.append("Related tests: " + (", ".join(self.contract.related_tests) or "none"))
             if self.contract.non_goals:
                 sections.append("Forbidden/non-goal changes: " + "; ".join(self.contract.non_goals))

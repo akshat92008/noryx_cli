@@ -89,9 +89,15 @@ def test_scope_guard_blocks_prohibited_and_requires_expansion_reason(tmp_path: P
 def test_failure_learning_is_hash_chained_and_escalates(tmp_path: Path):
     root = _repo(tmp_path)
     store = FailureLearningStore(root)
-    first = store.record(category="verification", phase="verification", summary="test_add failed at line 12")
-    second = store.record(category="verification", phase="verification", summary="test_add failed at line 99")
-    third = store.record(category="verification", phase="verification", summary="test_add failed at line 7")
+    first = store.record(
+        category="verification", phase="verification", summary="test_add failed at line 12"
+    )
+    second = store.record(
+        category="verification", phase="verification", summary="test_add failed at line 99"
+    )
+    third = store.record(
+        category="verification", phase="verification", summary="test_add failed at line 7"
+    )
     assert first.occurrence == 1
     assert second.occurrence == 2
     assert third.occurrence == 3

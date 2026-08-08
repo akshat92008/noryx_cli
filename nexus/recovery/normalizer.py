@@ -1,11 +1,12 @@
 """
-Failure Normalization Layer for Nexus CLI.
+Failure Normalization Layer for Noryx CLI.
 Converts raw, provider-specific, tool-specific or runner-specific outputs into canonical FailureRecords.
 """
 
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from nexus.recovery.records import (
     EvidenceReference,
@@ -118,7 +119,13 @@ class FailureNormalizer:
                 True,
                 False,
             )
-        if "no matching distribution" in norm or "pip install" in norm and "failed" in norm or "modulenotfounderror" in norm or "no module named" in norm:
+        if (
+            "no matching distribution" in norm
+            or "pip install" in norm
+            and "failed" in norm
+            or "modulenotfounderror" in norm
+            or "no module named" in norm
+        ):
             return (
                 FailureCategory.ENVIRONMENT,
                 FailureKind.DEPENDENCY_MISSING,
@@ -136,7 +143,13 @@ class FailureNormalizer:
             )
 
         # Mutation & Patch
-        if "patch conflict" in norm or "hunk failed" in norm or "hunk #" in norm or "patch failed" in norm or "corrupt patch" in norm:
+        if (
+            "patch conflict" in norm
+            or "hunk failed" in norm
+            or "hunk #" in norm
+            or "patch failed" in norm
+            or "corrupt patch" in norm
+        ):
             return (
                 FailureCategory.MUTATION,
                 FailureKind.PATCH_CONFLICT,
@@ -225,7 +238,9 @@ class FailureNormalizer:
     @classmethod
     def _extract_file_paths(cls, output: str) -> list[str]:
         # Match common file path formats in py/js stack traces
-        matches = re.findall(r'(?:File "([^"]+)"|([a-zA-Z0-9_\-\./]+\.(?:py|js|ts|json|md|txt)))', output)
+        matches = re.findall(
+            r'(?:File "([^"]+)"|([a-zA-Z0-9_\-\./]+\.(?:py|js|ts|json|md|txt)))', output
+        )
         paths = []
         for m in matches:
             p = m[0] or m[1]
@@ -235,7 +250,7 @@ class FailureNormalizer:
 
     @classmethod
     def _extract_line_numbers(cls, output: str) -> list[int]:
-        matches = re.findall(r'line (\d+)|:(\d+):', output)
+        matches = re.findall(r"line (\d+)|:(\d+):", output)
         lines = []
         for m in matches:
             num = int(m[0] or m[1])
@@ -245,7 +260,10 @@ class FailureNormalizer:
 
     @classmethod
     def _extract_symbols(cls, output: str) -> list[str]:
-        matches = re.findall(r"(?:in ([a-zA-Z0-9_]+)|NameError: name '([^']+)'|AttributeError: '[^']+' object has no attribute '([^']+)')", output)
+        matches = re.findall(
+            r"(?:in ([a-zA-Z0-9_]+)|NameError: name '([^']+)'|AttributeError: '[^']+' object has no attribute '([^']+)')",
+            output,
+        )
         symbols = []
         for m in matches:
             sym = m[0] or m[1] or m[2]
@@ -264,9 +282,7 @@ class FailureNormalizer:
         return tests[:10]
 
     @classmethod
-    def _summarize_failure(
-        cls, output: str, kind: Any, tests: list[str], files: list[str]
-    ) -> str:
+    def _summarize_failure(cls, output: str, kind: Any, tests: list[str], files: list[str]) -> str:
         k_val = str(kind.value if hasattr(kind, "value") else kind).upper()
         if tests:
             return f"{k_val}: Test failed: {tests[0]}"

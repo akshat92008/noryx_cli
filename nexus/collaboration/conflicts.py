@@ -109,8 +109,7 @@ class ScopeReservationRegistry:
     def release_for_assignment(self, assignment_id: str) -> int:
         """Release all reservations for a given assignment. Returns count released."""
         to_remove = [
-            rid for rid, r in self._reservations.items()
-            if r.assignment_id == assignment_id
+            rid for rid, r in self._reservations.items() if r.assignment_id == assignment_id
         ]
         for rid in to_remove:
             del self._reservations[rid]
@@ -127,7 +126,8 @@ class ScopeReservationRegistry:
         """
         now = datetime.now(tz=timezone.utc)
         owned = [
-            r for r in self._reservations.values()
+            r
+            for r in self._reservations.values()
             if r.assignment_id == assignment_id and r.mode == ReservationMode.EXCLUSIVE
         ]
 
@@ -171,9 +171,7 @@ class ScopeReservationRegistry:
         return [r for r in self._reservations.values() if r.expires_at >= now]
 
     @staticmethod
-    def _path_overlap(
-        a: Tuple[Path, ...], b: Tuple[Path, ...]
-    ) -> List[Path]:
+    def _path_overlap(a: Tuple[Path, ...], b: Tuple[Path, ...]) -> List[Path]:
         overlapping: List[Path] = []
         for pa in a:
             for pb in b:
@@ -201,6 +199,7 @@ class SemanticConflict:
 @dataclass
 class ChangeSignal:
     """Lightweight representation of what a worker intends to change."""
+
     assignment_id: str
     exported_symbols: List[str] = field(default_factory=list)
     modified_configs: List[str] = field(default_factory=list)
@@ -222,61 +221,65 @@ class SemanticConflictAnalyser:
         conflicts: List[SemanticConflict] = []
 
         for i, a in enumerate(signals):
-            for b in signals[i + 1:]:
+            for b in signals[i + 1 :]:
                 conflicts.extend(self._compare(a, b))
 
         return conflicts
 
     # ------------------------------------------------------------------
 
-    def _compare(
-        self, a: ChangeSignal, b: ChangeSignal
-    ) -> List[SemanticConflict]:
+    def _compare(self, a: ChangeSignal, b: ChangeSignal) -> List[SemanticConflict]:
         found: List[SemanticConflict] = []
 
         # 1. Duplicate symbol exports
         dup_symbols = set(a.exported_symbols) & set(b.exported_symbols)
         if dup_symbols:
-            found.append(SemanticConflict(
-                conflict_id=f"dup-sym-{a.assignment_id}-{b.assignment_id}",
-                assignment_id_a=a.assignment_id,
-                assignment_id_b=b.assignment_id,
-                kind="duplicate_symbol",
-                description=f"Both workers export conflicting symbols: {dup_symbols}",
-                severity="blocking",
-                affected_files=tuple(a.affected_files + b.affected_files),
-            ))
+            found.append(
+                SemanticConflict(
+                    conflict_id=f"dup-sym-{a.assignment_id}-{b.assignment_id}",
+                    assignment_id_a=a.assignment_id,
+                    assignment_id_b=b.assignment_id,
+                    kind="duplicate_symbol",
+                    description=f"Both workers export conflicting symbols: {dup_symbols}",
+                    severity="blocking",
+                    affected_files=tuple(a.affected_files + b.affected_files),
+                )
+            )
 
         # 2. Conflicting API assumptions
         for symbol, sig_a in a.api_assumptions.items():
             if symbol in b.api_assumptions:
                 sig_b = b.api_assumptions[symbol]
                 if sig_a != sig_b:
-                    found.append(SemanticConflict(
-                        conflict_id=f"api-{a.assignment_id}-{b.assignment_id}-{symbol}",
-                        assignment_id_a=a.assignment_id,
-                        assignment_id_b=b.assignment_id,
-                        kind="api_assumption",
-                        description=(
-                            f"Workers disagree on API signature for '{symbol}': "
-                            f"A assumes '{sig_a}', B assumes '{sig_b}'."
-                        ),
-                        severity="blocking",
-                        affected_files=tuple(a.affected_files + b.affected_files),
-                    ))
+                    found.append(
+                        SemanticConflict(
+                            conflict_id=f"api-{a.assignment_id}-{b.assignment_id}-{symbol}",
+                            assignment_id_a=a.assignment_id,
+                            assignment_id_b=b.assignment_id,
+                            kind="api_assumption",
+                            description=(
+                                f"Workers disagree on API signature for '{symbol}': "
+                                f"A assumes '{sig_a}', B assumes '{sig_b}'."
+                            ),
+                            severity="blocking",
+                            affected_files=tuple(a.affected_files + b.affected_files),
+                        )
+                    )
 
         # 3. Divergent configuration changes
         conf_overlap = set(a.modified_configs) & set(b.modified_configs)
         if conf_overlap:
-            found.append(SemanticConflict(
-                conflict_id=f"conf-{a.assignment_id}-{b.assignment_id}",
-                assignment_id_a=a.assignment_id,
-                assignment_id_b=b.assignment_id,
-                kind="config_divergence",
-                description=f"Both workers modify shared configuration keys: {conf_overlap}",
-                severity="blocking",
-                affected_files=tuple(a.affected_files + b.affected_files),
-            ))
+            found.append(
+                SemanticConflict(
+                    conflict_id=f"conf-{a.assignment_id}-{b.assignment_id}",
+                    assignment_id_a=a.assignment_id,
+                    assignment_id_b=b.assignment_id,
+                    kind="config_divergence",
+                    description=f"Both workers modify shared configuration keys: {conf_overlap}",
+                    severity="blocking",
+                    affected_files=tuple(a.affected_files + b.affected_files),
+                )
+            )
 
         return found
 
@@ -284,6 +287,7 @@ class SemanticConflictAnalyser:
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
 
 def _is_subpath(candidate: Path, parent: Path) -> bool:
     try:

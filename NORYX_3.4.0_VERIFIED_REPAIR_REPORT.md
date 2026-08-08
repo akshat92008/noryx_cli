@@ -1,12 +1,12 @@
-# Nexus CLI 3.4.0 — Verified Repair Reliability Report
+# Noryx CLI 3.4.0 — Verified Repair Reliability Report
 
 ## Release decision
 
-Nexus CLI 3.4.0 is a **hardened controlled-beta technical preview** of Nexus Verified Repair. It is suitable for supervised evaluation on bounded repository repairs. It is not certified for unattended production engineering, release-candidate promotion, or Claude Code-equivalent performance.
+Noryx CLI 3.4.0 is a **hardened controlled-beta technical preview** of Noryx Verified Repair. It is suitable for supervised evaluation on bounded repository repairs. It is not certified for unattended production engineering, release-candidate promotion, or Claude Code-equivalent performance.
 
 The release is built around one defensible product promise:
 
-> Nexus is the verification and reliability operating layer for coding models. It attempts the smallest coherent repair, enforces budget and workspace boundaries, verifies the result independently, emits a tamper-evident proof receipt, or stops honestly.
+> Noryx is the verification and reliability operating layer for coding models. It attempts the smallest coherent repair, enforces budget and workspace boundaries, verifies the result independently, emits a tamper-evident proof receipt, or stops honestly.
 
 ## Flagship workflow
 
@@ -29,7 +29,7 @@ The workflow:
 7. Maps callers, interfaces, tests, data contracts, and security boundaries.
 8. Applies the smallest coherent patch inside explicit budget and turn ceilings.
 9. Runs targeted and regression checks through the canonical process boundary.
-10. Emits a Nexus Proof receipt only from recorded evidence.
+10. Emits a Noryx Proof receipt only from recorded evidence.
 
 ## Reliability changes delivered
 
@@ -45,7 +45,7 @@ The workflow:
 
 - Release evidence is bound to the exact source-tree hash, source archive hash, wheel hash, version, runner, command, counts, timestamp, JUnit XML, coverage XML, and benchmark report.
 - Qualification rejects missing reports, stale or mismatched artifacts, invalid counts, failed tests, path escapes, and report hash drift.
-- The test matrix is resumable and uses separate process, HOME, cache, Nexus state, JUnit, log, and coverage files for every shard.
+- The test matrix is resumable and uses separate process, HOME, cache, Noryx state, JUnit, log, and coverage files for every shard.
 
 ### Architecture consolidation
 
@@ -87,10 +87,10 @@ The final artifact-bound evidence JSON and qualification decision are shipped in
 
 ## Remaining proof required
 
-Release-candidate or parity claims remain blocked until Nexus demonstrates:
+Release-candidate or parity claims remain blocked until Noryx demonstrates:
 
 - repeated real-provider long-horizon repairs on fresh repositories;
-- matched direct-model-versus-Nexus uplift experiments;
+- matched direct-model-versus-Noryx uplift experiments;
 - false verified completion below the public-beta threshold;
 - Linux Bubblewrap, macOS, Windows, and supported Python matrix results;
 - dependency vulnerability scanning, SBOM, and signed provenance;
@@ -99,4 +99,4 @@ Release-candidate or parity claims remain blocked until Nexus demonstrates:
 
 ## Correct designation
 
-**Nexus CLI 3.4.0 — Verified Repair controlled-beta technical preview.**
+**Noryx CLI 3.4.0 — Verified Repair controlled-beta technical preview.**

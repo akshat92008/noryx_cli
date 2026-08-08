@@ -16,7 +16,6 @@ from typing import Any, Iterable
 from nexus.intelligence.engineering.constraints import CompiledConstraint, ConstraintKind
 from nexus.verification_evidence import effective_verification_evidence
 
-
 _PROOF_KINDS = {
     "verification_check",
     "behavioral_check",
@@ -63,9 +62,13 @@ class SemanticVerificationResult:
 
 def _criterion(value: Any, index: int) -> tuple[str, str, str]:
     if isinstance(value, dict):
-        statement = str(value.get("statement") or value.get("text") or value.get("criterion") or "").strip()
+        statement = str(
+            value.get("statement") or value.get("text") or value.get("criterion") or ""
+        ).strip()
         identifier = str(value.get("id") or "").strip()
-        validation_type = str(value.get("validation_type") or value.get("type") or "").strip().lower()
+        validation_type = (
+            str(value.get("validation_type") or value.get("type") or "").strip().lower()
+        )
     else:
         statement = str(value).strip()
         identifier = ""
@@ -98,9 +101,15 @@ def _record_is_independent_proof(record: dict[str, Any]) -> bool:
             return False
         observed = metadata.get("observed_test_count", metadata.get("test_count"))
         detail = str(metadata.get("validation_detail") or metadata.get("validation_reason") or "")
-        if observed is None and not any(marker in detail.lower() for marker in (
-            "runner-specific success", "observed test-runner", "executed tests", "assertion script"
-        )):
+        if observed is None and not any(
+            marker in detail.lower()
+            for marker in (
+                "runner-specific success",
+                "observed test-runner",
+                "executed tests",
+                "assertion script",
+            )
+        ):
             return False
     return True
 
@@ -176,7 +185,8 @@ class SemanticVerifier:
         )
         effective_ids = {str(item.get("id")) for item in effective_checks}
         records = [
-            item for item in raw_records
+            item
+            for item in raw_records
             if item.get("kind") != "verification_check" or str(item.get("id")) in effective_ids
         ]
         changed = list(dict.fromkeys(str(item) for item in changed_files if str(item)))
@@ -184,7 +194,11 @@ class SemanticVerifier:
         findings: list[SemanticFinding] = []
         evidence_ids = [str(item.get("id", "")) for item in records if item.get("id")]
 
-        mutations = [item for item in records if item.get("kind") == "file_mutation" and item.get("status") == "verified"]
+        mutations = [
+            item
+            for item in records
+            if item.get("kind") == "file_mutation" and item.get("status") == "verified"
+        ]
         checks = [item for item in records if _record_is_independent_proof(item)]
         reviews = [
             item
@@ -212,34 +226,79 @@ class SemanticVerifier:
 
         if task_type not in {"read_only", "investigation", "documentation", "code_explanation"}:
             if not mutations and not changed:
-                findings.append(SemanticFinding("SEM-NO-MUTATION", "error", "The task required a repository change but no verified mutation exists."))
+                findings.append(
+                    SemanticFinding(
+                        "SEM-NO-MUTATION",
+                        "error",
+                        "The task required a repository change but no verified mutation exists.",
+                    )
+                )
             if (mutations or changed) and not checks:
-                findings.append(SemanticFinding("SEM-NO-EXTERNAL-CHECK", "error", "Mutations exist without a passing independent verification record."))
+                findings.append(
+                    SemanticFinding(
+                        "SEM-NO-EXTERNAL-CHECK",
+                        "error",
+                        "Mutations exist without a passing independent verification record.",
+                    )
+                )
 
         if review_required and (mutations or changed) and not reviews:
-            findings.append(SemanticFinding("SEM-NO-INDEPENDENT-REVIEW", "error", "No independent semantic review supports the completion claim."))
+            findings.append(
+                SemanticFinding(
+                    "SEM-NO-INDEPENDENT-REVIEW",
+                    "error",
+                    "No independent semantic review supports the completion claim.",
+                )
+            )
 
         prohibited = [str(item) for item in prohibited_patterns]
         prohibited_changes = [
-            path for path in changed if any(fnmatch.fnmatch(path, pattern) for pattern in prohibited)
+            path
+            for path in changed
+            if any(fnmatch.fnmatch(path, pattern) for pattern in prohibited)
         ]
         if prohibited_changes:
-            findings.append(SemanticFinding("SEM-PROHIBITED-CHANGE", "error", "Changed files violate an explicit prohibition: " + ", ".join(prohibited_changes)))
+            findings.append(
+                SemanticFinding(
+                    "SEM-PROHIBITED-CHANGE",
+                    "error",
+                    "Changed files violate an explicit prohibition: "
+                    + ", ".join(prohibited_changes),
+                )
+            )
 
         if allowed:
             unexpected = [path for path in changed if path not in allowed]
             if unexpected:
-                findings.append(SemanticFinding("SEM-SCOPE-EXPANSION", "error", "Changed files fall outside the approved engineering scope: " + ", ".join(unexpected)))
+                findings.append(
+                    SemanticFinding(
+                        "SEM-SCOPE-EXPANSION",
+                        "error",
+                        "Changed files fall outside the approved engineering scope: "
+                        + ", ".join(unexpected),
+                    )
+                )
 
         implementation_files = [path for path in changed if "test" not in path.lower()]
-        if task_type not in {"test_creation", "test_repair", "documentation"} and changed and not implementation_files:
-            findings.append(SemanticFinding("SEM-TESTS-ONLY", "error", "Only tests changed for a task that requires implementation behavior."))
+        if (
+            task_type not in {"test_creation", "test_repair", "documentation"}
+            and changed
+            and not implementation_files
+        ):
+            findings.append(
+                SemanticFinding(
+                    "SEM-TESTS-ONLY",
+                    "error",
+                    "Only tests changed for a task that requires implementation behavior.",
+                )
+            )
 
         failed_evidence = [
             item
             for item in records
             if item.get("status") == "failed"
-            and item.get("kind") in {
+            and item.get("kind")
+            in {
                 "verification_check",
                 "behavioral_check",
                 "behavioral_verification",
@@ -249,19 +308,40 @@ class SemanticVerifier:
             }
         ]
         if failed_evidence:
-            findings.append(SemanticFinding("SEM-FAILED-EVIDENCE", "error", "One or more required verification or review records failed.", [str(item.get("id", "")) for item in failed_evidence if item.get("id")]))
+            findings.append(
+                SemanticFinding(
+                    "SEM-FAILED-EVIDENCE",
+                    "error",
+                    "One or more required verification or review records failed.",
+                    [str(item.get("id", "")) for item in failed_evidence if item.get("id")],
+                )
+            )
 
         compiled_constraints = [CompiledConstraint.from_dict(item) for item in constraints]
         for constraint in compiled_constraints:
             if constraint.kind == ConstraintKind.UNRESOLVED_HARD_CONSTRAINT:
-                findings.append(SemanticFinding("SEM-UNRESOLVED-CONSTRAINT", "error", f"Hard constraint was not compiled into an enforceable policy: {constraint.source_text}"))
-            elif constraint.kind in {ConstraintKind.FORBID_PUBLIC_API_CHANGE, ConstraintKind.REQUIRE_BACKWARD_COMPATIBILITY}:
+                findings.append(
+                    SemanticFinding(
+                        "SEM-UNRESOLVED-CONSTRAINT",
+                        "error",
+                        f"Hard constraint was not compiled into an enforceable policy: {constraint.source_text}",
+                    )
+                )
+            elif constraint.kind in {
+                ConstraintKind.FORBID_PUBLIC_API_CHANGE,
+                ConstraintKind.REQUIRE_BACKWARD_COMPATIBILITY,
+            }:
                 compatible = any(
-                    _record_matches_validation_type(item, "api_compatibility")
-                    for item in checks
+                    _record_matches_validation_type(item, "api_compatibility") for item in checks
                 )
                 if not compatible:
-                    findings.append(SemanticFinding("SEM-COMPATIBILITY-PROOF-MISSING", "error", f"Constraint requires criterion-specific compatibility evidence: {constraint.source_text}"))
+                    findings.append(
+                        SemanticFinding(
+                            "SEM-COMPATIBILITY-PROOF-MISSING",
+                            "error",
+                            f"Constraint requires criterion-specific compatibility evidence: {constraint.source_text}",
+                        )
+                    )
             elif constraint.kind == ConstraintKind.PRESERVE_BEHAVIOR:
                 regression = any(
                     _record_matches_validation_type(item, "test")
@@ -270,13 +350,19 @@ class SemanticVerifier:
                     for item in checks
                 )
                 if not regression:
-                    findings.append(SemanticFinding(
-                        "SEM-BEHAVIOR-PRESERVATION-PROOF-MISSING",
-                        "error",
-                        f"Constraint requires a pre-existing or external regression check: {constraint.source_text}",
-                    ))
+                    findings.append(
+                        SemanticFinding(
+                            "SEM-BEHAVIOR-PRESERVATION-PROOF-MISSING",
+                            "error",
+                            f"Constraint requires a pre-existing or external regression check: {constraint.source_text}",
+                        )
+                    )
 
-        criteria = [_criterion(item, index) for index, item in enumerate(acceptance_criteria, 1) if str(item).strip()]
+        criteria = [
+            _criterion(item, index)
+            for index, item in enumerate(acceptance_criteria, 1)
+            if str(item).strip()
+        ]
         requirement_results: dict[str, str] = {}
         requirement_evidence: dict[str, list[str]] = {}
         for criterion_id, statement, declared_type in criteria:
@@ -294,12 +380,42 @@ class SemanticVerifier:
             requirement_evidence[statement] = ids
 
         if criteria and any(value == "UNVERIFIED" for value in requirement_results.values()):
-            findings.append(SemanticFinding("SEM-ACCEPTANCE-GAP", "error", "One or more explicit acceptance criteria lack criterion-specific independent evidence."))
+            findings.append(
+                SemanticFinding(
+                    "SEM-ACCEPTANCE-GAP",
+                    "error",
+                    "One or more explicit acceptance criteria lack criterion-specific independent evidence.",
+                )
+            )
 
         errors = [item for item in findings if item.severity == "error"]
         if errors:
-            status = "FAILED" if any(item.code in {"SEM-FAILED-EVIDENCE", "SEM-SCOPE-EXPANSION", "SEM-PROHIBITED-CHANGE", "SEM-STALE-EVIDENCE"} for item in errors) else "PARTIALLY_VERIFIED"
-            return SemanticVerificationResult(status, False, findings, evidence_ids, requirement_results, requirement_evidence)
+            status = (
+                "FAILED"
+                if any(
+                    item.code
+                    in {
+                        "SEM-FAILED-EVIDENCE",
+                        "SEM-SCOPE-EXPANSION",
+                        "SEM-PROHIBITED-CHANGE",
+                        "SEM-STALE-EVIDENCE",
+                    }
+                    for item in errors
+                )
+                else "PARTIALLY_VERIFIED"
+            )
+            return SemanticVerificationResult(
+                status, False, findings, evidence_ids, requirement_results, requirement_evidence
+            )
         if findings:
-            return SemanticVerificationResult("PARTIALLY_VERIFIED", False, findings, evidence_ids, requirement_results, requirement_evidence)
-        return SemanticVerificationResult("VERIFIED", True, findings, evidence_ids, requirement_results, requirement_evidence)
+            return SemanticVerificationResult(
+                "PARTIALLY_VERIFIED",
+                False,
+                findings,
+                evidence_ids,
+                requirement_results,
+                requirement_evidence,
+            )
+        return SemanticVerificationResult(
+            "VERIFIED", True, findings, evidence_ids, requirement_results, requirement_evidence
+        )

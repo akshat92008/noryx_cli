@@ -20,13 +20,9 @@ import json
 import mimetypes
 import os
 import re
-import shlex
-import signal
 import socket
 import ssl
 import subprocess
-import threading
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -35,8 +31,6 @@ from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-
-from nexus.paths import nexus_home
 
 _tool_working_dir = contextvars.ContextVar("tool_working_dir", default=None)
 _tool_history = contextvars.ContextVar("tool_history", default=None)
@@ -69,8 +63,9 @@ def get_history():
 
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
 from enum import Enum
+from typing import Any, Callable
+
 
 class RiskLevel(Enum):
     LOW = "low"
@@ -78,11 +73,13 @@ class RiskLevel(Enum):
     HIGH = "high"
     DANGEROUS = "dangerous"
 
+
 class PermissionLevel(Enum):
     READ = "read"
     WRITE = "write"
     EXECUTE = "execute"
     NETWORK = "network"
+
 
 class ToolStatus(Enum):
     SUCCESS = "success"
@@ -94,6 +91,7 @@ class ToolStatus(Enum):
     INVALID_INPUT = "invalid_input"
     ENVIRONMENT_UNAVAILABLE = "environment_unavailable"
     PARTIAL = "partial"
+
 
 @dataclass
 class ToolDefinition:
@@ -107,7 +105,7 @@ class ToolDefinition:
     requires_network: bool = False
     default_timeout_seconds: float = 120.0
     handler: Callable | None = None
-    
+
     def to_openai_format(self) -> dict[str, Any]:
         return {
             "type": "function",
@@ -115,8 +113,9 @@ class ToolDefinition:
                 "name": self.name,
                 "description": self.description,
                 "parameters": self.input_schema,
-            }
+            },
         }
+
 
 @dataclass
 class ToolResult:
@@ -125,7 +124,7 @@ class ToolResult:
     evidence: str = ""
     error: str = ""
     duration: float = 0.0
-    
+
     def __post_init__(self) -> None:
         """Normalize legacy statuses into the canonical enum and fail closed."""
         if isinstance(self.status, ToolStatus):
@@ -155,18 +154,20 @@ class ToolResult:
     def success(self) -> bool:
         return self.status == ToolStatus.SUCCESS
 
+
 class ToolRegistry:
     def __init__(self):
         self._tools: dict[str, ToolDefinition] = {}
-        
+
     def register(self, tool: ToolDefinition) -> None:
         self._tools[tool.name] = tool
-        
+
     def get(self, name: str) -> ToolDefinition | None:
         return self._tools.get(name)
-        
+
     def list_tools(self) -> list[ToolDefinition]:
         return list(self._tools.values())
+
 
 # Global registry instance
 registry = ToolRegistry()
@@ -531,7 +532,7 @@ RAW_TOOL_DEFINITIONS = [
         "function": {
             "name": "repo_index",
             "description": (
-                "Build or incrementally refresh Nexus' persistent repository graph. "
+                "Build or incrementally refresh Noryx' persistent repository graph. "
                 "Returns file, symbol, import, language, test, and parse-error counts."
             ),
             "parameters": {
@@ -690,7 +691,7 @@ RAW_TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "process_status",
-            "description": "Poll a Nexus-started background process and read its complete stdout/stderr logs.",
+            "description": "Poll a Noryx-started background process and read its complete stdout/stderr logs.",
             "parameters": {
                 "type": "object",
                 "properties": {"pid": {"type": "integer"}},
@@ -702,7 +703,7 @@ RAW_TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "process_stop",
-            "description": "Terminate a background process previously started by Nexus. Cannot target arbitrary system PIDs.",
+            "description": "Terminate a background process previously started by Noryx. Cannot target arbitrary system PIDs.",
             "parameters": {
                 "type": "object",
                 "properties": {"pid": {"type": "integer"}},
@@ -964,7 +965,7 @@ RAW_TOOL_DEFINITIONS.extend(
             "function": {
                 "name": "run_process",
                 "description": (
-                    "Run a typed argv command without a shell inside Nexus' strongest available "
+                    "Run a typed argv command without a shell inside Noryx' strongest available "
                     "sandbox. Network is off unless explicitly approved."
                 ),
                 "parameters": {
@@ -1032,7 +1033,7 @@ RAW_TOOL_DEFINITIONS.extend(
             "function": {
                 "name": "security_scan",
                 "description": (
-                    "Run Nexus' deterministic secret and unsafe-code pattern scan. "
+                    "Run Noryx' deterministic secret and unsafe-code pattern scan. "
                     "This does not claim a complete security audit."
                 ),
                 "parameters": {
@@ -1327,23 +1328,37 @@ def _resolve_path(path_str: str) -> Path:
     try:
         resolved.relative_to(base_dir)
     except ValueError:
-        raise ValueError(f"Path {resolved} is outside the active tool workspace {base_dir}") from None
+        raise ValueError(
+            f"Path {resolved} is outside the active tool workspace {base_dir}"
+        ) from None
     return resolved
 
 
 # ── Tool implementations ────────────────────────────────────────────────────
 
 
-def tool_read_file(path: str, start_line: int | None = None, end_line: int | None = None) -> ToolResult:
+def tool_read_file(
+    path: str, start_line: int | None = None, end_line: int | None = None
+) -> ToolResult:
     """Read file contents with line numbers."""
     try:
         p = _resolve_path(path)
         if not p.exists():
-            return ToolResult(status=ToolStatus.FAILURE, output=f"❌ File not found: {path}", error="File not found")
+            return ToolResult(
+                status=ToolStatus.FAILURE,
+                output=f"❌ File not found: {path}",
+                error="File not found",
+            )
         if not p.is_file():
-            return ToolResult(status=ToolStatus.FAILURE, output=f"❌ Not a file: {path}", error="Not a file")
+            return ToolResult(
+                status=ToolStatus.FAILURE, output=f"❌ Not a file: {path}", error="Not a file"
+            )
         if p.stat().st_size > 2 * 1024 * 1024:
-            return ToolResult(status=ToolStatus.FAILURE, output=f"❌ File too large ({_format_size(p.stat().st_size)}). Use search_code instead.", error="File too large")
+            return ToolResult(
+                status=ToolStatus.FAILURE,
+                output=f"❌ File too large ({_format_size(p.stat().st_size)}). Use search_code instead.",
+                error="File too large",
+            )
 
         with open(p, "r", encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
@@ -1372,13 +1387,16 @@ def tool_read_file(path: str, start_line: int | None = None, end_line: int | Non
 
         return ToolResult(status=ToolStatus.SUCCESS, output=header + "\n" + "\n".join(numbered))
     except (LookupError, OSError, TypeError, ValueError) as e:
-        return ToolResult(status=ToolStatus.FAILURE, output=f"❌ Error reading file: {e}", error=str(e))
+        return ToolResult(
+            status=ToolStatus.FAILURE, output=f"❌ Error reading file: {e}", error=str(e)
+        )
 
 
 def tool_write_file(path: str, content: str) -> str:
     """Write content to a file, creating directories as needed. Tracked for undo."""
     try:
         from nexus.mutation import MutationController
+
         p = _resolve_path(path)
 
         # Snapshot before writing
@@ -1394,7 +1412,11 @@ def tool_write_file(path: str, content: str) -> str:
         history.record_change(str(p), "write_file", snapshot)
 
         line_count = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
-        return f"✅ Wrote {line_count} lines to {p}\nDiff:\n{res.diff}" if res.diff else f"✅ Wrote {line_count} lines to {p}"
+        return (
+            f"✅ Wrote {line_count} lines to {p}\nDiff:\n{res.diff}"
+            if res.diff
+            else f"✅ Wrote {line_count} lines to {p}"
+        )
     except (OSError, TypeError, ValueError) as e:
         return f"❌ Error writing file: {e}"
 
@@ -1452,6 +1474,7 @@ def tool_edit_file(path: str, old_text: str, new_text: str) -> str:
 
         new_content = content.replace(target_old, new_text, 1)
         from nexus.mutation import MutationController
+
         mutator = MutationController(p.parent)
         res = mutator.write_file(p, new_content)
         if not res.success:
@@ -1508,6 +1531,7 @@ def tool_patch_file(path: str, start_line: int, end_line: int, new_content: str)
         new_content_final = "".join(lines)
 
         from nexus.mutation import MutationController
+
         mutator = MutationController(p.parent)
         res = mutator.write_file(p, new_content_final)
         if not res.success:
@@ -1584,7 +1608,7 @@ def tool_multi_edit(edits: list[dict]) -> str:
     try:
         for target, body in final_bodies.items():
             snapshots[target] = history.snapshot_before_write(str(target))
-            temp = target.with_name(f".{target.name}.nexus-{uuid.uuid4().hex}.tmp")
+            temp = target.with_name(f".{target.name}.noryx-{uuid.uuid4().hex}.tmp")
             with temp.open("w", encoding="utf-8", newline="") as handle:
                 handle.write(body)
                 handle.flush()
@@ -1603,7 +1627,7 @@ def tool_multi_edit(edits: list[dict]) -> str:
         rollback_errors: list[str] = []
         for target in reversed(committed):
             try:
-                restore = target.with_name(f".{target.name}.nexus-rollback-{uuid.uuid4().hex}.tmp")
+                restore = target.with_name(f".{target.name}.noryx-rollback-{uuid.uuid4().hex}.tmp")
                 with restore.open("w", encoding="utf-8", newline="") as handle:
                     handle.write(originals[target])
                     handle.flush()
@@ -1786,10 +1810,14 @@ def tool_process_run(
     except (LookupError, OSError, RuntimeError, TypeError, ValueError) as exc:
         return f"❌ Error starting background process: {exc}"
     return _background_processes.start_background_process(
-        command, work_dir, owner=_tool_owner.get(), network=network,
+        command,
+        work_dir,
+        owner=_tool_owner.get(),
+        network=network,
         require_os_isolation=require_os_isolation,
         allow_unisolated_host_process=allow_unisolated_host_process,
-        timeout=timeout, max_output_bytes=max_output_bytes,
+        timeout=timeout,
+        max_output_bytes=max_output_bytes,
     )
 
 
@@ -2603,7 +2631,7 @@ def tool_web_fetch(url: str, max_length: int = 10000) -> str:
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "NexusAI/3.1 (coding-agent)"},
+            headers={"User-Agent": "Noryx/3.1 (coding-agent)"},
         )
         with _safe_urlopen(req, timeout=15, policy=policy) as resp:
             final_url = getattr(resp, "geturl", lambda: url)()
@@ -2663,7 +2691,7 @@ def tool_web_search(query: str, max_results: int = 5) -> str:
         )
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "NexusAI/1.0"},
+            headers={"User-Agent": "Noryx/1.0"},
         )
         with _safe_urlopen(req, timeout=10, policy=policy) as resp:
             html_text = resp.read(policy.max_response_bytes).decode("utf-8", errors="replace")
@@ -2768,13 +2796,14 @@ def tool_github_create_pr(title: str, body: str, base: str = "") -> str:
 def tool_read_notebook(path: str) -> str:
     """Read a Jupyter Notebook (.ipynb) and display its cells."""
     import json
+
     try:
         p = _resolve_path(path)
         if not p.exists():
             return f"❌ File not found: {path}"
         with open(p, "r", encoding="utf-8") as f:
             nb = json.load(f)
-            
+
         cells = nb.get("cells", [])
         output = [f"Notebook: {p.name} ({len(cells)} cells)"]
         for i, cell in enumerate(cells):
@@ -2790,25 +2819,26 @@ def tool_read_notebook(path: str) -> str:
 def tool_edit_notebook_cell(path: str, cell_index: int, new_source: str) -> str:
     """Edit a specific cell in a Jupyter Notebook."""
     import json
+
     try:
         p = _resolve_path(path)
         if not p.exists():
             return f"❌ File not found: {path}"
         with open(p, "r", encoding="utf-8") as f:
             nb = json.load(f)
-            
+
         cells = nb.get("cells", [])
         if cell_index < 0 or cell_index >= len(cells):
             return f"❌ Invalid cell index {cell_index}. Notebook has {len(cells)} cells."
-            
+
         cells[cell_index]["source"] = [line + "\n" for line in new_source.split("\n")]
         # Remove trailing newline from the last line if necessary
         if cells[cell_index]["source"]:
             cells[cell_index]["source"][-1] = cells[cell_index]["source"][-1].rstrip("\n")
-            
+
         with open(p, "w", encoding="utf-8") as f:
             json.dump(nb, f, indent=1)
-            
+
         return f"✅ Cell {cell_index} updated successfully."
     except Exception as e:
         return f"❌ Error editing notebook: {e}"
@@ -2818,9 +2848,12 @@ def tool_schedule_routine(interval: int, task: str) -> str:
     """Schedule a routine task to run in the background."""
     try:
         from nexus.routine import schedule_routine
+
         # Note: We need a way to pass the agent context. We will handle agent context injection in agent.py
         # For now, schedule_routine will just use the global RoutineOrchestrator.
-        return schedule_routine(interval, task, agent=getattr(tool_schedule_routine, 'agent_instance', None))
+        return schedule_routine(
+            interval, task, agent=getattr(tool_schedule_routine, "agent_instance", None)
+        )
     except ImportError as e:
         return f"❌ Routine Error: {e}"
 
@@ -2829,6 +2862,7 @@ def tool_message_peer(peer_name: str, message: str) -> str:
     """Message an active peer subagent."""
     try:
         from nexus.routine import message_peer
+
         return message_peer(peer_name, message)
     except ImportError as e:
         return f"❌ Peer Messaging Error: {e}"
@@ -3000,14 +3034,11 @@ def execute_tool(name: str, arguments: dict, policy_engine=None) -> ToolResult:
         return ToolResult(
             status=ToolStatus.INVALID_INPUT,
             output=f"❌ Unknown tool: {name}",
-            error=f"Unknown tool: {name}"
+            error=f"Unknown tool: {name}",
         )
     try:
         if not tool_def.handler:
-            return ToolResult(
-                status=ToolStatus.FAILURE,
-                output=f"❌ No handler for tool: {name}"
-            )
+            return ToolResult(status=ToolStatus.FAILURE, output=f"❌ No handler for tool: {name}")
         result = tool_def.handler(**arguments)
         if isinstance(result, ToolResult):
             return result
@@ -3016,7 +3047,7 @@ def execute_tool(name: str, arguments: dict, policy_engine=None) -> ToolResult:
         return ToolResult(
             status=ToolStatus.FAILURE,
             output=f"❌ Tool execution failed for {name}: {e}",
-            error=str(e)
+            error=str(e),
         )
 
 
@@ -3026,23 +3057,34 @@ for raw_tool in RAW_TOOL_DEFINITIONS:
     name = fn_def.get("name")
     if not name:
         continue
-        
+
     handler = TOOL_DISPATCH.get(name)
-    
+
     # Determine flags based on name (legacy mapping)
     mutates = name in (
-        "write_file", "edit_file", "patch_file", "multi_edit", 
-        "git_commit", "git_branch", "run_command", "run_process", "process_run"
+        "write_file",
+        "edit_file",
+        "patch_file",
+        "multi_edit",
+        "git_commit",
+        "git_branch",
+        "run_command",
+        "run_process",
+        "process_run",
     )
     network = name in (
-        "web_fetch", "web_search", "github_list_issues", 
-        "github_view_issue", "github_create_pr", "api_check"
+        "web_fetch",
+        "web_search",
+        "github_list_issues",
+        "github_view_issue",
+        "github_create_pr",
+        "api_check",
     )
-    
+
     perm = PermissionLevel.WRITE if mutates else PermissionLevel.READ
     if network:
         perm = PermissionLevel.NETWORK
-        
+
     risk = RiskLevel.HIGH if mutates or network else RiskLevel.LOW
     if name in ("run_command", "run_process", "process_run"):
         risk = RiskLevel.DANGEROUS
@@ -3057,6 +3099,6 @@ for raw_tool in RAW_TOOL_DEFINITIONS:
         permission=perm,
         mutates_workspace=mutates,
         requires_network=network,
-        handler=handler
+        handler=handler,
     )
     registry.register(tool)

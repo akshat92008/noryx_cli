@@ -1,4 +1,4 @@
-"""Nexus Extension Platform — production-ready plugin SDK and MCP ecosystem.
+"""Noryx Extension Platform — production-ready plugin SDK and MCP ecosystem.
 
 Provides versioned extension SDK, manifest validation, capability-based
 permissions, secure isolated runtime, registry, lifecycle management,

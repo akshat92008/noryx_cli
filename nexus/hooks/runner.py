@@ -192,7 +192,7 @@ class HookRunner:
 
         cwd = self.working_dir or "."
         from nexus.process_gateway import ProcessExecutionGateway, ProcessRequest
-        
+
         # A very small set of inert filesystem/process primitives may run through
         # the restricted fallback.  All formatters, tests, package managers, and
         # repository-controlled executables still require native OS isolation.

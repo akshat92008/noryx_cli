@@ -7,9 +7,10 @@ from typing import Any
 
 # Temporarily alias NvidiaClient until it's fully migrated out of api.py
 from nexus.api import NvidiaClient
-from nexus.providers.base import ChatRequest, Provider, ProviderCapabilities, ModelProvider
+from nexus.providers.base import ChatRequest, ModelProvider, ProviderCapabilities
 
 logger = logging.getLogger(__name__)
+
 
 class HostedProvider(ModelProvider):
     """Adapter for hosted API providers (OpenAI-compatible).

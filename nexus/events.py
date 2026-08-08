@@ -1,8 +1,9 @@
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List
-import uuid
+
 
 class EventType(Enum):
     TASK_STARTED = "TaskStarted"
@@ -31,6 +32,7 @@ class EventType(Enum):
     PLAN_REVISED = "PlanRevised"
     EXECUTION_CONTRACT_CREATED = "ExecutionContractCreated"
 
+
 @dataclass
 class NexusEvent:
     event_type: EventType
@@ -40,8 +42,10 @@ class NexusEvent:
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
+
 class EventBus:
-    """Centralized event bus for Nexus runtime."""
+    """Centralized event bus for Noryx runtime."""
+
     _subscribers: Dict[EventType, List[Callable[[NexusEvent], None]]] = {
         event_type: [] for event_type in EventType
     }
@@ -63,8 +67,17 @@ class EventBus:
             except Exception as e:
                 # Event handlers should not crash the main loop
                 import logging
-                logging.getLogger(__name__).error(f"Error in event handler for {event.event_type}: {e}")
+
+                logging.getLogger(__name__).error(
+                    f"Error in event handler for {event.event_type}: {e}"
+                )
 
     @classmethod
-    def publish(cls, event_type: EventType, run_id: str, component: str, metadata: Dict[str, Any] = None):
-        cls.emit(NexusEvent(event_type=event_type, run_id=run_id, component=component, metadata=metadata or {}))
+    def publish(
+        cls, event_type: EventType, run_id: str, component: str, metadata: Dict[str, Any] = None
+    ):
+        cls.emit(
+            NexusEvent(
+                event_type=event_type, run_id=run_id, component=component, metadata=metadata or {}
+            )
+        )

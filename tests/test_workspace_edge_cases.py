@@ -13,7 +13,7 @@ def _init_repo(path: Path) -> None:
 
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
     subprocess.run(["git", "config", "user.email", "nexus@example.invalid"], cwd=path, check=True)
-    subprocess.run(["git", "config", "user.name", "Nexus Test"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.name", "Noryx Test"], cwd=path, check=True)
     (path / "tracked.txt").write_text("base\n", encoding="utf-8")
     subprocess.run(["git", "add", "."], cwd=path, check=True)
     subprocess.run(["git", "commit", "-qm", "initial"], cwd=path, check=True)

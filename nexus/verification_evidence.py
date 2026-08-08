@@ -5,6 +5,7 @@ verification*.  A command may be safe and return zero without proving that any
 relevant test executed.  Completion gates consume the structured profiles and
 validation results produced here instead of relying on command-text substrings.
 """
+
 from __future__ import annotations
 
 import ast
@@ -37,9 +38,18 @@ def _normalise_target(value: str) -> str:
     return value.rstrip("/")
 
 
-def _profile(*, valid: bool, runner: str = "", scope: str = "unknown",
-             targets: Iterable[str] = (), command: str = "", reason: str = "") -> TestCommandProfile:
-    normalized_targets = tuple(dict.fromkeys(_normalise_target(item) for item in targets if _normalise_target(item)))
+def _profile(
+    *,
+    valid: bool,
+    runner: str = "",
+    scope: str = "unknown",
+    targets: Iterable[str] = (),
+    command: str = "",
+    reason: str = "",
+) -> TestCommandProfile:
+    normalized_targets = tuple(
+        dict.fromkeys(_normalise_target(item) for item in targets if _normalise_target(item))
+    )
     return TestCommandProfile(
         valid=valid,
         runner=runner,
@@ -76,14 +86,34 @@ def _looks_like_path(token: str) -> bool:
     if "::" in token:
         return True
     suffix = Path(token).suffix.lower()
-    return "/" in token or suffix in {".py", ".js", ".jsx", ".ts", ".tsx", ".rb", ".php", ".go", ".rs"}
+    return "/" in token or suffix in {
+        ".py",
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",
+        ".rb",
+        ".php",
+        ".go",
+        ".rs",
+    }
 
 
 def _pytest_targets(args: list[str]) -> list[str]:
     targets: list[str] = []
     options_with_values = {
-        "-k", "-m", "--maxfail", "--tb", "--capture", "--rootdir", "--confcutdir",
-        "--basetemp", "--junitxml", "--cov", "--cov-report", "--durations",
+        "-k",
+        "-m",
+        "--maxfail",
+        "--tb",
+        "--capture",
+        "--rootdir",
+        "--confcutdir",
+        "--basetemp",
+        "--junitxml",
+        "--cov",
+        "--cov-report",
+        "--durations",
     }
     skip_next = False
     for token in args:
@@ -102,7 +132,9 @@ def _pytest_targets(args: list[str]) -> list[str]:
     return targets
 
 
-def analyse_test_command(command: str | Sequence[str], *, root: str | Path | None = None) -> TestCommandProfile:
+def analyse_test_command(
+    command: str | Sequence[str], *, root: str | Path | None = None
+) -> TestCommandProfile:
     """Recognise an actual supported test-runner invocation.
 
     The parser rejects command chaining, redirection, interpolation, and generic
@@ -124,12 +156,20 @@ def analyse_test_command(command: str | Sequence[str], *, root: str | Path | Non
             tail = args[2:]
             if runner == "pytest":
                 targets = _pytest_targets(tail)
-                scope = "targeted" if targets or any(t in {"-k", "-m"} for t in tail) else "full_suite"
+                scope = (
+                    "targeted" if targets or any(t in {"-k", "-m"} for t in tail) else "full_suite"
+                )
             else:
-                selectors = [item for item in tail if not item.startswith("-") and item != "discover"]
+                selectors = [
+                    item for item in tail if not item.startswith("-") and item != "discover"
+                ]
                 targets = [_normalise_target(item) for item in selectors]
-                scope = "targeted" if targets or "discover" not in tail and selectors else "full_suite"
-            return _profile(valid=True, runner=runner, scope=scope, targets=targets, command=normalized)
+                scope = (
+                    "targeted" if targets or "discover" not in tail and selectors else "full_suite"
+                )
+            return _profile(
+                valid=True, runner=runner, scope=scope, targets=targets, command=normalized
+            )
 
         # A direct repository assertion script may be accepted only when it is
         # workspace-contained and visibly intended for verification.
@@ -143,17 +183,35 @@ def analyse_test_command(command: str | Sequence[str], *, root: str | Path | Non
                 try:
                     candidate.relative_to(base)
                 except ValueError:
-                    return _profile(valid=False, command=normalized, reason="verification script escapes the workspace")
+                    return _profile(
+                        valid=False,
+                        command=normalized,
+                        reason="verification script escapes the workspace",
+                    )
             stem = Path(script).stem.lower()
-            if Path(script).suffix.lower() == ".py" and stem.startswith(("test", "verify", "check")):
+            if Path(script).suffix.lower() == ".py" and stem.startswith(
+                ("test", "verify", "check")
+            ):
                 if root is None or candidate.is_file():
-                    return _profile(valid=True, runner="python_script", scope="script", targets=(script,), command=normalized)
-        return _profile(valid=False, command=normalized, reason="python command is not a recognised test invocation")
+                    return _profile(
+                        valid=True,
+                        runner="python_script",
+                        scope="script",
+                        targets=(script,),
+                        command=normalized,
+                    )
+        return _profile(
+            valid=False,
+            command=normalized,
+            reason="python command is not a recognised test invocation",
+        )
 
     if exe in {"pytest", "py.test"}:
         targets = _pytest_targets(args)
         scope = "targeted" if targets or any(t in {"-k", "-m"} for t in args) else "full_suite"
-        return _profile(valid=True, runner="pytest", scope=scope, targets=targets, command=normalized)
+        return _profile(
+            valid=True, runner="pytest", scope=scope, targets=targets, command=normalized
+        )
 
     if exe in {"npm", "npm.cmd", "yarn", "yarn.cmd", "pnpm", "pnpm.cmd", "bun", "bun.exe"}:
         package_runner = exe.split(".", 1)[0]
@@ -163,51 +221,135 @@ def analyse_test_command(command: str | Sequence[str], *, root: str | Path | Non
             # not by themselves prove a subset.
             targets = []
             if "--" in tail:
-                targets = [_normalise_target(x) for x in tail[tail.index("--") + 1:] if not x.startswith("-")]
-            return _profile(valid=True, runner=f"{package_runner}_test", scope="targeted" if targets else "full_suite", targets=targets, command=normalized)
-        if package_runner == "yarn" and args and args[0] == "run" and len(args) > 1 and args[1] == "test":
+                targets = [
+                    _normalise_target(x)
+                    for x in tail[tail.index("--") + 1 :]
+                    if not x.startswith("-")
+                ]
+            return _profile(
+                valid=True,
+                runner=f"{package_runner}_test",
+                scope="targeted" if targets else "full_suite",
+                targets=targets,
+                command=normalized,
+            )
+        if (
+            package_runner == "yarn"
+            and args
+            and args[0] == "run"
+            and len(args) > 1
+            and args[1] == "test"
+        ):
             return _profile(valid=True, runner="yarn_test", scope="full_suite", command=normalized)
-        return _profile(valid=False, command=normalized, reason="package-manager command is not a test invocation")
+        return _profile(
+            valid=False,
+            command=normalized,
+            reason="package-manager command is not a test invocation",
+        )
 
     if exe == "cargo" and args and args[0] == "test":
-        targets = [f"selector:{item}" for item in args[1:] if item and not item.startswith("-") and item != "--"]
-        return _profile(valid=True, runner="cargo_test", scope="targeted" if targets else "full_suite", targets=targets, command=normalized)
+        targets = [
+            f"selector:{item}"
+            for item in args[1:]
+            if item and not item.startswith("-") and item != "--"
+        ]
+        return _profile(
+            valid=True,
+            runner="cargo_test",
+            scope="targeted" if targets else "full_suite",
+            targets=targets,
+            command=normalized,
+        )
 
     if exe == "go" and args and args[0] == "test":
-        targets = [_normalise_target(item) for item in args[1:] if item and not item.startswith("-")]
+        targets = [
+            _normalise_target(item) for item in args[1:] if item and not item.startswith("-")
+        ]
         full = not targets or targets == ["./..."]
-        return _profile(valid=True, runner="go_test", scope="full_suite" if full else "targeted", targets=() if full else targets, command=normalized)
+        return _profile(
+            valid=True,
+            runner="go_test",
+            scope="full_suite" if full else "targeted",
+            targets=() if full else targets,
+            command=normalized,
+        )
 
     if exe in {"mvn", "mvnw", "mvnw.cmd"} or exe.endswith("mvnw"):
         if any(item in {"test", "verify"} for item in args):
-            targeted = [item.split("=", 1)[1] for item in args if item.startswith("-Dtest=") and "=" in item]
-            return _profile(valid=True, runner="maven_test", scope="targeted" if targeted else "full_suite", targets=targeted, command=normalized)
+            targeted = [
+                item.split("=", 1)[1] for item in args if item.startswith("-Dtest=") and "=" in item
+            ]
+            return _profile(
+                valid=True,
+                runner="maven_test",
+                scope="targeted" if targeted else "full_suite",
+                targets=targeted,
+                command=normalized,
+            )
 
     if exe in {"gradle", "gradlew", "gradlew.bat"} or exe.endswith("gradlew"):
         if any(item == "test" or item.endswith(":test") for item in args):
             targeted = [args[i + 1] for i, item in enumerate(args[:-1]) if item == "--tests"]
-            return _profile(valid=True, runner="gradle_test", scope="targeted" if targeted else "full_suite", targets=targeted, command=normalized)
+            return _profile(
+                valid=True,
+                runner="gradle_test",
+                scope="targeted" if targeted else "full_suite",
+                targets=targeted,
+                command=normalized,
+            )
 
     if exe == "bundle" and len(args) >= 2 and args[0] == "exec" and args[1] == "rspec":
         targets = [_normalise_target(item) for item in args[2:] if _looks_like_path(item)]
-        return _profile(valid=True, runner="rspec", scope="targeted" if targets else "full_suite", targets=targets, command=normalized)
+        return _profile(
+            valid=True,
+            runner="rspec",
+            scope="targeted" if targets else "full_suite",
+            targets=targets,
+            command=normalized,
+        )
     if exe == "rspec":
         targets = [_normalise_target(item) for item in args if _looks_like_path(item)]
-        return _profile(valid=True, runner="rspec", scope="targeted" if targets else "full_suite", targets=targets, command=normalized)
+        return _profile(
+            valid=True,
+            runner="rspec",
+            scope="targeted" if targets else "full_suite",
+            targets=targets,
+            command=normalized,
+        )
 
     if exe in {"phpunit", "vendor/bin/phpunit"} or exe.endswith("phpunit"):
         targets = [_normalise_target(item) for item in args if _looks_like_path(item)]
-        return _profile(valid=True, runner="phpunit", scope="targeted" if targets else "full_suite", targets=targets, command=normalized)
+        return _profile(
+            valid=True,
+            runner="phpunit",
+            scope="targeted" if targets else "full_suite",
+            targets=targets,
+            command=normalized,
+        )
 
     if exe in {"dart", "flutter"} and args and args[0] == "test":
         targets = [_normalise_target(item) for item in args[1:] if _looks_like_path(item)]
-        return _profile(valid=True, runner=f"{exe}_test", scope="targeted" if targets else "full_suite", targets=targets, command=normalized)
+        return _profile(
+            valid=True,
+            runner=f"{exe}_test",
+            scope="targeted" if targets else "full_suite",
+            targets=targets,
+            command=normalized,
+        )
 
     if exe == "mix" and args and args[0] == "test":
         targets = [_normalise_target(item) for item in args[1:] if _looks_like_path(item)]
-        return _profile(valid=True, runner="mix_test", scope="targeted" if targets else "full_suite", targets=targets, command=normalized)
+        return _profile(
+            valid=True,
+            runner="mix_test",
+            scope="targeted" if targets else "full_suite",
+            targets=targets,
+            command=normalized,
+        )
 
-    return _profile(valid=False, command=normalized, reason="command is not a recognised test runner")
+    return _profile(
+        valid=False, command=normalized, reason="command is not a recognised test runner"
+    )
 
 
 _COUNT_PATTERNS = (
@@ -232,7 +374,9 @@ _ZERO_PATTERNS = (
 
 def observed_test_count(output: str) -> int | None:
     text = str(output or "")
-    counts = [int(match.group(1)) for pattern in _COUNT_PATTERNS for match in pattern.finditer(text)]
+    counts = [
+        int(match.group(1)) for pattern in _COUNT_PATTERNS for match in pattern.finditer(text)
+    ]
     positive = [count for count in counts if count > 0]
     if positive:
         return max(positive)
@@ -253,13 +397,27 @@ def _python_script_assertion_count(profile: TestCommandProfile, root: str | Path
         return 0
     count = sum(isinstance(node, ast.Assert) for node in ast.walk(tree))
     assertion_calls = {
-        "assertEqual", "assertNotEqual", "assertTrue", "assertFalse", "assertIs",
-        "assertIsNot", "assertIn", "assertNotIn", "assertRaises", "fail",
+        "assertEqual",
+        "assertNotEqual",
+        "assertTrue",
+        "assertFalse",
+        "assertIs",
+        "assertIsNot",
+        "assertIn",
+        "assertNotIn",
+        "assertRaises",
+        "fail",
     }
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-        name = node.func.id if isinstance(node.func, ast.Name) else node.func.attr if isinstance(node.func, ast.Attribute) else ""
+        name = (
+            node.func.id
+            if isinstance(node.func, ast.Name)
+            else node.func.attr
+            if isinstance(node.func, ast.Attribute)
+            else ""
+        )
         if name in assertion_calls:
             count += 1
     return count
@@ -286,9 +444,14 @@ def _runner_success_marker(profile: TestCommandProfile, output: str) -> bool:
     return bool(options) and all(re.search(pattern, text, re.I | re.M) for pattern in options)
 
 
-def validate_test_execution(profile: TestCommandProfile, *, output: str, exit_code: int | None,
-                            require_observed_tests: bool = True,
-                            root: str | Path | None = None) -> tuple[bool, str, int | None]:
+def validate_test_execution(
+    profile: TestCommandProfile,
+    *,
+    output: str,
+    exit_code: int | None,
+    require_observed_tests: bool = True,
+    root: str | Path | None = None,
+) -> tuple[bool, str, int | None]:
     if not profile.valid:
         return False, profile.reason or "unrecognised test command", None
     if exit_code != 0:
@@ -300,7 +463,11 @@ def validate_test_execution(profile: TestCommandProfile, *, output: str, exit_co
         return True, f"observed {count} executed tests", count
     script_assertions = _python_script_assertion_count(profile, root)
     if profile.scope == "script" and script_assertions > 0:
-        return True, f"executed assertion script with {script_assertions} assertion(s)", script_assertions
+        return (
+            True,
+            f"executed assertion script with {script_assertions} assertion(s)",
+            script_assertions,
+        )
     if _runner_success_marker(profile, output):
         return True, "observed runner-specific success evidence", None
     if require_observed_tests:
@@ -314,14 +481,40 @@ def _looks_like_test_path(path: str) -> bool:
     parts = {part.lower() for part in Path(normalized).parts}
     return (
         name.startswith(("test_", "verify_", "check_"))
-        or name.endswith(("_test.py", ".test.js", ".test.jsx", ".test.ts", ".test.tsx", ".spec.js", ".spec.jsx", ".spec.ts", ".spec.tsx"))
+        or name.endswith(
+            (
+                "_test.py",
+                ".test.js",
+                ".test.jsx",
+                ".test.ts",
+                ".test.tsx",
+                ".spec.js",
+                ".spec.jsx",
+                ".spec.ts",
+                ".spec.tsx",
+            )
+        )
         or bool(parts & _TEST_DIRS)
     )
 
 
 def _current_test_paths(root: str | Path) -> set[str]:
     base = Path(root).expanduser().resolve()
-    ignored = {".git", ".nexusai", ".pytest_cache", ".ruff_cache", ".mypy_cache", "__pycache__", "node_modules", ".venv", "venv", "dist", "build", "target", ".gradle"}
+    ignored = {
+        ".git",
+        ".nexusai",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        "__pycache__",
+        "node_modules",
+        ".venv",
+        "venv",
+        "dist",
+        "build",
+        "target",
+        ".gradle",
+    }
     found: set[str] = set()
     for path in base.rglob("*"):
         if not path.is_file():
@@ -363,14 +556,30 @@ def _path_provenance(path: str, expected: dict[str, str | None], root: str | Pat
     return "pre_existing" if current_digest == expected_digest else "modified_pre_existing"
 
 
-def test_origin_for_profile(profile: TestCommandProfile, expected_hashes: dict[str, str | None],
-                            *, root: str | Path | None = None) -> str:
+def test_origin_for_profile(
+    profile: TestCommandProfile,
+    expected_hashes: dict[str, str | None],
+    *,
+    root: str | Path | None = None,
+) -> str:
     if not profile.valid:
         return "unknown"
     expected = {_normalise_target(path): digest for path, digest in expected_hashes.items()}
-    explicit = {_normalise_target(target).split("::", 1)[0] for target in profile.targets if target and not target.startswith("selector:")}
+    explicit = {
+        _normalise_target(target).split("::", 1)[0]
+        for target in profile.targets
+        if target and not target.startswith("selector:")
+    }
     if profile.scope == "full_suite":
-        paths = _current_test_paths(root) if root is not None else {p for p, digest in expected.items() if digest is not None and _looks_like_test_path(p)}
+        paths = (
+            _current_test_paths(root)
+            if root is not None
+            else {
+                p
+                for p, digest in expected.items()
+                if digest is not None and _looks_like_test_path(p)
+            }
+        )
     else:
         paths = explicit
     if not paths:
@@ -394,7 +603,9 @@ def verification_identity(item: dict[str, Any]) -> str:
         targets = tuple(sorted(str(value) for value in (metadata.get("test_targets", []) or [])))
         return f"test|{metadata.get('test_runner') or 'unknown'}|{metadata.get('verification_scope') or 'unknown'}|{targets!r}"
     command = str(item.get("command") or "")
-    fingerprint = str(metadata.get("command_fingerprint") or hashlib.sha256(command.encode()).hexdigest())
+    fingerprint = str(
+        metadata.get("command_fingerprint") or hashlib.sha256(command.encode()).hexdigest()
+    )
     return f"{check_type}|{fingerprint}"
 
 
@@ -412,7 +623,8 @@ def effective_verification_evidence(records: list[dict[str, Any]]) -> list[dict[
     # A validated full-suite pass at a revision covers targeted obligations for
     # the same runner and revision.  The inverse is intentionally impossible.
     broad_passes = [
-        item for item in selected
+        item
+        for item in selected
         if item.get("status") == "verified"
         and (item.get("metadata") or {}).get("verification_scope") == "full_suite"
         and (item.get("metadata") or {}).get("verification_valid") is True

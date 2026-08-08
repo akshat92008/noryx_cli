@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Reject an invalid superiority campaign before paid executions begin."""
+
 from __future__ import annotations
 
 import argparse

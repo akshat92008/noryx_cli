@@ -24,7 +24,7 @@ _RESULT_RE = re.compile(r"(?P<count>\d+) (?P<kind>passed|failed|skipped|xfailed|
 _EXCLUDED_TREE_PARTS = frozenset(
     {
         ".git",
-        ".nexus",
+        ".noryx",
         ".nexusai",
         ".pytest_cache",
         ".mypy_cache",
@@ -45,16 +45,16 @@ def _source_tree_sha256(root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*")):
         relative = path.relative_to(root)
-        if any(part in _EXCLUDED_TREE_PARTS or part.endswith(".egg-info") for part in relative.parts):
+        if any(
+            part in _EXCLUDED_TREE_PARTS or part.endswith(".egg-info") for part in relative.parts
+        ):
             continue
         if path.is_dir():
             continue
         if path.name.startswith(".coverage") or path.suffix in {".pyc", ".pyo"}:
             continue
         if path.is_symlink():
-            payload = ("symlink:" + os.readlink(path)).encode(
-                "utf-8", errors="surrogateescape"
-            )
+            payload = ("symlink:" + os.readlink(path)).encode("utf-8", errors="surrogateescape")
         else:
             payload = path.read_bytes()
         digest.update(relative.as_posix().encode("utf-8", errors="surrogateescape"))
@@ -118,8 +118,7 @@ def main() -> int:
         }
         results.append(result)
         print(
-            f"[{index:03d}/{len(paths):03d}] "
-            f"{status.upper():7s} {duration:7.2f}s {relative}",
+            f"[{index:03d}/{len(paths):03d}] {status.upper():7s} {duration:7.2f}s {relative}",
             flush=True,
         )
 

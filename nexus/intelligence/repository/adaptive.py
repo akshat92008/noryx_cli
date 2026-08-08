@@ -4,12 +4,13 @@ The ranker produces local relevance.  This layer expands only through explicit
 repository relationships so callers, tests, configuration and risk boundaries
 are not omitted merely because their filenames do not match the prompt.
 """
+
 from __future__ import annotations
 
 import posixpath
 import re
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Iterable
 
@@ -84,7 +85,9 @@ class AdaptiveContextSelector:
                 score=max(100.0, seed_map.get(path, ContextCandidate(path, "", "", 0, 0)).score),
             )
         if not seed_map:
-            return AdaptiveSelection((), ContextCoverage(limitations=("No repository-backed seed candidate was found.",)))
+            return AdaptiveSelection(
+                (), ContextCoverage(limitations=("No repository-backed seed candidate was found.",))
+            )
 
         selected: dict[str, ContextCandidate] = dict(seed_map)
         relationships: set[tuple[str, str, str]] = set()
@@ -111,8 +114,8 @@ class AdaptiveContextSelector:
                     continue
                 visited_depth[target] = next_depth
                 max_used = max(max_used, next_depth)
-                confidence = max(0.35, min(0.98, weight * (0.92 ** depth)))
-                score = max(1.0, source_score * weight * (0.82 ** depth))
+                confidence = max(0.35, min(0.98, weight * (0.92**depth)))
+                score = max(1.0, source_score * weight * (0.82**depth))
                 record = self.files[target]
                 reason = f"{relation} from {source}"
                 existing = selected.get(target)
@@ -145,7 +148,9 @@ class AdaptiveContextSelector:
         selected_paths = {item.path for item in ranked}
         related_tests = {path for path in categories["tests"] if path in selected_paths}
         high_risk_seeds = {
-            path for path in selected_paths if self.files[path].risk_level in {RiskLevel.HIGH, RiskLevel.CRITICAL}
+            path
+            for path in selected_paths
+            if self.files[path].risk_level in {RiskLevel.HIGH, RiskLevel.CRITICAL}
         }
         confidence = self._confidence(
             selected_paths,
@@ -156,8 +161,13 @@ class AdaptiveContextSelector:
         )
         limitations: list[str] = []
         if len(selected) > len(ranked):
-            limitations.append(f"Context cap omitted {len(selected) - len(ranked)} graph candidates.")
-        if any(self.files[path].test_file is False for path in selected_paths) and not related_tests:
+            limitations.append(
+                f"Context cap omitted {len(selected) - len(ranked)} graph candidates."
+            )
+        if (
+            any(self.files[path].test_file is False for path in selected_paths)
+            and not related_tests
+        ):
             limitations.append("No repository-backed related test was selected.")
         return AdaptiveSelection(
             candidates=tuple(ranked),
@@ -166,9 +176,13 @@ class AdaptiveContextSelector:
                 decisive_files=tuple(sorted(categories["decisive"].intersection(selected_paths))),
                 callers=tuple(sorted(categories["callers"].intersection(selected_paths))),
                 dependencies=tuple(sorted(categories["dependencies"].intersection(selected_paths))),
-                reverse_dependencies=tuple(sorted(categories["reverse"].intersection(selected_paths))),
+                reverse_dependencies=tuple(
+                    sorted(categories["reverse"].intersection(selected_paths))
+                ),
                 related_tests=tuple(sorted(related_tests)),
-                configuration=tuple(sorted(categories["configuration"].intersection(selected_paths))),
+                configuration=tuple(
+                    sorted(categories["configuration"].intersection(selected_paths))
+                ),
                 risk_boundaries=tuple(sorted(categories["risk"].intersection(selected_paths))),
                 graph_hops_used=max_used,
                 confidence=confidence,
@@ -217,8 +231,12 @@ class AdaptiveContextSelector:
                     continue
                 target_record = self.files[target]
                 category = "tests" if target_record.test_file else "callers"
-                relation = "test_symbol_reference" if target_record.test_file else "symbol_reference"
-                yield from emit(target, relation, 0.90 if target_record.test_file else 0.82, category)
+                relation = (
+                    "test_symbol_reference" if target_record.test_file else "symbol_reference"
+                )
+                yield from emit(
+                    target, relation, 0.90 if target_record.test_file else 0.82, category
+                )
 
         package = PurePosixPath(path).parent.as_posix()
         for target, target_record in self.files.items():
@@ -226,7 +244,9 @@ class AdaptiveContextSelector:
                 continue
             if target_record.test_file and self._test_matches(path, target):
                 yield from emit(target, "test_mapping", 0.86, "tests")
-            if target_record.config_file and self._config_matches(record, target_record, package, query):
+            if target_record.config_file and self._config_matches(
+                record, target_record, package, query
+            ):
                 yield from emit(target, "configuration_boundary", 0.62, "configuration")
             if (
                 record.risk_level in {RiskLevel.HIGH, RiskLevel.CRITICAL}
@@ -259,7 +279,11 @@ class AdaptiveContextSelector:
         if tail:
             for path in self.files:
                 stem = str(PurePosixPath(path).with_suffix(""))
-                if stem == tail or stem.endswith("/" + tail) or path.endswith("/" + tail + "/__init__.py"):
+                if (
+                    stem == tail
+                    or stem.endswith("/" + tail)
+                    or path.endswith("/" + tail + "/__init__.py")
+                ):
                     candidates.append(path)
         for candidate in candidates:
             normalized = self._normalize_path(candidate)
@@ -287,9 +311,17 @@ class AdaptiveContextSelector:
         return source_stem == normalized or source_stem in test_stem
 
     @staticmethod
-    def _config_matches(source: RepositoryFile, target: RepositoryFile, package: str, query: str) -> bool:
+    def _config_matches(
+        source: RepositoryFile, target: RepositoryFile, package: str, query: str
+    ) -> bool:
         config_name = PurePosixPath(target.path).name.lower()
-        if config_name in {"pyproject.toml", "package.json", "tsconfig.json", "go.mod", "cargo.toml"}:
+        if config_name in {
+            "pyproject.toml",
+            "package.json",
+            "tsconfig.json",
+            "go.mod",
+            "cargo.toml",
+        }:
             return True
         terms = {part.lower() for part in re.findall(r"[A-Za-z0-9_]+", query) if len(part) > 3}
         haystack = " ".join([source.path, package, *source.imports, *source.references]).lower()
@@ -297,7 +329,12 @@ class AdaptiveContextSelector:
 
     @staticmethod
     def _risk_rank(level: RiskLevel) -> int:
-        return {RiskLevel.CRITICAL: 4, RiskLevel.HIGH: 3, RiskLevel.MEDIUM: 2, RiskLevel.LOW: 1}.get(level, 0)
+        return {
+            RiskLevel.CRITICAL: 4,
+            RiskLevel.HIGH: 3,
+            RiskLevel.MEDIUM: 2,
+            RiskLevel.LOW: 1,
+        }.get(level, 0)
 
     @staticmethod
     def _confidence(selected, *, explicit, tests, high_risk, relationships) -> float:
@@ -320,6 +357,10 @@ class AdaptiveContextSelector:
         if not raw:
             return ""
         normalized = posixpath.normpath(raw)
-        if normalized in {"", ".", ".."} or normalized.startswith("../") or normalized.startswith("/"):
+        if (
+            normalized in {"", ".", ".."}
+            or normalized.startswith("../")
+            or normalized.startswith("/")
+        ):
             return ""
         return str(PurePosixPath(normalized))

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qualify Nexus against real hosted providers and deterministic project oracles."""
+"""Qualify Noryx against real hosted providers and deterministic project oracles."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def _write_json(path: Path, value: object) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Run real-provider Nexus benchmarks. This can incur provider charges and "
+            "Run real-provider Noryx benchmarks. This can incur provider charges and "
             "must be opted into explicitly."
         )
     )
@@ -126,9 +126,7 @@ def main() -> int:
             "retries": item.get("retries", 0),
             "cost_usd": item.get("estimated_cost_usd"),
             "changed_files": item.get("changed_files", []),
-            "external_verification_passed": item.get(
-                "external_verification_passed", False
-            ),
+            "external_verification_passed": item.get("external_verification_passed", False),
             "failure_phase": item.get("failure_phase", ""),
             "failure_type": item.get("failure_type", ""),
             "human_intervention": item.get("human_intervention", False),

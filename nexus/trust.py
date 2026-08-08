@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 TRUSTED_CONFIG_NAMES = {
+    "NORYX.md",
+    "noryx.md",
+    ".noryx.md",
     "NEXUS.md",
     "nexus.md",
     ".nexus.md",
@@ -39,13 +42,16 @@ class TrustStore:
 
     def __init__(self, working_dir: str):
         self.working_dir = Path(working_dir).resolve()
-        self.state_dir = self.working_dir / ".nexusai"
+        self.state_dir = self.working_dir / ".noryx"
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.path = self.state_dir / "trusted-config.json"
         self.state = self._load()
 
     def inspect(
-        self, path: str | Path, expected_digest: str | None = None, expected_content: str | None = None
+        self,
+        path: str | Path,
+        expected_digest: str | None = None,
+        expected_content: str | None = None,
     ) -> TrustDecision:
         p = Path(path).expanduser().resolve()
         if not p.is_file() and expected_digest is None:
@@ -73,7 +79,10 @@ class TrustStore:
         return TrustDecision(str(p), digest, approved, changed, diff)
 
     def approve(
-        self, path: str | Path, expected_digest: str | None = None, expected_content: str | None = None
+        self,
+        path: str | Path,
+        expected_digest: str | None = None,
+        expected_content: str | None = None,
     ) -> TrustDecision:
         decision = self.inspect(path, expected_digest, expected_content)
         if not decision.digest:
@@ -82,25 +91,28 @@ class TrustStore:
         self.state[decision.path] = {
             "digest": decision.digest,
             "approved": True,
-            "content": expected_content if expected_content is not None else (
-                p.read_text(encoding="utf-8", errors="replace") if p.is_file() else ""
-            ),
+            "content": expected_content
+            if expected_content is not None
+            else (p.read_text(encoding="utf-8", errors="replace") if p.is_file() else ""),
         }
         self._save()
         decision.approved = True
         return decision
 
     def reject(
-        self, path: str | Path, expected_digest: str | None = None, expected_content: str | None = None
+        self,
+        path: str | Path,
+        expected_digest: str | None = None,
+        expected_content: str | None = None,
     ) -> TrustDecision:
         decision = self.inspect(path, expected_digest, expected_content)
         p = Path(decision.path)
         self.state[decision.path] = {
             "digest": decision.digest,
             "approved": False,
-            "content": expected_content if expected_content is not None else (
-                p.read_text(encoding="utf-8", errors="replace") if p.is_file() else ""
-            ),
+            "content": expected_content
+            if expected_content is not None
+            else (p.read_text(encoding="utf-8", errors="replace") if p.is_file() else ""),
         }
         self._save()
         return decision
@@ -109,12 +121,14 @@ class TrustStore:
         candidates: set[Path] = set()
         for name in TRUSTED_CONFIG_NAMES:
             candidates.update(self.working_dir.rglob(name))
-        candidates.update((self.working_dir / ".nexus" / "skills").glob("*.md"))
-        candidates.update((self.working_dir / ".nexus").glob("policies.*"))
-        candidates.update((self.working_dir / ".nexus").glob("config.*"))
-        candidates.update((self.working_dir / ".nexus").glob("verify.json"))
+        for control_dir in (".noryx", ".nexus"):
+            candidates.update((self.working_dir / control_dir / "skills").glob("*.md"))
+            candidates.update((self.working_dir / control_dir).glob("policies.*"))
+            candidates.update((self.working_dir / control_dir).glob("config.*"))
+            candidates.update((self.working_dir / control_dir).glob("verify.json"))
         ignored = {
             ".git",
+            ".noryx",
             ".nexusai",
             "node_modules",
             ".venv",
@@ -126,7 +140,10 @@ class TrustStore:
         return [self.inspect(p) for p in sorted(candidates) if not ignored.intersection(p.parts)]
 
     def is_approved(
-        self, path: str | Path, expected_digest: str | None = None, expected_content: str | None = None
+        self,
+        path: str | Path,
+        expected_digest: str | None = None,
+        expected_content: str | None = None,
     ) -> bool:
         return self.inspect(path, expected_digest, expected_content).approved
 

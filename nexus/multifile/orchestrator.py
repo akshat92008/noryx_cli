@@ -4,6 +4,7 @@ The existing EngineeringChangeSet models *planned edits*.  This module models
 what must be inspected, changed, and verified before the run may be considered
 complete.  It deliberately separates obligations from model prose.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -61,7 +62,11 @@ class MultiFileCompletionContract:
     def __post_init__(self) -> None:
         if not self.contract_id:
             canonical = "|".join(
-                [self.objective, self.repository_tree_hash, *(item.path + item.obligation for item in self.obligations)]
+                [
+                    self.objective,
+                    self.repository_tree_hash,
+                    *(item.path + item.obligation for item in self.obligations),
+                ]
             )
             self.contract_id = hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
@@ -72,11 +77,17 @@ class MultiFileCompletionContract:
 
     @property
     def inspect_files(self) -> set[str]:
-        return {item.path for item in self.obligations if item.obligation == "inspect" and item.blocking}
+        return {
+            item.path for item in self.obligations if item.obligation == "inspect" and item.blocking
+        }
 
     @property
     def preserve_files(self) -> set[str]:
-        return {item.path for item in self.obligations if item.obligation == "preserve" and item.blocking}
+        return {
+            item.path
+            for item in self.obligations
+            if item.obligation == "preserve" and item.blocking
+        }
 
     @property
     def hard_enforcement(self) -> bool:
@@ -113,7 +124,15 @@ class MultiFileCompletionContract:
         if not self.hard_enforcement:
             # Advisory contracts may omit low-confidence inspection obligations,
             # but never permit unexpected paths or missing explicit verification.
-            complete = not any((missing_changes, missing_verification, unexpected, preserved, changed_count_missing))
+            complete = not any(
+                (
+                    missing_changes,
+                    missing_verification,
+                    unexpected,
+                    preserved,
+                    changed_count_missing,
+                )
+            )
         return CompletionAssessment(
             complete=complete,
             missing_inspection=tuple(missing_inspection),
@@ -128,13 +147,20 @@ class MultiFileCompletionContract:
     def _allowed(self, path: str) -> bool:
         if path in self.required_change_files:
             return True
-        return any(path == root or path.startswith(root.rstrip("/") + "/") for root in self.allowed_change_roots)
+        return any(
+            path == root or path.startswith(root.rstrip("/") + "/")
+            for root in self.allowed_change_roots
+        )
 
     @staticmethod
     def _normalize(path: str) -> str:
         raw = str(path).replace("\\", "/").strip()
         normalized = posixpath.normpath(raw)
-        if normalized in {"", ".", ".."} or normalized.startswith("../") or normalized.startswith("/"):
+        if (
+            normalized in {"", ".", ".."}
+            or normalized.startswith("../")
+            or normalized.startswith("/")
+        ):
             raise ValueError(f"Invalid repository-relative path: {path!r}")
         return str(PurePosixPath(normalized))
 
@@ -163,48 +189,93 @@ class MultiFileOrchestrator:
         obligations: list[FileObligation] = []
 
         for path in explicit:
-            obligations.append(FileObligation(path, "inspect", "User explicitly named this file.", 1.0, True))
+            obligations.append(
+                FileObligation(path, "inspect", "User explicitly named this file.", 1.0, True)
+            )
         for path in decisive:
-            obligations.append(FileObligation(path, "inspect", "Repository context ranked this file as decisive.", 0.90, True))
+            obligations.append(
+                FileObligation(
+                    path, "inspect", "Repository context ranked this file as decisive.", 0.90, True
+                )
+            )
         normalized_task = str(task_type).lower()
         lowered = objective.lower()
-        repository_wide = any(term in lowered for term in (
-            "repository-wide", "repository wide", "all callers", "every caller",
-            "across the repo", "across the repository", "public api",
-            "signature change", "breaking change",
-        ))
+        repository_wide = any(
+            term in lowered
+            for term in (
+                "repository-wide",
+                "repository wide",
+                "all callers",
+                "every caller",
+                "across the repo",
+                "across the repository",
+                "public api",
+                "signature change",
+                "breaking change",
+            )
+        )
         coordinated_caller_change = repository_wide or normalized_task in {
-            "migration", "refactor", "repository_wide_api_change", "framework_migration",
+            "migration",
+            "refactor",
+            "repository_wide_api_change",
+            "framework_migration",
         }
         for path in caller_paths:
             obligation = "change" if coordinated_caller_change else "inspect"
-            obligations.append(FileObligation(
-                path, obligation,
-                "Direct caller or reverse dependency requires coordinated change."
-                if coordinated_caller_change
-                else "Direct caller or reverse dependency may require coordinated change.",
-                0.90 if coordinated_caller_change else 0.82,
-                coordinated_caller_change or risk_level in {"high", "critical"},
-            ))
+            obligations.append(
+                FileObligation(
+                    path,
+                    obligation,
+                    "Direct caller or reverse dependency requires coordinated change."
+                    if coordinated_caller_change
+                    else "Direct caller or reverse dependency may require coordinated change.",
+                    0.90 if coordinated_caller_change else 0.82,
+                    coordinated_caller_change or risk_level in {"high", "critical"},
+                )
+            )
         for path in tests:
-            obligations.append(FileObligation(path, "verify", "Related regression test mapped by repository evidence.", 0.92, True))
+            obligations.append(
+                FileObligation(
+                    path,
+                    "verify",
+                    "Related regression test mapped by repository evidence.",
+                    0.92,
+                    True,
+                )
+            )
 
         preserve_paths: list[str] = []
         for non_goal in non_goals:
             for path in repository.files:
                 if PurePosixPath(path).name.lower() in str(non_goal).lower():
                     preserve_paths.append(path)
-                    obligations.append(FileObligation(path, "preserve", f"Explicit non-goal: {non_goal}", 1.0, True))
+                    obligations.append(
+                        FileObligation(
+                            path, "preserve", f"Explicit non-goal: {non_goal}", 1.0, True
+                        )
+                    )
         preserved = set(preserve_paths)
 
         required_change_files: list[str] = []
-        mutation_terms = ("fix", "implement", "add", "change", "refactor", "migrate", "remove", "rename", "update", "repair")
+        mutation_terms = (
+            "fix",
+            "implement",
+            "add",
+            "change",
+            "refactor",
+            "migrate",
+            "remove",
+            "rename",
+            "update",
+            "repair",
+        )
         if any(term in lowered for term in mutation_terms):
             # Explicit source files are hard change obligations unless the same
             # objective explicitly protects them as a non-goal. Decisive files
             # remain inspect obligations because a correct solution may change a caller.
             required_change_files = [
-                path for path in explicit
+                path
+                for path in explicit
                 if path not in preserved
                 and (not repository.files.get(path, None) or not repository.files[path].test_file)
             ]
@@ -212,15 +283,23 @@ class MultiFileOrchestrator:
                 required_change_files.extend(path for path in caller_paths if path not in preserved)
             if normalized_task in {"migration", "framework_migration"}:
                 migration_surface = [
-                    path for path, record in repository.files.items()
+                    path
+                    for path, record in repository.files.items()
                     if record.config_file or record.migration_file
                 ]
                 for path in migration_surface:
-                    obligations.append(FileObligation(
-                        path, "change", "Framework/configuration migration surface must be reconciled.",
-                        0.88, True,
-                    ))
-                required_change_files.extend(path for path in migration_surface if path not in preserved)
+                    obligations.append(
+                        FileObligation(
+                            path,
+                            "change",
+                            "Framework/configuration migration surface must be reconciled.",
+                            0.88,
+                            True,
+                        )
+                    )
+                required_change_files.extend(
+                    path for path in migration_surface if path not in preserved
+                )
 
         candidate_paths = set([*explicit, *decisive, *caller_paths, *tests])
         roots = cls._minimal_roots(candidate_paths)
@@ -244,12 +323,16 @@ class MultiFileOrchestrator:
             "Files protected by explicit non-goals must remain content-identical.",
         ]
         if coordinated_caller_change:
-            invariants.extend([
-                "No statically discovered caller may remain on the superseded API contract.",
-                "Repository-wide changes require targeted verification of definitions and all mapped callers.",
-            ])
+            invariants.extend(
+                [
+                    "No statically discovered caller may remain on the superseded API contract.",
+                    "Repository-wide changes require targeted verification of definitions and all mapped callers.",
+                ]
+            )
         if normalized_task in {"migration", "framework_migration"}:
-            invariants.append("Deprecated framework/configuration surface must be removed or explicitly compatibility-pinned.")
+            invariants.append(
+                "Deprecated framework/configuration surface must be removed or explicitly compatibility-pinned."
+            )
         return MultiFileCompletionContract(
             schema_version="nexus.multifile-completion.v3",
             objective=objective,
@@ -296,6 +379,9 @@ class MultiFileOrchestrator:
         for item in items:
             key = (item.path, item.obligation)
             prior = strongest.get(key)
-            if prior is None or (item.blocking, item.confidence) > (prior.blocking, prior.confidence):
+            if prior is None or (item.blocking, item.confidence) > (
+                prior.blocking,
+                prior.confidence,
+            ):
                 strongest[key] = item
         return sorted(strongest.values(), key=lambda item: (item.path, item.obligation))

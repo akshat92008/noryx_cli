@@ -4,10 +4,10 @@ This module does not pretend to make a weak model intelligent.  It creates a
 strict reasoning protocol that requires falsifiable hypotheses, invariants,
 negative evidence, and completion confidence before mutation or success.
 """
+
 from __future__ import annotations
 
 import hashlib
-import re
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Iterable
@@ -126,11 +126,17 @@ class DeliberationCompiler:
             "Fail closed when context, tool status, repository revision, or verification evidence is ambiguous.",
         ]
         if any(term in text for term in ("race", "concurr", "atomic", "lock", "thread", "async")):
-            invariants.append("Concurrency atomicity and ordering guarantees must be preserved under repeated execution.")
+            invariants.append(
+                "Concurrency atomicity and ordering guarantees must be preserved under repeated execution."
+            )
         if any(term in text for term in ("auth", "security", "permission", "credential", "token")):
-            invariants.append("Authentication, authorization, confidentiality, and least-privilege boundaries cannot weaken.")
+            invariants.append(
+                "Authentication, authorization, confidentiality, and least-privilege boundaries cannot weaken."
+            )
         if any(term in text for term in ("migration", "schema", "database")):
-            invariants.append("Migration is reversible or explicitly one-way, preserves existing data, and has rollback evidence.")
+            invariants.append(
+                "Migration is reversible or explicitly one-way, preserves existing data, and has rollback evidence."
+            )
         if "without changing" in text or "do not" in text or "don't" in text:
             invariants.append("Every explicit non-goal must be checked against the final diff.")
 
@@ -142,12 +148,16 @@ class DeliberationCompiler:
             "A final diff critique mapping each change to the objective and an acceptance criterion.",
         ]
         if tests:
-            evidence_requirements.append("Verification must execute the discovered related tests: " + ", ".join(tests[:8]))
+            evidence_requirements.append(
+                "Verification must execute the discovered related tests: " + ", ".join(tests[:8])
+            )
         if risk_level in {"high", "critical"}:
-            evidence_requirements.extend([
-                "An independent deterministic security/architecture check appropriate to the risk.",
-                "No success claim below the configured high-risk confidence floor.",
-            ])
+            evidence_requirements.extend(
+                [
+                    "An independent deterministic security/architecture check appropriate to the risk.",
+                    "No success claim below the configured high-risk confidence floor.",
+                ]
+            )
 
         mutation_preconditions = [
             "Repository tree hash still matches the planning revision.",
@@ -195,84 +205,125 @@ class DeliberationCompiler:
         target = symbols[0] if symbols else (files[0] if files else "the failing path")
         observed = files[0] if files else "the primary implementation path"
         test_hint = tests[0] if tests else "a minimal deterministic reproduction"
-        candidates: list[tuple[str, str, tuple[str, ...], tuple[str, ...], tuple[str, ...], float]] = []
+        candidates: list[
+            tuple[str, str, tuple[str, ...], tuple[str, ...], tuple[str, ...], float]
+        ] = []
         if any(term in text for term in ("race", "concurr", "thread", "atomic", "lock")):
-            candidates.extend([
-                (
-                    "atomicity",
-                    f"{target} performs a read/decision/write sequence without one atomic boundary.",
-                    ("interleaving permits duplicate or stale state", "shared state changes between decision and commit"),
-                    ("the operation is already protected by one effective lock/transaction",),
-                    (f"inspect {observed} and direct callers", f"stress {test_hint} with repeated interleavings"),
-                    0.72,
-                ),
-                (
-                    "ownership",
-                    "Multiple code paths independently own the same state transition.",
-                    ("two callers mutate the same resource", "duplicate transition logic exists"),
-                    ("all mutations delegate to one authoritative owner",),
-                    ("search reverse imports and callers", "compare transition preconditions"),
-                    0.58,
-                ),
-            ])
+            candidates.extend(
+                [
+                    (
+                        "atomicity",
+                        f"{target} performs a read/decision/write sequence without one atomic boundary.",
+                        (
+                            "interleaving permits duplicate or stale state",
+                            "shared state changes between decision and commit",
+                        ),
+                        ("the operation is already protected by one effective lock/transaction",),
+                        (
+                            f"inspect {observed} and direct callers",
+                            f"stress {test_hint} with repeated interleavings",
+                        ),
+                        0.72,
+                    ),
+                    (
+                        "ownership",
+                        "Multiple code paths independently own the same state transition.",
+                        (
+                            "two callers mutate the same resource",
+                            "duplicate transition logic exists",
+                        ),
+                        ("all mutations delegate to one authoritative owner",),
+                        ("search reverse imports and callers", "compare transition preconditions"),
+                        0.58,
+                    ),
+                ]
+            )
         if any(term in text for term in ("auth", "permission", "token", "session")):
-            candidates.append((
-                "contract",
-                "Authentication state or authorization checks are evaluated against stale or incomplete context.",
-                ("a caller bypasses canonical validation", "state validation and use occur at different revisions"),
-                ("every caller uses the same current-state validation immediately before use",),
-                ("trace entrypoint-to-storage data flow", "test denied, expired, and concurrent cases"),
-                0.64,
-            ))
+            candidates.append(
+                (
+                    "contract",
+                    "Authentication state or authorization checks are evaluated against stale or incomplete context.",
+                    (
+                        "a caller bypasses canonical validation",
+                        "state validation and use occur at different revisions",
+                    ),
+                    ("every caller uses the same current-state validation immediately before use",),
+                    (
+                        "trace entrypoint-to-storage data flow",
+                        "test denied, expired, and concurrent cases",
+                    ),
+                    0.64,
+                )
+            )
         if task_type in {"bug_repair", "security_remediation", "refactor"}:
-            candidates.extend([
-                (
-                    "boundary",
-                    "The visible failure originates at a dependency or interface boundary rather than the reported line.",
-                    ("caller/callee assumptions disagree", "input, return, exception, or lifecycle contract differs"),
-                    ("all boundary contracts are consistent and the defect reproduces locally",),
-                    ("inspect direct imports, callers, implementers, and tests",),
-                    0.55,
-                ),
-                (
-                    "baseline",
-                    "The failure is inherited or environment-specific and not caused by the targeted implementation.",
-                    ("the baseline fails identically", "failure varies with runtime/configuration"),
-                    ("a clean baseline passes and the target mutation deterministically controls the outcome",),
-                    ("capture pre-mutation baseline", "compare normalized failure signatures"),
-                    0.35,
-                ),
-            ])
+            candidates.extend(
+                [
+                    (
+                        "boundary",
+                        "The visible failure originates at a dependency or interface boundary rather than the reported line.",
+                        (
+                            "caller/callee assumptions disagree",
+                            "input, return, exception, or lifecycle contract differs",
+                        ),
+                        (
+                            "all boundary contracts are consistent and the defect reproduces locally",
+                        ),
+                        ("inspect direct imports, callers, implementers, and tests",),
+                        0.55,
+                    ),
+                    (
+                        "baseline",
+                        "The failure is inherited or environment-specific and not caused by the targeted implementation.",
+                        (
+                            "the baseline fails identically",
+                            "failure varies with runtime/configuration",
+                        ),
+                        (
+                            "a clean baseline passes and the target mutation deterministically controls the outcome",
+                        ),
+                        ("capture pre-mutation baseline", "compare normalized failure signatures"),
+                        0.35,
+                    ),
+                ]
+            )
         else:
-            candidates.extend([
-                (
-                    "integration",
-                    "The requested capability requires coordinated changes across implementation, callers, tests, and packaging.",
-                    ("multiple repository relationships are impacted",),
-                    ("one isolated change satisfies all executable acceptance criteria",),
-                    ("build an impact graph", "inspect package/config entrypoints"),
-                    0.70,
-                ),
-                (
-                    "compatibility",
-                    "An existing public or persisted contract constrains the implementation shape.",
-                    ("external callers or fixtures depend on current behavior",),
-                    ("the code is private and has no persisted consumers",),
-                    ("search public exports, schemas, fixtures, and migrations",),
-                    0.55,
-                ),
-            ])
+            candidates.extend(
+                [
+                    (
+                        "integration",
+                        "The requested capability requires coordinated changes across implementation, callers, tests, and packaging.",
+                        ("multiple repository relationships are impacted",),
+                        ("one isolated change satisfies all executable acceptance criteria",),
+                        ("build an impact graph", "inspect package/config entrypoints"),
+                        0.70,
+                    ),
+                    (
+                        "compatibility",
+                        "An existing public or persisted contract constrains the implementation shape.",
+                        ("external callers or fixtures depend on current behavior",),
+                        ("the code is private and has no persisted consumers",),
+                        ("search public exports, schemas, fixtures, and migrations",),
+                        0.55,
+                    ),
+                ]
+            )
         if len(candidates) < 3:
-            candidates.append((
-                "test_gap",
-                "Existing tests do not exercise the canonical runtime route containing the defect.",
-                ("unit paths pass while end-to-end behavior fails",),
-                ("an existing test invokes the same production boundary and reproduces the issue",),
-                ("map tests to production imports and entrypoints",),
-                0.50,
-            ))
+            candidates.append(
+                (
+                    "test_gap",
+                    "Existing tests do not exercise the canonical runtime route containing the defect.",
+                    ("unit paths pass while end-to-end behavior fails",),
+                    (
+                        "an existing test invokes the same production boundary and reproduces the issue",
+                    ),
+                    ("map tests to production imports and entrypoints",),
+                    0.50,
+                )
+            )
         result: list[EngineeringHypothesis] = []
-        for index, (category, statement, predicts, falsifies, checks, confidence) in enumerate(candidates[:5], 1):
+        for index, (category, statement, predicts, falsifies, checks, confidence) in enumerate(
+            candidates[:5], 1
+        ):
             digest = hashlib.sha256(f"{category}:{statement}".encode()).hexdigest()[:8]
             result.append(
                 EngineeringHypothesis(

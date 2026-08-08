@@ -1,4 +1,4 @@
-"""Environment variable control layer for Nexus CLI.
+"""Environment variable control layer for Noryx CLI.
 
 Builds minimal, allowlist-based environments for subprocesses, plugins, workers,
 and MCP servers to prevent credential leaks and host environment pollution.

@@ -11,13 +11,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from nexus.storage import exclusive_file_lock
 from nexus.intelligence.engineering.integrity import StateAuthenticator
+from nexus.storage import exclusive_file_lock
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
 
 
 class LongHorizonIntegrityError(ValueError):
@@ -144,7 +143,9 @@ class LongHorizonState:
             task_id=str(data["task_id"]),
             objective=str(data.get("objective", "")),
             phase=LongHorizonPhase(str(data.get("phase", LongHorizonPhase.RESEARCH.value))),
-            phase_attempts={str(k): int(v) for k, v in dict(data.get("phase_attempts", {})).items()},
+            phase_attempts={
+                str(k): int(v) for k, v in dict(data.get("phase_attempts", {})).items()
+            },
             checkpoints=[PhaseCheckpoint(**item) for item in data.get("checkpoints", [])],
             completed_steps=[str(item) for item in data.get("completed_steps", [])],
             remaining_steps=[str(item) for item in data.get("remaining_steps", [])],
@@ -165,7 +166,7 @@ class LongHorizonController:
     def __init__(self, repository_root: str | Path, task_id: str, objective: str):
         root = Path(repository_root).expanduser().resolve()
         self.authenticator = StateAuthenticator.for_repository(root)
-        self.path = root / ".nexus" / "long-horizon" / f"{task_id}.json"
+        self.path = root / ".noryx" / "long-horizon" / f"{task_id}.json"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with exclusive_file_lock(self.path):
             if self.path.exists():

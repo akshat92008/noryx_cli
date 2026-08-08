@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,7 +18,7 @@ from nexus.planner import (
     TaskStatus,
 )
 from nexus.run_state import RunLedger
-from nexus.sandbox import SandboxBackend, SandboxRunner
+from nexus.sandbox import SandboxBackend
 
 
 def test_long_horizon_manifest_is_valid_and_dry_runnable():
@@ -128,11 +126,11 @@ def test_benchmark_automatically_resumes_same_run_until_verified(tmp_path, monke
     )
     agent_commands = []
 
-
-    from nexus.sandbox import CommandResult, SandboxBackend
     import nexus.process_gateway
+    from nexus.sandbox import CommandResult
+
     agent_commands = []
-    
+
     def fake_gateway_run(req):
         command = " ".join(req.command)
         if "nexus" in command:
@@ -140,6 +138,7 @@ def test_benchmark_automatically_resumes_same_run_until_verified(tmp_path, monke
             index = len(agent_commands)
             status = "FAILED" if index == 1 else "VERIFIED"
             import json
+
             payload = {
                 "session_id": "session",
                 "run": {
@@ -157,7 +156,7 @@ def test_benchmark_automatically_resumes_same_run_until_verified(tmp_path, monke
                 exit_code=2 if index == 1 else 0,
                 stdout=json.dumps(payload),
                 stderr="",
-                timed_out=False
+                timed_out=False,
             )
         return CommandResult(
             argv=list(req.command),
@@ -167,8 +166,9 @@ def test_benchmark_automatically_resumes_same_run_until_verified(tmp_path, monke
             exit_code=0,
             stdout="ok\n",
             stderr="",
-            timed_out=False
+            timed_out=False,
         )
+
     monkeypatch.setattr(nexus.process_gateway.ProcessExecutionGateway, "run", fake_gateway_run)
 
     result = BenchmarkRunner(BenchmarkSuite.load(manifest)).run().results[0]

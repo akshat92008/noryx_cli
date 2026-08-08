@@ -40,7 +40,7 @@ class MigrationStatus(str, Enum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     ROLLED_BACK = "ROLLED_BACK"
-    BLOCKED = "BLOCKED"          # infrastructure unavailable or requires approval
+    BLOCKED = "BLOCKED"  # infrastructure unavailable or requires approval
     REQUIRES_APPROVAL = "REQUIRES_APPROVAL"
 
 
@@ -55,15 +55,16 @@ class MigrationKind(str, Enum):
 @dataclass
 class ConfigurationMigration:
     """A plan for migrating a configuration key."""
+
     old_key: str
     new_key: str
     config_files: list[str] = field(default_factory=list)
-    parser: str = ""                 # e.g. "toml", "yaml", "ini", "env"
+    parser: str = ""  # e.g. "toml", "yaml", "ini", "env"
     default_before: str = ""
     default_after: str = ""
     deprecation_warning: bool = True
     compatibility_policy: CompatibilityPolicy = CompatibilityPolicy.DEPRECATION_WINDOW
-    backward_compat_shim: str = ""   # code to support both old and new key
+    backward_compat_shim: str = ""  # code to support both old and new key
     documentation_files: list[str] = field(default_factory=list)
     environment_variables: list[str] = field(default_factory=list)
 
@@ -71,12 +72,13 @@ class ConfigurationMigration:
 @dataclass
 class SchemaMigration:
     """A plan for a schema/database migration."""
+
     migration_id: str
     description: str
     current_schema: str
     target_schema: str
-    forward_migration: str    # SQL or ORM commands
-    backward_migration: str   # rollback SQL or ORM commands
+    forward_migration: str  # SQL or ORM commands
+    backward_migration: str  # rollback SQL or ORM commands
     is_reversible: bool = True
     is_destructive: bool = False
     requires_production_approval: bool = False
@@ -88,6 +90,7 @@ class SchemaMigration:
 @dataclass
 class DependencyChange:
     """A planned dependency upgrade or replacement."""
+
     kind: str  # UPGRADE | REPLACE
     package_name: str
     version_before: str
@@ -103,6 +106,7 @@ class DependencyChange:
 @dataclass
 class FrameworkMigrationStage:
     """One bounded phase of a framework migration."""
+
     stage_number: int
     name: str
     description: str
@@ -117,6 +121,7 @@ class FrameworkMigrationStage:
 @dataclass
 class MigrationPlan:
     """Unified migration plan container."""
+
     plan_id: str
     kind: MigrationKind
     description: str
@@ -146,6 +151,7 @@ class MigrationOrchestrator:
     ) -> MigrationPlan:
         """Plan a configuration key rename/restructure."""
         import uuid
+
         plan = MigrationPlan(
             plan_id=f"config-mig-{uuid.uuid4().hex[:8]}",
             kind=MigrationKind.CONFIGURATION,
@@ -197,6 +203,7 @@ class MigrationOrchestrator:
     ) -> MigrationPlan:
         """Plan a database/schema migration. Never executes production migrations."""
         import uuid
+
         plan = MigrationPlan(
             plan_id=f"schema-mig-{uuid.uuid4().hex[:8]}",
             kind=MigrationKind.SCHEMA,
@@ -261,6 +268,7 @@ class MigrationOrchestrator:
     ) -> MigrationPlan:
         """Plan a dependency upgrade or replacement."""
         import uuid
+
         plan = MigrationPlan(
             plan_id=f"dep-{uuid.uuid4().hex[:8]}",
             kind=(
@@ -333,6 +341,7 @@ class MigrationOrchestrator:
         entire migration in one model turn.
         """
         import uuid
+
         plan = MigrationPlan(
             plan_id=f"fw-stage-{stage.stage_number:02d}-{uuid.uuid4().hex[:6]}",
             kind=MigrationKind.FRAMEWORK,

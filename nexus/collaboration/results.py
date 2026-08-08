@@ -12,8 +12,7 @@ from __future__ import annotations
 import ast
 import uuid
 from decimal import Decimal
-from pathlib import Path
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Tuple
 
 from nexus.collaboration.models import (
     AgentAssignment,
@@ -62,9 +61,7 @@ def validate_result(result: AssignmentResult, assignment: Optional[AgentAssignme
     if result.status in (AssignmentStatus.COMPLETED, AssignmentStatus.LOCALLY_VALIDATED):
         evidence_ids = result.evidence_ids or result.evidence
         if not evidence_ids:
-            raise ResultValidationError(
-                "COMPLETED result must provide at least one evidence_id."
-            )
+            raise ResultValidationError("COMPLETED result must provide at least one evidence_id.")
 
         # Check for mutation workers
         if assignment and assignment.mutation_policy.allowed and assignment.allowed_mutation_paths:

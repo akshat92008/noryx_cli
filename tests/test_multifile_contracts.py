@@ -1,27 +1,19 @@
 """Tests for the canonical EngineeringChangeSet contract model (Sprint 8)."""
+
 from __future__ import annotations
 
-import pytest
+from nexus.multifile.consistency import ChangeSetConsistencyValidator
 from nexus.multifile.contracts import (
     ChangeType,
-    ChangeDependency,
-    ChangeStage,
-    ChangeStageStatus,
     CompatibilityPolicy,
     ContractChange,
-    ContractScope,
     ContractType,
     EngineeringChangeSet,
-    MissingChange,
     PlannedFileChange,
-    RollbackPlan,
-    ScopeViolation,
     SymbolReference,
     TaskType,
     ValidationStatus,
 )
-from nexus.multifile.consistency import ChangeSetConsistencyValidator
-
 
 # ---------------------------------------------------------------------------
 # PlannedFileChange
@@ -132,7 +124,7 @@ def test_stale_snapshot_detection():
         repository_snapshot_id="",  # no snapshot bound
         file_changes=[
             PlannedFileChange(path="nexus/x.py", reason="Fix bug", change_type=ChangeType.MODIFY),
-        ]
+        ],
     )
     # No snapshot → still executable (warned but not blocked at model level)
     assert cs.repository_snapshot_id == ""
@@ -199,8 +191,9 @@ def test_schema_without_migration_detected(tmp_path):
     )
     validator = ChangeSetConsistencyValidator(repo_root=tmp_path)
     result = validator.validate(cs)
-    assert any("migration" in mc.reason.lower() for mc in result.missing_changes) or \
-           any("migration" in w.lower() for w in result.warnings)
+    assert any("migration" in mc.reason.lower() for mc in result.missing_changes) or any(
+        "migration" in w.lower() for w in result.warnings
+    )
 
 
 def test_change_set_serialization():

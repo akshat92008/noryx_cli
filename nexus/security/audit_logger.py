@@ -1,4 +1,4 @@
-"""Append-only corruption-evident audit logger for Nexus CLI.
+"""Append-only corruption-evident audit logger for Noryx CLI.
 
 Records security decisions, policy evaluations, secret redactions, and approvals.
 The local SHA-256 chain detects accidental or unsophisticated modification; it is not
@@ -12,7 +12,7 @@ import json
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from nexus.security.secret_protection import SecretRedactor
 

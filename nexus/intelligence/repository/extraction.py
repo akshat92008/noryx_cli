@@ -7,7 +7,7 @@ import json
 import re
 from pathlib import Path
 
-from nexus.intelligence.repository.model import RepositorySymbol, SymbolReference
+from nexus.intelligence.repository.model import RepositorySymbol
 
 
 class LanguageExtractor:
@@ -51,7 +51,9 @@ class LanguageExtractor:
         }
 
     @staticmethod
-    def _extract_python(tree: ast.AST, relative_path: str) -> tuple[list[str], list[RepositorySymbol], list[str]]:
+    def _extract_python(
+        tree: ast.AST, relative_path: str
+    ) -> tuple[list[str], list[RepositorySymbol], list[str]]:
         imports: list[str] = []
         symbols: list[RepositorySymbol] = []
         references: list[str] = []
@@ -91,7 +93,7 @@ class LanguageExtractor:
                 kind = "method" if parents else "function"
                 end_line = getattr(node, "end_lineno", node.lineno)
                 docstring = ast.get_docstring(node) or ""
-                
+
                 # Signature summary
                 args = [arg.arg for arg in node.args.args]
                 sig = f"{node.name}({', '.join(args)})"
@@ -148,12 +150,16 @@ class LanguageExtractor:
                         base_names.append(base.id)
                     elif isinstance(base, ast.Attribute):
                         base_names.append(base.attr)
-                if any(name in {"Base", "Model", "Document", "DeclarativeBase"} for name in base_names):
+                if any(
+                    name in {"Base", "Model", "Document", "DeclarativeBase"} for name in base_names
+                ):
                     models.append(node.name)
         return routes, models
 
     @staticmethod
-    def _extract_generic(source: str, relative_path: str) -> tuple[list[str], list[RepositorySymbol], list[str]]:
+    def _extract_generic(
+        source: str, relative_path: str
+    ) -> tuple[list[str], list[RepositorySymbol], list[str]]:
         import_patterns = (
             r"\b(?:import|from)\s+(?:[^'\"]*?\s+from\s+)?['\"]([^'\"]+)['\"]",
             r"\brequire\s*\(\s*['\"]([^'\"]+)['\"]\s*\)",
@@ -169,7 +175,10 @@ class LanguageExtractor:
             ("interface", r"\binterface\s+([A-Za-z_$][\w$]*)"),
             ("type", r"\btype\s+([A-Za-z_$][\w$]*)\s*="),
             ("function", r"\b(?:function|func|fn)\s+([A-Za-z_$][\w$]*)"),
-            ("function", r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>"),
+            (
+                "function",
+                r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>",
+            ),
         )
         symbols: list[RepositorySymbol] = []
         for kind, pattern in declarations:
@@ -189,8 +198,10 @@ class LanguageExtractor:
         declared = {item.name for item in symbols}
         call_names = re.findall(r"\b([A-Za-z_$][\w$]*)\s*\(", source)
         references = [
-            name for name in call_names
-            if name not in declared and name not in {"if", "for", "while", "switch", "catch", "return"}
+            name
+            for name in call_names
+            if name not in declared
+            and name not in {"if", "for", "while", "switch", "catch", "return"}
         ]
         return imports, symbols, references
 
@@ -211,6 +222,12 @@ class LanguageExtractor:
         if suffix == ".prisma":
             models.extend(re.findall(r"^\s*model\s+([A-Za-z_]\w*)", source, re.MULTILINE))
         if suffix == ".sql":
-            models.extend(re.findall(r"\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[\"`]?([A-Za-z_]\w*)", source, re.I))
+            models.extend(
+                re.findall(
+                    r"\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[\"`]?([A-Za-z_]\w*)",
+                    source,
+                    re.I,
+                )
+            )
 
         return routes, models

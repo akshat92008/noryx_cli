@@ -4,11 +4,9 @@ Adaptive Model Router — Task-Specific Capability Matching, Portfolio Modes and
 
 from __future__ import annotations
 
-import hashlib
 import os
-import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -107,7 +105,7 @@ class RoutingDecision:
 
 
 class ModelRouter:
-    """Authoritative Adaptive Model Router for Nexus CLI."""
+    """Authoritative Adaptive Model Router for Noryx CLI."""
 
     def __init__(self) -> None:
         self.history: list[RoutingDecision] = []
@@ -130,7 +128,9 @@ class ModelRouter:
             tool_req = False
         elif phase_enum in (EngineeringPhase.PLANNING, EngineeringPhase.PLAN_CRITICISM):
             min_caps[CapabilityDimension.PLAN_QUALITY] = 0.7
-            min_caps[CapabilityDimension.SECURITY_REASONING] = 0.7 if risk_level in ("high", "critical") else 0.5
+            min_caps[CapabilityDimension.SECURITY_REASONING] = (
+                0.7 if risk_level in ("high", "critical") else 0.5
+            )
             tool_req = True
         elif phase_enum == EngineeringPhase.RECOVERY:
             min_caps[CapabilityDimension.RECOVERY_QUALITY] = 0.75
@@ -172,15 +172,26 @@ class ModelRouter:
         descriptors = [
             item
             for item in model_registry.list_all()
-            if item.enabled and (item.backend != "custom" or os.environ.get("NEXUS_MODEL_ID", "").strip())
+            if item.enabled
+            and (item.backend != "custom" or os.environ.get("NEXUS_MODEL_ID", "").strip())
         ]
         reasons: list[str] = []
         policy_constraints: list[str] = []
 
         # Filter 1: Privacy policy
-        if portfolio_mode == PortfolioMode.PRIVATE or requirements.preferred_privacy == PrivacyClass.LOCAL_ONLY:
-            valid_descs = [d for d in descriptors if d.local or d.privacy_class in (PrivacyClass.LOCAL_ONLY, PrivacyClass.PRIVATE_INFRASTRUCTURE)]
-            policy_constraints.append(f"Privacy constraint enforced: {requirements.preferred_privacy.value}")
+        if (
+            portfolio_mode == PortfolioMode.PRIVATE
+            or requirements.preferred_privacy == PrivacyClass.LOCAL_ONLY
+        ):
+            valid_descs = [
+                d
+                for d in descriptors
+                if d.local
+                or d.privacy_class in (PrivacyClass.LOCAL_ONLY, PrivacyClass.PRIVATE_INFRASTRUCTURE)
+            ]
+            policy_constraints.append(
+                f"Privacy constraint enforced: {requirements.preferred_privacy.value}"
+            )
         else:
             valid_descs = list(descriptors)
 
@@ -191,10 +202,17 @@ class ModelRouter:
             valid_descs = [d for d in valid_descs if d.supports_structured_output]
 
         # Filter 3: Context Window
-        valid_descs = [d for d in valid_descs if (d.context_window or 128000) >= requirements.context_required]
+        valid_descs = [
+            d for d in valid_descs if (d.context_window or 128000) >= requirements.context_required
+        ]
 
         # Filter 4: Exclude previous failed models for this run if alternatives exist
-        non_failed = [d for d in valid_descs if d.model_id not in failed_set and model_registry.resolve_key(d.model_id) not in failed_set]
+        non_failed = [
+            d
+            for d in valid_descs
+            if d.model_id not in failed_set
+            and model_registry.resolve_key(d.model_id) not in failed_set
+        ]
         if non_failed:
             valid_descs = non_failed
 
@@ -203,7 +221,9 @@ class ModelRouter:
             valid_descs = model_registry.list_all()
 
         if not valid_descs:
-            raise RuntimeError("No enabled model satisfies the required privacy, tool, structured-output, and context constraints.")
+            raise RuntimeError(
+                "No enabled model satisfies the required privacy, tool, structured-output, and context constraints."
+            )
 
         # Score & rank candidates.  Certified candidates are always preferred
         # over merely high-scoring candidates for high-risk work.
@@ -211,7 +231,9 @@ class ModelRouter:
         for desc in valid_descs:
             profile = model_doctor.get_profile(desc.model_id)
             gaps = self._capability_gaps(profile, requirements)
-            score = self._evaluate_model_suitability(desc, profile, requirements, portfolio_mode, budget_remaining_usd)
+            score = self._evaluate_model_suitability(
+                desc, profile, requirements, portfolio_mode, budget_remaining_usd
+            )
             if not gaps:
                 score += 500.0
             elif requirements.risk_level in ("high", "critical"):
@@ -227,7 +249,9 @@ class ModelRouter:
                 reasons.append(f"User manual selection override: {user_model_choice}")
             else:
                 selected_desc = scored_candidates[0][1]
-                reasons.append(f"Manual choice {user_model_choice} invalid or policy-blocked; defaulted to suitable candidate {selected_desc.display_name}")
+                reasons.append(
+                    f"Manual choice {user_model_choice} invalid or policy-blocked; defaulted to suitable candidate {selected_desc.display_name}"
+                )
         else:
             selected_desc = scored_candidates[0][1]
             reasons.append(f"Selected via portfolio mode {portfolio_mode.value}")
@@ -250,14 +274,26 @@ class ModelRouter:
         sel_profile = selected_row[2]
         capability_gaps = list(selected_row[3])
         meets_requirements = not capability_gaps
-        measured = bool(sel_profile and sel_profile.source not in {"conservative-prior", "prior", "unknown"})
+        measured = bool(
+            sel_profile and sel_profile.source not in {"conservative-prior", "prior", "unknown"}
+        )
         if requirements.risk_level in ("high", "critical") and not measured:
-            capability_gaps.append("high-risk routing requires measured Model Doctor evidence; profile is prior-only")
+            capability_gaps.append(
+                "high-risk routing requires measured Model Doctor evidence; profile is prior-only"
+            )
             meets_requirements = False
-        confidence = 0.85 if meets_requirements and sel_profile and sel_profile.overall_band in (CapabilityBand.STRONG, CapabilityBand.SUITABLE) else 0.45
+        confidence = (
+            0.85
+            if meets_requirements
+            and sel_profile
+            and sel_profile.overall_band in (CapabilityBand.STRONG, CapabilityBand.SUITABLE)
+            else 0.45
+        )
         if not meets_requirements:
             approval = True
-            policy_constraints.append("Selected model is not certified for every required capability; autonomous execution is blocked pending approval or escalation")
+            policy_constraints.append(
+                "Selected model is not certified for every required capability; autonomous execution is blocked pending approval or escalation"
+            )
             reasons.append("Capability gaps: " + "; ".join(capability_gaps))
 
         reasons.append(f"Phase {requirements.phase.value} risk {requirements.risk_level}")
@@ -368,7 +404,10 @@ class ModelRouter:
         risk_level: str = "low",
     ) -> str:
         """Safely downshift from strong model to cheap model for documentation/boilerplate edits."""
-        if risk_level in ("high", "critical") or downstream_phase in (EngineeringPhase.PLANNING, EngineeringPhase.DEBUGGING):
+        if risk_level in ("high", "critical") or downstream_phase in (
+            EngineeringPhase.PLANNING,
+            EngineeringPhase.DEBUGGING,
+        ):
             return current_model_key
 
         if downstream_phase in (EngineeringPhase.DOCUMENTATION, EngineeringPhase.REPOS_SUMMARY):

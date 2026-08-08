@@ -84,7 +84,7 @@ class AuditLogger:
         records: list[AuditRecord] = []
         try:
             lines = self._path.read_text(encoding="utf-8").strip().split("\n")
-            for line in lines[-self.MAX_RECORDS:]:
+            for line in lines[-self.MAX_RECORDS :]:
                 if line.strip():
                     records.append(AuditRecord.from_dict(json.loads(line)))
         except (json.JSONDecodeError, OSError):
@@ -111,7 +111,7 @@ class AuditLogger:
         )
         self._records.append(record)
         if len(self._records) > self.MAX_RECORDS:
-            self._records = self._records[-self.MAX_RECORDS:]
+            self._records = self._records[-self.MAX_RECORDS :]
 
         with open(self._path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record.to_dict()) + "\n")

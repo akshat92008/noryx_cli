@@ -206,6 +206,7 @@ class PlatformExtensionRegistry:
 
     def get_enabled_by_type(self, extension_type: str) -> list[ExtensionRecord]:
         return [
-            r for r in self._records.values()
+            r
+            for r in self._records.values()
             if r.enabled and r.manifest.extension_type == extension_type
         ]

@@ -1,4 +1,4 @@
-"""Executable offline reliability benchmark for the installed Nexus runtime.
+"""Executable offline reliability benchmark for the installed Noryx runtime.
 
 This suite proves deterministic orchestration and truth-integrity behavior without
 claiming model intelligence.  It performs a real repository repair through the
@@ -32,7 +32,6 @@ from nexus.intelligence.engineering import (
 from nexus.intelligence.repository.snapshot import workspace_revision
 from nexus.policy import get_mode_policy
 from nexus.providers.base import Provider
-
 
 SCHEMA_VERSION = "nexus.offline-reliability.v1"
 
@@ -72,9 +71,7 @@ class OfflineReliabilityReport:
                 "executed_scenarios": len(self.scenarios),
                 "passed": passed,
                 "failed": len(self.scenarios) - passed,
-                "pass_rate": round(passed / len(self.scenarios), 4)
-                if self.scenarios
-                else 0.0,
+                "pass_rate": round(passed / len(self.scenarios), 4) if self.scenarios else 0.0,
                 "real_repository_repairs": sum(
                     1
                     for item in self.scenarios
@@ -186,7 +183,7 @@ def _git_init(root: Path) -> None:
         check=True,
     )
     subprocess.run(
-        ["git", "config", "user.name", "Nexus Offline Benchmark"],
+        ["git", "config", "user.name", "Noryx Offline Benchmark"],
         cwd=root,
         check=True,
     )
@@ -199,8 +196,7 @@ def _scenario_repository_repair(base: Path) -> ScenarioResult:
     root = base / "calculator-repair"
     root.mkdir()
     (root / "calculator.py").write_text(
-        "def add(a, b):\n    return a + b\n\n"
-        "def multiply(a, b):\n    return a + b\n",
+        "def add(a, b):\n    return a + b\n\ndef multiply(a, b):\n    return a + b\n",
         encoding="utf-8",
     )
     (root / "test_calculator.py").write_text(
@@ -332,9 +328,7 @@ def _scenario_repository_repair(base: Path) -> ScenarioResult:
 
 def _fixture_repository(root: Path) -> None:
     root.mkdir()
-    (root / "calculator.py").write_text(
-        "def multiply(a, b):\n    return a + b\n", encoding="utf-8"
-    )
+    (root / "calculator.py").write_text("def multiply(a, b):\n    return a + b\n", encoding="utf-8")
     (root / "verify.py").write_text(
         "from calculator import multiply\nassert multiply(2, 3) == 6\n", encoding="utf-8"
     )
@@ -391,9 +385,10 @@ def _scenario_prose_evidence(base: Path) -> ScenarioResult:
         prohibited_patterns=[],
         acceptance_criteria=["Users can reset passwords"],
     )
-    passed = not result.satisfied and result.requirement_results.get(
-        "Users can reset passwords"
-    ) == "UNVERIFIED"
+    passed = (
+        not result.satisfied
+        and result.requirement_results.get("Users can reset passwords") == "UNVERIFIED"
+    )
     return ScenarioResult(
         "model-prose-is-not-proof",
         "verification-adversarial",
@@ -419,9 +414,7 @@ def _scenario_fabricated_scope(base: Path) -> ScenarioResult:
         source_revision=revision,
         details="model-authored unsupported claim",
     )
-    decision = brain.authorize_mutation(
-        ["helper.py"], expansion_evidence=[fabricated]
-    )
+    decision = brain.authorize_mutation(["helper.py"], expansion_evidence=[fabricated])
     return ScenarioResult(
         "fabricated-scope-evidence",
         "policy-adversarial",

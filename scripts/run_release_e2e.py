@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run eight real Nexus CLI scenarios and preserve complete raw transcripts.
+"""Run eight real Noryx CLI scenarios and preserve complete raw transcripts.
 
 This harness never substitutes model output or test results.  Every scenario
 invokes ``run.py`` as a child process, records stdout/stderr/return codes, then
@@ -154,7 +154,9 @@ def scenarios() -> list[Scenario]:
                 "Create exactly one file hello.py with a main function that prints exactly "
                 "hello-nexus, and call main() under an if __name__ == '__main__' guard."
             ),
-            steps=[Step("native execution", ["python3", "hello.py"], expected_stdout="hello-nexus\n")],
+            steps=[
+                Step("native execution", ["python3", "hello.py"], expected_stdout="hello-nexus\n")
+            ],
         ),
         Scenario(
             name="02_python_surgical_bugfix",
@@ -272,9 +274,19 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-root", default=str(REPO / "verification_evidence"))
     parser.add_argument("--workspace-root", default=tempfile.gettempdir())
-    parser.add_argument("--model", default=os.environ.get("NEXUS_E2E_MODEL"), help="Override the model for all model-backed scenarios")
-    parser.add_argument("--model-id", default=os.environ.get("NEXUS_MODEL_ID"), help="Provider model ID for --model custom")
-    parser.add_argument("--scenario", action="append", help="Run only the named scenario (repeatable)")
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("NEXUS_E2E_MODEL"),
+        help="Override the model for all model-backed scenarios",
+    )
+    parser.add_argument(
+        "--model-id",
+        default=os.environ.get("NEXUS_MODEL_ID"),
+        help="Provider model ID for --model custom",
+    )
+    parser.add_argument(
+        "--scenario", action="append", help="Run only the named scenario (repeatable)"
+    )
     args = parser.parse_args()
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -313,8 +325,10 @@ def main() -> int:
         records = []
         setup_steps = [
             Step("git init", ["git", "init"]),
-            Step("git identity email", ["git", "config", "user.email", "nexus-e2e@example.invalid"]),
-            Step("git identity name", ["git", "config", "user.name", "Nexus E2E"]),
+            Step(
+                "git identity email", ["git", "config", "user.email", "nexus-e2e@example.invalid"]
+            ),
+            Step("git identity name", ["git", "config", "user.name", "Noryx E2E"]),
             Step("git add baseline", ["git", "add", "."]),
             Step("git baseline commit", ["git", "commit", "--allow-empty", "-m", "baseline"]),
         ]
@@ -324,15 +338,15 @@ def main() -> int:
         effective_model = args.model or scenario.model
         expected_cli_code = 0 if scenario.model_call else 2
         cli_record = run_step(
-                Step(
-                    "Nexus CLI",
-                    nexus_command(workspace, scenario.prompt, effective_model, args.model_id),
-                    expected_returncode=expected_cli_code,
-                    timeout=600,
-                ),
-                workspace,
-                env,
-            )
+            Step(
+                "Noryx CLI",
+                nexus_command(workspace, scenario.prompt, effective_model, args.model_id),
+                expected_returncode=expected_cli_code,
+                timeout=600,
+            ),
+            workspace,
+            env,
+        )
         records.append(cli_record)
         try:
             cli_payload = json.loads(cli_record["stdout"])
@@ -341,7 +355,7 @@ def main() -> int:
             if session_id and evidence_path.is_file():
                 records.append(
                     run_step(
-                        Step("Nexus evidence trail", ["cat", str(evidence_path)]),
+                        Step("Noryx evidence trail", ["cat", str(evidence_path)]),
                         workspace,
                         env,
                     )
@@ -355,10 +369,13 @@ def main() -> int:
             records.append(run_step(step, workspace, env))
 
         # A real CLI shell operation proves the resulting git state is visible
-        # through Nexus, while git diff --check independently checks whitespace.
+        # through Noryx, while git diff --check independently checks whitespace.
         records.append(
             run_step(
-                Step("Nexus git status", nexus_command(workspace, "!git status --short", effective_model, args.model_id)),
+                Step(
+                    "Noryx git status",
+                    nexus_command(workspace, "!git status --short", effective_model, args.model_id),
+                ),
                 workspace,
                 env,
             )
@@ -401,7 +418,15 @@ def main() -> int:
     (artifact_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
-    print(json.dumps({"artifact_dir": str(artifact_dir), "passed": manifest["passed"], "failed": manifest["failed"]}))
+    print(
+        json.dumps(
+            {
+                "artifact_dir": str(artifact_dir),
+                "passed": manifest["passed"],
+                "failed": manifest["failed"],
+            }
+        )
+    )
     return 0 if manifest["failed"] == 0 else 1
 
 

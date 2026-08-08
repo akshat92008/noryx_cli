@@ -13,19 +13,21 @@ from nexus.platform.capabilities import validate_capabilities
 EXTENSION_API_VERSION = "nexus.extensions.v1"
 MANIFEST_VERSION = "1.0.0"
 
-EXTENSION_TYPES = frozenset({
-    "tool",
-    "provider",
-    "context_source",
-    "repository_analyzer",
-    "verification_check",
-    "planning_extension",
-    "routing_policy",
-    "event_subscriber",
-    "mcp_server",
-    "mcp_client",
-    "plugin",
-})
+EXTENSION_TYPES = frozenset(
+    {
+        "tool",
+        "provider",
+        "context_source",
+        "repository_analyzer",
+        "verification_check",
+        "planning_extension",
+        "routing_policy",
+        "event_subscriber",
+        "mcp_server",
+        "mcp_client",
+        "plugin",
+    }
+)
 
 _NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 _VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$")
@@ -161,9 +163,7 @@ def validate_manifest(data: dict[str, Any]) -> list[str]:
 
     api_version = data.get("api_version", EXTENSION_API_VERSION)
     if api_version != EXTENSION_API_VERSION:
-        errors.append(
-            f"Unsupported api_version '{api_version}': expected {EXTENSION_API_VERSION}"
-        )
+        errors.append(f"Unsupported api_version '{api_version}': expected {EXTENSION_API_VERSION}")
 
     entry_point = data.get("entry_point", "__init__.py")
     if entry_point and (".." in entry_point or entry_point.startswith("/")):
@@ -180,7 +180,13 @@ def validate_manifest(data: dict[str, Any]) -> list[str]:
     if isinstance(caps, list):
         errors.extend(validate_capabilities(caps))
 
-    for field_name in ("required_tools", "required_paths", "required_env", "dependencies", "permissions"):
+    for field_name in (
+        "required_tools",
+        "required_paths",
+        "required_env",
+        "dependencies",
+        "permissions",
+    ):
         values = data.get(field_name, [])
         if values and not isinstance(values, list):
             errors.append(f"'{field_name}' must be a list")

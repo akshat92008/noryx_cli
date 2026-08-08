@@ -15,22 +15,20 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import subprocess
 import shlex
-import tempfile
+import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from nexus.multifile.consistency import ChangeSetConsistencyValidator
 from nexus.multifile.contracts import (
+    ChangeSetValidationResult,
     ChangeStage,
     ChangeStageStatus,
     EngineeringChangeSet,
     PlannedFileChange,
-    ValidationStatus,
-    ChangeSetValidationResult,
 )
 from nexus.multifile.events import (
     ChangeStageCompleted,
@@ -40,8 +38,7 @@ from nexus.multifile.events import (
     IntermediateVerificationStarted,
     MultiFileVerificationCompleted,
 )
-from nexus.multifile.graph import build_graph, DependencyCycleError
-from nexus.multifile.consistency import ChangeSetConsistencyValidator
+from nexus.multifile.graph import DependencyCycleError, build_graph
 from nexus.process_gateway import ProcessExecutionGateway, ProcessRequest
 
 logger = logging.getLogger(__name__)
@@ -95,11 +92,7 @@ class IntermediateVerifier:
                 )
                 result = ProcessExecutionGateway.run(req)
 
-                combined_output.append(
-                    f"$ {cmd}\n"
-                    f"exit={result.exit_code}\n"
-                    f"{result.stdout[:1000]}"
-                )
+                combined_output.append(f"$ {cmd}\nexit={result.exit_code}\n{result.stdout[:1000]}")
                 if result.exit_code != 0:
                     combined_output.append(
                         f"\nStage {stage_id} verification failed at command: {cmd}"
@@ -133,7 +126,7 @@ class StagedChangeSetExecutor:
         checkpoint_manager: Any = None,
     ) -> None:
         self.repo_root = Path(repo_root)
-        self.run_dir = Path(run_dir) if run_dir else self.repo_root / ".nexus" / "runs" / "current"
+        self.run_dir = Path(run_dir) if run_dir else self.repo_root / ".noryx" / "runs" / "current"
         self.patch_applier = patch_applier or _default_patch_applier
         self.checkpoint_manager = checkpoint_manager
         self._verifier = IntermediateVerifier()
@@ -180,9 +173,9 @@ class StagedChangeSetExecutor:
 
         # 4. Execute stages
         if cs.stages:
-            stage_result = self._execute_staged(cs, result)
+            self._execute_staged(cs, result)
         else:
-            stage_result = self._execute_flat(cs, result, graph)
+            self._execute_flat(cs, result, graph)
 
         # 5. Final integration verification
         if result.status not in ("FAILED", "BLOCKED", "PARTIAL"):
@@ -229,9 +222,7 @@ class StagedChangeSetExecutor:
         # Here we check that the snapshot ID format is valid.
         return bool(cs.repository_snapshot_id)
 
-    def _execute_staged(
-        self, cs: EngineeringChangeSet, result: ChangeSetExecutionResult
-    ) -> None:
+    def _execute_staged(self, cs: EngineeringChangeSet, result: ChangeSetExecutionResult) -> None:
         """Execute changes through explicitly defined stages."""
         mandatory_failed = False
 
@@ -293,21 +284,25 @@ class StagedChangeSetExecutor:
         stage.status = ChangeStageStatus.IN_PROGRESS
         stage.started_at = datetime.now(timezone.utc).isoformat()
 
-        self._emit(ChangeStageStarted(
-            run_id=cs.run_id,
-            change_set_id=cs.change_set_id,
-            stage_id=stage.stage_id,
-            stage_name=stage.name,
-            file_count=len(stage.file_paths),
-            mandatory=stage.mandatory,
-        ))
+        self._emit(
+            ChangeStageStarted(
+                run_id=cs.run_id,
+                change_set_id=cs.change_set_id,
+                stage_id=stage.stage_id,
+                stage_name=stage.name,
+                file_count=len(stage.file_paths),
+                mandatory=stage.mandatory,
+            )
+        )
 
         # Create checkpoint before stage
         if stage.checkpoint_required and self.checkpoint_manager:
             try:
                 self.checkpoint_manager.create(stage.stage_id)
             except Exception as exc:
-                logger.warning("Failed to create checkpoint for stage '%s': %s", stage.stage_id, exc)
+                logger.warning(
+                    "Failed to create checkpoint for stage '%s': %s", stage.stage_id, exc
+                )
 
         modified: list[str] = []
 
@@ -324,14 +319,16 @@ class StagedChangeSetExecutor:
                 stage.status = ChangeStageStatus.FAILED
                 stage.failure_reason = f"Patch failed for '{path}': {detail}"
                 stage.completed_at = datetime.now(timezone.utc).isoformat()
-                self._emit(ChangeStageFailed(
-                    run_id=cs.run_id,
-                    change_set_id=cs.change_set_id,
-                    stage_id=stage.stage_id,
-                    stage_name=stage.name,
-                    failure_reason=stage.failure_reason,
-                    files_partially_modified=modified,
-                ))
+                self._emit(
+                    ChangeStageFailed(
+                        run_id=cs.run_id,
+                        change_set_id=cs.change_set_id,
+                        stage_id=stage.stage_id,
+                        stage_name=stage.name,
+                        failure_reason=stage.failure_reason,
+                        files_partially_modified=modified,
+                    )
+                )
                 return StageExecutionResult(
                     stage_id=stage.stage_id,
                     status=ChangeStageStatus.FAILED,
@@ -341,36 +338,42 @@ class StagedChangeSetExecutor:
 
         # Intermediate verification
         if stage.verification_commands:
-            self._emit(IntermediateVerificationStarted(
-                run_id=cs.run_id,
-                change_set_id=cs.change_set_id,
-                stage_id=stage.stage_id,
-                commands=stage.verification_commands,
-            ))
+            self._emit(
+                IntermediateVerificationStarted(
+                    run_id=cs.run_id,
+                    change_set_id=cs.change_set_id,
+                    stage_id=stage.stage_id,
+                    commands=stage.verification_commands,
+                )
+            )
             passed, summary = self._verifier.verify(
                 stage.verification_commands,
                 cwd=str(self.repo_root),
                 stage_id=stage.stage_id,
             )
-            self._emit(IntermediateVerificationCompleted(
-                run_id=cs.run_id,
-                change_set_id=cs.change_set_id,
-                stage_id=stage.stage_id,
-                passed=passed,
-                output_summary=summary[:500],
-            ))
+            self._emit(
+                IntermediateVerificationCompleted(
+                    run_id=cs.run_id,
+                    change_set_id=cs.change_set_id,
+                    stage_id=stage.stage_id,
+                    passed=passed,
+                    output_summary=summary[:500],
+                )
+            )
             stage.verification_passed = passed
             if not passed and stage.mandatory:
                 stage.status = ChangeStageStatus.FAILED
                 stage.failure_reason = f"Verification failed: {summary[:200]}"
                 stage.completed_at = datetime.now(timezone.utc).isoformat()
-                self._emit(ChangeStageFailed(
-                    run_id=cs.run_id,
-                    change_set_id=cs.change_set_id,
-                    stage_id=stage.stage_id,
-                    stage_name=stage.name,
-                    failure_reason=stage.failure_reason,
-                ))
+                self._emit(
+                    ChangeStageFailed(
+                        run_id=cs.run_id,
+                        change_set_id=cs.change_set_id,
+                        stage_id=stage.stage_id,
+                        stage_name=stage.name,
+                        failure_reason=stage.failure_reason,
+                    )
+                )
                 return StageExecutionResult(
                     stage_id=stage.stage_id,
                     status=ChangeStageStatus.FAILED,
@@ -381,14 +384,16 @@ class StagedChangeSetExecutor:
         stage.status = ChangeStageStatus.COMPLETED
         stage.completed_at = datetime.now(timezone.utc).isoformat()
 
-        self._emit(ChangeStageCompleted(
-            run_id=cs.run_id,
-            change_set_id=cs.change_set_id,
-            stage_id=stage.stage_id,
-            stage_name=stage.name,
-            verification_passed=stage.verification_passed,
-            files_modified=modified,
-        ))
+        self._emit(
+            ChangeStageCompleted(
+                run_id=cs.run_id,
+                change_set_id=cs.change_set_id,
+                stage_id=stage.stage_id,
+                stage_name=stage.name,
+                verification_passed=stage.verification_passed,
+                files_modified=modified,
+            )
+        )
 
         self._persist_stage(stage)
         return StageExecutionResult(
@@ -426,13 +431,15 @@ class StagedChangeSetExecutor:
             result.final_verified = True
             cs.final_verified = True
 
-        self._emit(MultiFileVerificationCompleted(
-            run_id=cs.run_id,
-            change_set_id=cs.change_set_id,
-            status="VERIFIED" if result.final_verified else "FAILED",
-            acceptance_criteria_passed=ac_passed,
-            acceptance_criteria_failed=ac_failed,
-        ))
+        self._emit(
+            MultiFileVerificationCompleted(
+                run_id=cs.run_id,
+                change_set_id=cs.change_set_id,
+                status="VERIFIED" if result.final_verified else "FAILED",
+                acceptance_criteria_passed=ac_passed,
+                acceptance_criteria_failed=ac_failed,
+            )
+        )
 
     def _persist_stage(self, stage: ChangeStage) -> None:
         stages_dir = self.run_dir / "stages"

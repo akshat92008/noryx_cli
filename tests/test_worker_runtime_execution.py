@@ -12,7 +12,6 @@ from nexus.collaboration.models import (
     AgentAssignment,
     AgentRole,
     AssignmentStatus,
-    ContextResource,
     MutationPolicy,
     WorkerBudget,
     WorkerContextPacket,
@@ -112,7 +111,9 @@ def test_mutating_worker_executes_tools_and_locally_validates(tmp_path: Path):
     )
 
     result = asyncio.run(
-        runtime.execute(assignment, context_for(assignment_id), workspace_for(tmp_path, assignment_id))
+        runtime.execute(
+            assignment, context_for(assignment_id), workspace_for(tmp_path, assignment_id)
+        )
     )
 
     assert result.status == AssignmentStatus.LOCALLY_VALIDATED
@@ -168,6 +169,10 @@ def test_untrusted_context_cannot_override_assignment(tmp_path: Path):
         ScopeReservationRegistry(),
         provider_coordinator=SequenceProvider([json.dumps({"summary": "not reached"})]),
     )
-    result = asyncio.run(runtime.execute(assignment, context, workspace_for(tmp_path, assignment.assignment_id, False)))
+    result = asyncio.run(
+        runtime.execute(
+            assignment, context, workspace_for(tmp_path, assignment.assignment_id, False)
+        )
+    )
     assert result.status == AssignmentStatus.BLOCKED
     assert "untrusted instruction" in result.summary

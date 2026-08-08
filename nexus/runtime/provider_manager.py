@@ -24,7 +24,6 @@ from nexus.verification import CheckStatus
 logger = logging.getLogger(__name__)
 
 
-
 class ProviderManagerMixin:
     def set_model(self, model_key: str) -> bool:
         """Switch to a different model."""
@@ -218,7 +217,7 @@ class ProviderManagerMixin:
                 or "too many requests" in error_msg.lower()
             )
             if (
-                (is_rate_limit or "Nexus AI Provider Failover Error" in error_msg)
+                (is_rate_limit or "Noryx AI Provider Failover Error" in error_msg)
                 and self.enable_nova_fallback
                 and self.local_intern_enabled
             ):
@@ -663,4 +662,3 @@ class ProviderManagerMixin:
         self.messages.append({"role": "assistant", "content": final_content})
         self._auto_save()
         return final_content, events
-

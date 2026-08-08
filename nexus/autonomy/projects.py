@@ -175,7 +175,9 @@ class EngineeringProject:
 
 class AutonomyStore:
     def __init__(self, state_dir: Path | None = None):
-        self.state_dir = state_dir or Path.home() / ".nexusai" / "autonomy"
+        from nexus.paths import noryx_home
+
+        self.state_dir = state_dir or noryx_home() / "autonomy"
         self.state_dir.mkdir(parents=True, exist_ok=True)
 
     def _path(self, name: str) -> Path:
@@ -211,7 +213,9 @@ class ProjectScheduler:
         if not candidates:
             return None
         risk_order = {"low": 0, "medium": 1, "high": 2, "critical": 3}
-        return sorted(candidates, key=lambda item: (risk_order.get(item.risk, 1), item.milestone_id))[0]
+        return sorted(
+            candidates, key=lambda item: (risk_order.get(item.risk, 1), item.milestone_id)
+        )[0]
 
 
 class ProjectService:
@@ -303,8 +307,12 @@ class ProjectService:
             "evidence_complete": bool(project.verification_evidence),
         }
 
-    def checkpoint(self, project_id: str, reason: str, *, repository_revision: str = "") -> Checkpoint:
-        payload = json.dumps(self.get(project_id).to_dict() if self.get(project_id) else {}, sort_keys=True)
+    def checkpoint(
+        self, project_id: str, reason: str, *, repository_revision: str = ""
+    ) -> Checkpoint:
+        payload = json.dumps(
+            self.get(project_id).to_dict() if self.get(project_id) else {}, sort_keys=True
+        )
         checkpoint = Checkpoint(
             checkpoint_id=f"chk_{uuid.uuid4().hex[:10]}",
             project_id=project_id,
@@ -337,7 +345,10 @@ class ProjectService:
         reasons = []
         if "repository" not in allowed_scopes:
             for path in changed_paths:
-                if not any(path.startswith(scope.rstrip("/") + "/") or path == scope for scope in allowed_scopes):
+                if not any(
+                    path.startswith(scope.rstrip("/") + "/") or path == scope
+                    for scope in allowed_scopes
+                ):
                     reasons.append(f"unplanned_path:{path}")
         if new_dependencies:
             reasons.append("new_dependencies")

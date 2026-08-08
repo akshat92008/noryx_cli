@@ -1,5 +1,5 @@
 """
-Baseline-Aware Failure Analysis for Nexus CLI.
+Baseline-Aware Failure Analysis for Noryx CLI.
 Compares pre-run baseline failures, pre-mutation state, and post-mutation evidence.
 """
 
@@ -31,7 +31,6 @@ class BaselineAnalyzer:
         is_environment_error: bool = False,
     ) -> dict[str, FailureRelation]:
         base_set = set(baseline_failures)
-        prev_set = set(previous_attempt_failures or [])
         target_set = set(target_tests or [])
 
         results: dict[str, FailureRelation] = {}

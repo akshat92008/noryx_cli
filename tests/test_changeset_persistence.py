@@ -1,7 +1,7 @@
 """Tests for ChangeSetPersistence (Sprint 8)."""
+
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 
 from nexus.multifile.contracts import (
@@ -22,7 +22,9 @@ def test_save_and_load_change_set(tmp_path: Path):
         task_type=TaskType.FEATURE,
         objective="Multi-file persistence test",
         file_changes=[
-            PlannedFileChange(path="nexus/a.py", reason="Initial edit", change_type=ChangeType.MODIFY)
+            PlannedFileChange(
+                path="nexus/a.py", reason="Initial edit", change_type=ChangeType.MODIFY
+            )
         ],
     )
     save_path = persistence.save_change_set(cs)
@@ -79,7 +81,11 @@ def test_prepare_resume_valid(tmp_path: Path):
     persistence.save_change_set(cs)
     persistence.save_stage_artifact(
         "stage-1",
-        {"stage_id": "stage-1", "status": ChangeStageStatus.COMPLETED.value, "file_paths": ["nexus/a.py"]},
+        {
+            "stage_id": "stage-1",
+            "status": ChangeStageStatus.COMPLETED.value,
+            "file_paths": ["nexus/a.py"],
+        },
     )
 
     resume_info = persistence.prepare_resume("run-200", str(tmp_path))

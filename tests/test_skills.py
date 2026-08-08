@@ -6,7 +6,7 @@ def test_skill_loader_markdown_parsing(tmp_path):
     loader = SkillLoader(registry, working_dir=tmp_path, trusted=lambda x: True)
 
     # Create project skills dir
-    skill_dir = tmp_path / ".nexus" / "skills"
+    skill_dir = tmp_path / ".noryx" / "skills"
     skill_dir.mkdir(parents=True)
 
     skill_md = skill_dir / "my-skill.md"

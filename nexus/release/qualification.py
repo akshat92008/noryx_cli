@@ -11,8 +11,8 @@ import hashlib
 import json
 import re
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -22,6 +22,7 @@ _SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:[-+][0-9A-Za-
 
 def sha256_file(path: str | Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
 
 def source_tree_sha256(root: str | Path) -> str:
     """Hash release source while excluding generated runtime and build state."""
@@ -38,7 +39,7 @@ def source_tree_sha256(root: str | Path) -> str:
         "release_evidence",
         "verification_evidence",
         "runs",
-        ".nexus",
+        ".noryx",
         ".nexusai",
     }
     digest = hashlib.sha256()
@@ -206,7 +207,9 @@ class ReleaseQualification:
                     failures.append("bound_evidence_contains_test_failures")
 
         try:
-            stamp = datetime.fromisoformat(str(binding.get("generated_at", "")).replace("Z", "+00:00"))
+            stamp = datetime.fromisoformat(
+                str(binding.get("generated_at", "")).replace("Z", "+00:00")
+            )
             if stamp.tzinfo is None:
                 raise ValueError("timezone missing")
             if stamp > datetime.now(timezone.utc).astimezone(stamp.tzinfo):
@@ -230,7 +233,9 @@ class ReleaseQualification:
             for item in self.supply_chain.artifacts
             if item.exists and Path(item.path).name.endswith((".tar.gz", ".zip"))
         ]
-        if archive_artifacts and source_archive_hash not in {item.sha256 for item in archive_artifacts}:
+        if archive_artifacts and source_archive_hash not in {
+            item.sha256 for item in archive_artifacts
+        }:
             failures.append("bound_evidence_source_archive_hash_mismatch")
         elif archive_artifacts and not source_archive_hash:
             failures.append("bound_evidence_source_archive_hash_missing")
@@ -243,11 +248,15 @@ class ReleaseQualification:
 
         reports = binding.get("reports")
         required_reports = self.channel_policy.required_report_names
-        if not isinstance(reports, Mapping) or any(name not in reports for name in required_reports):
+        if not isinstance(reports, Mapping) or any(
+            name not in reports for name in required_reports
+        ):
             failures.append("bound_evidence_reports_missing")
             return failures
 
-        evidence_root = Path(self.evidence_root).expanduser().resolve() if self.evidence_root else None
+        evidence_root = (
+            Path(self.evidence_root).expanduser().resolve() if self.evidence_root else None
+        )
         resolved_reports: dict[str, Path] = {}
         for name in required_reports:
             descriptor = reports.get(name)
@@ -279,7 +288,11 @@ class ReleaseQualification:
         if junit is not None and parsed_counts is not None:
             try:
                 xml_root = ET.parse(junit).getroot()
-                suites = [xml_root] if xml_root.tag == "testsuite" else list(xml_root.findall("testsuite"))
+                suites = (
+                    [xml_root]
+                    if xml_root.tag == "testsuite"
+                    else list(xml_root.findall("testsuite"))
+                )
                 collected = sum(int(item.attrib.get("tests", 0)) for item in suites)
                 failed = sum(
                     int(item.attrib.get("failures", 0)) + int(item.attrib.get("errors", 0))
@@ -330,7 +343,7 @@ class ReleaseQualification:
                 root_packages = [
                     item
                     for item in packages
-                    if isinstance(item, Mapping) and item.get("name") == "nexusai-cli"
+                    if isinstance(item, Mapping) and item.get("name") == "noryx-cli"
                 ]
                 if not root_packages or root_packages[0].get("versionInfo") != self.version:
                     failures.append("bound_evidence_sbom_version_mismatch")
@@ -346,9 +359,15 @@ class ReleaseQualification:
                 if deploy_payload.get("autonomous_production_ready") is True:
                     sandbox = deploy_payload.get("sandbox_qualification") or {}
                     competitive = deploy_payload.get("competitive_superiority") or {}
-                    if not isinstance(sandbox, Mapping) or sandbox.get("autonomous_ready") is not True:
+                    if (
+                        not isinstance(sandbox, Mapping)
+                        or sandbox.get("autonomous_ready") is not True
+                    ):
                         failures.append("bound_evidence_autonomous_readiness_overclaimed")
-                    elif not isinstance(competitive, Mapping) or competitive.get("qualified") is not True:
+                    elif (
+                        not isinstance(competitive, Mapping)
+                        or competitive.get("qualified") is not True
+                    ):
                         failures.append("bound_evidence_autonomous_readiness_overclaimed")
                 elif deploy_payload.get("autonomous_production_ready") is not False:
                     failures.append("bound_evidence_autonomous_readiness_overclaimed")
@@ -385,7 +404,9 @@ class ReleaseQualification:
         elif not self.test_results:
             warnings.append("test_evidence_not_supplied")
 
-        failed_security = sorted(k for k, v in self.security_results.items() if not self._result_passed(v))
+        failed_security = sorted(
+            k for k, v in self.security_results.items() if not self._result_passed(v)
+        )
         if failed_security:
             failures.extend(f"security_failed:{name}" for name in failed_security)
         elif self.channel_policy.require_security_evidence and not self.security_results:

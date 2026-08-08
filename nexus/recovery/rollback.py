@@ -1,4 +1,4 @@
-"""Verified rollback decision and execution for Nexus recovery."""
+"""Verified rollback decision and execution for Noryx recovery."""
 
 from __future__ import annotations
 
@@ -67,9 +67,7 @@ class RollbackManager:
             if not isinstance(request_metadata, dict):
                 request_metadata = {}
 
-            start_raw = report_metadata.get(
-                "history_start", request_metadata.get("history_start")
-            )
+            start_raw = report_metadata.get("history_start", request_metadata.get("history_start"))
             end_raw = report_metadata.get("history_end")
             try:
                 history_start = int(start_raw)
@@ -109,8 +107,7 @@ class RollbackManager:
                 snapshot = Path(str(snapshot_value)).expanduser() if snapshot_value else None
                 if snapshot is None or not snapshot.is_file():
                     return False, (
-                        "Rollback blocked: required snapshot is unavailable for "
-                        f"{target}."
+                        f"Rollback blocked: required snapshot is unavailable for {target}."
                     )
                 expected.append((target, True, _digest(snapshot)))
 
@@ -136,7 +133,10 @@ class RollbackManager:
             if verification_errors:
                 return False, "Rollback verification failed: " + "; ".join(verification_errors)
 
-            return True, f"Verified rollback of {count} operation(s) for {session_id}/{run_path.name}:\n{detail}"
+            return (
+                True,
+                f"Verified rollback of {count} operation(s) for {session_id}/{run_path.name}:\n{detail}",
+            )
         except Exception as exc:  # noqa: BLE001
             return False, f"Rollback error: {exc}"
 

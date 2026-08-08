@@ -100,9 +100,7 @@ def test_autonomous_mode_disables_shell_and_fails_closed_without_native_sandbox(
     assert "shell-string execution is disabled" in shell_result
     assert not typed_success
     assert "No supported OS sandbox" in typed_result
-    assert "run_command" not in {
-        item["function"]["name"] for item in (agent._get_tools() or [])
-    }
+    assert "run_command" not in {item["function"]["name"] for item in (agent._get_tools() or [])}
     assert target.is_dir()
 
 
@@ -151,7 +149,7 @@ def test_cancelled_dangerous_call_never_executes(tmp_path, monkeypatch):
 
 
 def test_nova_file_edits_require_nova_guardrail_metadata(tmp_path, monkeypatch):
-    """Nova-backed file writes must have passed Nova guardrails before Nexus safety."""
+    """Nova-backed file writes must have passed Nova guardrails before Noryx safety."""
     old_cwd = os.getcwd()
     try:
         agent = _agent_for_tmp_path(tmp_path, monkeypatch)
@@ -168,7 +166,7 @@ def test_nova_file_edits_require_nova_guardrail_metadata(tmp_path, monkeypatch):
 
 
 def test_nova_guarded_file_edit_still_uses_nexus_safety(tmp_path, monkeypatch):
-    """A passed Nova verdict is not enough to bypass Nexus SafetyLayer."""
+    """A passed Nova verdict is not enough to bypass Noryx SafetyLayer."""
     old_cwd = os.getcwd()
     try:
         agent = _agent_for_tmp_path(tmp_path, monkeypatch)

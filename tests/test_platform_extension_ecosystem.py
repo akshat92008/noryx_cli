@@ -158,7 +158,9 @@ def test_permission_store_checks_every_scope(tmp_path, scope, expected_valid_aft
 
 @pytest.mark.parametrize("extension_type", ["tool", "provider", "mcp_server"])
 def test_sdk_generated_templates_validate_for_core_extension_types(tmp_path, extension_type):
-    generated = ExtensionSDK.generate_extension(tmp_path, f"{extension_type}_generated", extension_type)
+    generated = ExtensionSDK.generate_extension(
+        tmp_path, f"{extension_type}_generated", extension_type
+    )
 
     ok, messages = ExtensionSDK.validate_extension(generated)
 
@@ -309,12 +311,14 @@ def test_sdk_generate_validate_and_package_extension(tmp_path):
 
 
 def test_compatibility_rejects_future_minimum_version():
-    manifest = ExtensionManifest.from_dict({
-        "name": "future_ext",
-        "version": "1.0.0",
-        "extension_type": "tool",
-        "min_nexus_version": "999.0.0",
-    })
+    manifest = ExtensionManifest.from_dict(
+        {
+            "name": "future_ext",
+            "version": "1.0.0",
+            "extension_type": "tool",
+            "min_nexus_version": "999.0.0",
+        }
+    )
 
     result = CompatibilityManager(nexus_version="3.2.1").check(manifest)
 
@@ -333,12 +337,14 @@ def test_runtime_denies_unstarted_extension(tmp_path):
 def test_runtime_denies_missing_permission_on_running_extension(tmp_path):
     runtime = SecureExtensionRuntime(PermissionStore(tmp_path), working_dir=str(tmp_path))
     runtime._workers["sample_tool"] = _FakeWorker()
-    runtime._manifests["sample_tool"] = ExtensionManifest.from_dict({
-        "name": "sample_tool",
-        "version": "1.0.0",
-        "extension_type": "tool",
-        "capabilities": ["tool_invoke"],
-    })
+    runtime._manifests["sample_tool"] = ExtensionManifest.from_dict(
+        {
+            "name": "sample_tool",
+            "version": "1.0.0",
+            "extension_type": "tool",
+            "capabilities": ["tool_invoke"],
+        }
+    )
 
     result = runtime.call(
         "sample_tool",
@@ -412,7 +418,9 @@ def test_extensions_cli_create_validate_install_list_inspect(tmp_path):
     assert result.returncode == 0, result.stderr
 
     ext_dir = tmp_path / "cli_tool"
-    result = run_cli("extensions", "--working-dir", str(tmp_path), "validate", str(ext_dir), cwd=tmp_path)
+    result = run_cli(
+        "extensions", "--working-dir", str(tmp_path), "validate", str(ext_dir), cwd=tmp_path
+    )
     assert result.returncode == 0, result.stderr
 
     result = run_cli(
@@ -429,7 +437,9 @@ def test_extensions_cli_create_validate_install_list_inspect(tmp_path):
     result = run_cli("extensions", "--working-dir", str(tmp_path), "list", cwd=tmp_path)
     assert "cli_tool" in result.stdout
 
-    result = run_cli("extensions", "--working-dir", str(tmp_path), "inspect", "cli_tool", cwd=tmp_path)
+    result = run_cli(
+        "extensions", "--working-dir", str(tmp_path), "inspect", "cli_tool", cwd=tmp_path
+    )
     assert "Extension: cli_tool" in result.stdout
 
 

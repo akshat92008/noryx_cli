@@ -114,11 +114,14 @@ class ExtensionBenchmark:
         start = time.perf_counter()
         for i in range(10):
             from nexus.platform.registry import ExtensionRecord
-            manifest = ExtensionManifest.from_dict({
-                "name": f"bench_{i}",
-                "version": "1.0.0",
-                "extension_type": "tool",
-            })
+
+            manifest = ExtensionManifest.from_dict(
+                {
+                    "name": f"bench_{i}",
+                    "version": "1.0.0",
+                    "extension_type": "tool",
+                }
+            )
             record = ExtensionRecord(
                 manifest=manifest,
                 install_path=f"/tmp/bench_{i}",

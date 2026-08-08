@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Set
+
 from nexus.planning.engineering_plan import EngineeringPlan, PlanStep
 
 

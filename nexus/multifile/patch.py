@@ -18,15 +18,12 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import shutil
-import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
-from nexus.multifile.contracts import ChangeType, EngineeringChangeSet, PlannedFileChange
-from nexus.multifile.graph import build_graph, DependencyCycleError
+from nexus.multifile.contracts import ChangeType, EngineeringChangeSet
+from nexus.multifile.graph import DependencyCycleError, build_graph
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +78,7 @@ class MultiFilePatchManager:
 
     def validate_patch(
         self,
-        patch_files: dict[str, str],   # path → new content
+        patch_files: dict[str, str],  # path → new content
         cs: EngineeringChangeSet,
     ) -> PatchApplicationResult:
         """Validate a patch (dict of path → content) against the change set.
@@ -92,7 +89,7 @@ class MultiFilePatchManager:
         result = PatchApplicationResult(status=PatchApplicationStatus.SUCCESS)
         change_set_paths = {fc.path for fc in cs.file_changes}
 
-        for path, content in patch_files.items():
+        for path, _content in patch_files.items():
             # 1. Unknown file rejection
             if path not in change_set_paths:
                 result.rejected_files.append(path)
@@ -120,9 +117,7 @@ class MultiFilePatchManager:
                 continue
 
             # 3. Generated file direct-edit check
-            if fc and fc.generated and fc.change_type not in (
-                ChangeType.GENERATED_UPDATE,
-            ):
+            if fc and fc.generated and fc.change_type not in (ChangeType.GENERATED_UPDATE,):
                 result.rejected_files.append(path)
                 result.file_results.append(
                     FileApplicationResult(
@@ -169,7 +164,7 @@ class MultiFilePatchManager:
 
     def apply_patch(
         self,
-        patch_files: dict[str, str],   # path → new content
+        patch_files: dict[str, str],  # path → new content
         cs: EngineeringChangeSet,
         *,
         dry_run: bool = False,

@@ -66,7 +66,8 @@ def test_module_entrypoint_exposes_version():
     )
     assert result.returncode == 0
     from nexus import __version__
-    assert result.stdout.strip() == f"NexusAI {__version__}"
+
+    assert result.stdout.strip() == f"Noryx {__version__}"
 
 
 def test_ollama_host_without_scheme_is_normalized(monkeypatch):
@@ -224,7 +225,7 @@ def test_controlled_beta_requires_truth_integrity_reports(tmp_path):
         json.dumps(
             {
                 "spdxVersion": "SPDX-2.3",
-                "packages": [{"name": "nexusai-cli", "versionInfo": "3.6.0"}],
+                "packages": [{"name": "noryx-cli", "versionInfo": "3.6.0"}],
             }
         ),
         encoding="utf-8",

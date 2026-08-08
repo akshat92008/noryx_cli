@@ -1,1 +1,1 @@
-"""Packaged Nexus resource."""
+"""Packaged Noryx resource."""

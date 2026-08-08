@@ -1,21 +1,20 @@
 """Tests for ChangeSetConsistencyValidator (Sprint 8)."""
+
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 
+from nexus.multifile.consistency import ChangeSetConsistencyValidator
 from nexus.multifile.contracts import (
     ChangeType,
     ContractChange,
     ContractType,
     EngineeringChangeSet,
-    ImpactCategory,
     PlannedFileChange,
     Reference,
     SymbolReference,
     ValidationStatus,
 )
-from nexus.multifile.consistency import ChangeSetConsistencyValidator
 
 
 def _write(path: Path, content: str) -> None:
@@ -42,7 +41,9 @@ def test_definition_changed_caller_stale_detected(tmp_path):
     cs = EngineeringChangeSet(
         contract_changes=[cc],
         file_changes=[
-            PlannedFileChange(path="nexus/ui.py", reason="Change render signature", change_type=ChangeType.MODIFY),
+            PlannedFileChange(
+                path="nexus/ui.py", reason="Change render signature", change_type=ChangeType.MODIFY
+            ),
             # nexus/caller.py NOT included → should be flagged
         ],
     )
@@ -96,9 +97,9 @@ def test_schema_changed_migration_absent(tmp_path):
     )
     validator = ChangeSetConsistencyValidator(repo_root=tmp_path)
     result = validator.validate(cs)
-    assert any(
-        "migration" in mc.reason.lower() for mc in result.missing_changes
-    ) or any("migration" in w.lower() for w in result.warnings)
+    assert any("migration" in mc.reason.lower() for mc in result.missing_changes) or any(
+        "migration" in w.lower() for w in result.warnings
+    )
 
 
 # ---------------------------------------------------------------------------

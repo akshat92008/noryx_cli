@@ -4,8 +4,12 @@ The DAG execution engine and the audited process controller live under one
 importable package so ``nexus.execution.controller`` is never shadowed by a
 same-named module.
 """
+
+from nexus.execution.controller import ExecutionController, ExecutionResult
 from nexus.runtime.kernel import (
     ExecutionResult as KernelExecutionResult,
+)
+from nexus.runtime.kernel import (
     FailureKind,
     PlanReviewer,
     ReviewOutcome,
@@ -16,7 +20,6 @@ from nexus.runtime.kernel import (
     classify_failure,
 )
 from nexus.runtime.kernel import TaskDagKernel as ExecutionEngine
-from nexus.execution.controller import ExecutionController, ExecutionResult
 
 __all__ = [
     "ExecutionController",

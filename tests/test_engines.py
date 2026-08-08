@@ -129,9 +129,7 @@ def test_context_refresh_removes_stale_dependencies_and_deleted_files(tmp_path, 
     assert "new_domain" in manager._file_contexts[str(service.resolve())].imports
 
 
-def test_relative_python_and_javascript_imports_build_real_dependency_edges(
-    tmp_path, monkeypatch
-):
+def test_relative_python_and_javascript_imports_build_real_dependency_edges(tmp_path, monkeypatch):
     monkeypatch.setenv("NEXUS_HOME", str(tmp_path / "state"))
     workspace = tmp_path / "repo"
     package = workspace / "pkg"
@@ -149,9 +147,7 @@ def test_relative_python_and_javascript_imports_build_real_dependency_edges(
     assert str((package / "service.py").resolve()) in manager.get_dependency_context(
         "pkg/domain.py"
     )
-    assert str((workspace / "client.ts").resolve()) in manager.get_dependency_context(
-        "domain.ts"
-    )
+    assert str((workspace / "client.ts").resolve()) in manager.get_dependency_context("domain.ts")
 
 
 def test_safety_layer():

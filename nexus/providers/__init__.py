@@ -1,5 +1,5 @@
 """
-Nexus Provider Architecture
+Noryx Provider Architecture
 """
 
 from nexus.providers.base import ChatRequest, Provider, ProviderCapabilities, ProviderContractError

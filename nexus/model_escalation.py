@@ -1,11 +1,11 @@
 """
-Evidence-Based Model Escalation & Failure Attribution Engine for Nexus CLI.
+Evidence-Based Model Escalation & Failure Attribution Engine for Noryx CLI.
 """
 
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -39,7 +39,9 @@ class ModelFailureAttribution:
         return {
             "failure_id": self.failure_id,
             "model_id": self.model_id,
-            "capability_dimension": self.capability_dimension.value if self.capability_dimension else None,
+            "capability_dimension": self.capability_dimension.value
+            if self.capability_dimension
+            else None,
             "attribution": self.attribution.value,
             "confidence": round(self.confidence, 3),
             "supporting_evidence": self.supporting_evidence,
@@ -102,7 +104,18 @@ class EscalationController:
         fail_kind_clean = (failure_kind or "").lower()
 
         # Non-model failures: Environment / Tool / Sandbox
-        if any(w in norm for w in ("command not found", "connection refused", "eacces", "permission denied", "no such file or directory", "sh: ", "exec format error")):
+        if any(
+            w in norm
+            for w in (
+                "command not found",
+                "connection refused",
+                "eacces",
+                "permission denied",
+                "no such file or directory",
+                "sh: ",
+                "exec format error",
+            )
+        ):
             return ModelFailureAttribution(
                 failure_id=f"attr-{hash(time.time()) & 0xFFFFFFFF:08x}",
                 model_id=current_model_key,
@@ -110,7 +123,10 @@ class EscalationController:
                 attribution=AttributionClass.ENVIRONMENT_FAILURE,
                 confidence=0.95,
                 supporting_evidence=[f"Environment error detected in raw log: {raw_error[:100]}"],
-                alternative_causes=["Tool environment path mismatch", "Missing executable dependency"],
+                alternative_causes=[
+                    "Tool environment path mismatch",
+                    "Missing executable dependency",
+                ],
             )
 
         if not tools_available or "tool execution failed" in norm:
@@ -202,14 +218,19 @@ class EscalationController:
 
         # Find next higher tier model
         next_candidates = [
-            d for d in all_descs
+            d
+            for d in all_descs
             if d.enabled and d.model_id != getattr(current_desc, "model_id", "")
         ]
 
         if getattr(current_desc, "tier", None) == ModelTier.LOCAL:
-            target_candidates = [d for d in next_candidates if d.tier in (ModelTier.AFFORDABLE, ModelTier.STRONG)]
+            target_candidates = [
+                d for d in next_candidates if d.tier in (ModelTier.AFFORDABLE, ModelTier.STRONG)
+            ]
         elif getattr(current_desc, "tier", None) == ModelTier.AFFORDABLE:
-            target_candidates = [d for d in next_candidates if d.tier in (ModelTier.STRONG, ModelTier.FRONTIER)]
+            target_candidates = [
+                d for d in next_candidates if d.tier in (ModelTier.STRONG, ModelTier.FRONTIER)
+            ]
         else:
             target_candidates = [d for d in next_candidates if d.tier == ModelTier.FRONTIER]
 
@@ -235,8 +256,15 @@ class EscalationController:
         target_desc = target_candidates[0]
         target_key = model_registry.resolve_key(target_desc.model_id) or target_desc.model_id
 
-        curr_cost = ((current_desc.input_cost or 0.0) * 2000 + (current_desc.output_cost or 0.0) * 500) / 1_000_000 if current_desc else 0.0
-        target_cost = ((target_desc.input_cost or 0.0) * 2000 + (target_desc.output_cost or 0.0) * 500) / 1_000_000
+        curr_cost = (
+            ((current_desc.input_cost or 0.0) * 2000 + (current_desc.output_cost or 0.0) * 500)
+            / 1_000_000
+            if current_desc
+            else 0.0
+        )
+        target_cost = (
+            (target_desc.input_cost or 0.0) * 2000 + (target_desc.output_cost or 0.0) * 500
+        ) / 1_000_000
         cost_increase = max(0.0, target_cost - curr_cost)
 
         if cost_increase > remaining_budget_usd:
@@ -256,7 +284,9 @@ class EscalationController:
             )
 
         approval_req = target_desc.tier == ModelTier.FRONTIER and ask_before_frontier
-        privacy_note = "remote cloud model selected" if not target_desc.local else "local model selected"
+        privacy_note = (
+            "remote cloud model selected" if not target_desc.local else "local model selected"
+        )
 
         decision = EscalationDecision(
             escalation_id=f"esc-{hash(time.time()) & 0xFFFFFFFF:08x}",

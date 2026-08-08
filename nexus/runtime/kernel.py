@@ -1,4 +1,4 @@
-"""Nexus runtime engines: interactive agentic loop and dependency-aware DAG executor."""
+"""Noryx runtime engines: interactive agentic loop and dependency-aware DAG executor."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from typing import Any, Callable, Generator
 
 from nexus.planner import ExecutionPlan, PlanStep, TaskStatus
 from nexus.providers.base import Provider
+from nexus.recovery import RecoveryController
+from nexus.recovery.normalizer import FailureNormalizer
 from nexus.run_state import RunLedger
 from nexus.runtime.events import (
     BaseEvent,
@@ -29,10 +31,8 @@ from nexus.runtime.events import (
     TurnCompleted,
     TurnStarted,
 )
-from nexus.recovery import RecoveryController
 from nexus.runtime.state_machine import RunState, StateMachine
-from nexus.recovery.records import FailureRecord
-from nexus.recovery.normalizer import FailureNormalizer
+
 logger = logging.getLogger(__name__)
 
 
@@ -107,7 +107,7 @@ PlanReviewer = Callable[[ExecutionPlan], ReviewOutcome]
 
 
 class ExecutionKernel:
-    """The canonical interactive execution engine for the Nexus agent.
+    """The canonical interactive execution engine for the Noryx agent.
 
     Manages the agentic loop: sends messages to a provider, dispatches tool
     calls, accumulates results, and emits structured events throughout.
@@ -177,7 +177,7 @@ class ExecutionKernel:
         for handler in self._event_handlers:
             try:
                 handler(event)
-            except (OSError, ValueError) as exc:# pragma: no cover
+            except (OSError, ValueError) as exc:  # pragma: no cover
                 logger.warning("Event handler raised: %s", exc)
 
     def _create_and_emit(self, event: BaseEvent) -> BaseEvent:
@@ -272,7 +272,9 @@ class ExecutionKernel:
                         detail=raw_msg[:1000],
                     )
                 # Emit failure event (including classification)
-                yield self._create_and_emit(FailureEvent(kind=self.recovery.classify(raw_msg), message=raw_msg))
+                yield self._create_and_emit(
+                    FailureEvent(kind=self.recovery.classify(raw_msg), message=raw_msg)
+                )
                 yield self._create_and_emit(ErrorEvent(message=f"Provider error: {e}"))
                 self.state_machine.transition_to(RunState.FAILED)
                 yield self._create_and_emit(RunFailed(error=str(e)))
@@ -297,7 +299,9 @@ class ExecutionKernel:
                         error_category=self.recovery.classify(str(exc)).value,
                         detail=str(exc)[:1000],
                     )
-                yield self._create_and_emit(FailureEvent(kind=self.recovery.classify(str(exc)), message=str(exc)))
+                yield self._create_and_emit(
+                    FailureEvent(kind=self.recovery.classify(str(exc)), message=str(exc))
+                )
                 yield self._create_and_emit(ErrorEvent(message=f"Provider stream error: {exc}"))
                 self.state_machine.transition_to(RunState.FAILED)
                 yield self._create_and_emit(RunFailed(error=str(exc)))

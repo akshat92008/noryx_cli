@@ -1,5 +1,5 @@
 """
-Final Report Contract implementation for Nexus CLI.
+Final Report Contract implementation for Noryx CLI.
 Transforms canonical JSON reports into markdown/terminal summaries.
 """
 
@@ -25,7 +25,7 @@ class FinalReportGenerator:
         objective = data.get("objective", "No objective provided")
 
         lines = []
-        lines.append("# Nexus Run Report")
+        lines.append("# Noryx Run Report")
         lines.append(f"**Status:** {status}")
         lines.append(f"**Objective:** {objective}\n")
 

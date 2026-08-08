@@ -1,10 +1,10 @@
-# Nexus CLI 3.8.1 — Launch Hardening Report
+# Noryx CLI 3.8.1 — Launch Hardening Report
 
 Release date: 2026-08-06
 
 ## Release scope
 
-Nexus CLI 3.8.1 is the stable launch release for repository analysis, planning,
+Noryx CLI 3.8.1 is the stable launch release for repository analysis, planning,
 and supervised Verified Repair with mandatory human diff review. The runtime
 fails closed when verification provenance is incomplete and when the deployment
 host lacks qualified native isolation. Autonomous generated-command execution

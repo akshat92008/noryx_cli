@@ -1,4 +1,4 @@
-"""Canonical Planning Engine Facade for Nexus CLI (Sprint 6)."""
+"""Canonical Planning Engine Facade for Noryx CLI (Sprint 6)."""
 
 from __future__ import annotations
 
@@ -14,26 +14,25 @@ from nexus.planning.cost import CostEstimator
 from nexus.planning.critic import CritiqueDecision, PlanCritic, PlanCritique
 from nexus.planning.engineering_plan import ActionType, EngineeringPlan, Hypothesis, PlanStep
 from nexus.planning.execution_contract import ExecutionContract, ExecutionContractGenerator
-from nexus.planning.graph import PlanDependencyGraph
-from nexus.planning.policies import PlanningPolicyRegistry
 from nexus.planning.replanner import PlanReplanner
 from nexus.planning.risk import RiskAssessor, RiskLevel
 from nexus.planning.scope import ScopeEstimator
 from nexus.planning.task_contract import (
-    Constraint,
     Requirement,
     RequirementSource,
     TaskContract,
     TaskType,
 )
-from nexus.planning.validator import DeterministicValidator, ValidationIssue
+from nexus.planning.validator import DeterministicValidator
 from nexus.tools import TOOL_DEFINITIONS
 
 
 class PlanningEngine:
     """Canonical Sprint 6 Planning Engine governing task interpretation, criticism, and execution contracts."""
 
-    def __init__(self, workspace_root: Optional[Union[str, Path]] = None, repo_intelligence: Any = None):
+    def __init__(
+        self, workspace_root: Optional[Union[str, Path]] = None, repo_intelligence: Any = None
+    ):
         self.root_dir = Path(workspace_root).resolve() if workspace_root else Path.cwd().resolve()
         self.repo_intelligence = repo_intelligence
 
@@ -72,7 +71,9 @@ class PlanningEngine:
 
         if re.search(r"^\s*(?:please\s+)?(?:fix|debug|repair|patch|resolve)\b", lower_req):
             ttype = TaskType.BUG_REPAIR
-        elif re.search(r"^\s*(?:please\s+)?(?:build|create|implement|add|develop|write)\b", lower_req):
+        elif re.search(
+            r"^\s*(?:please\s+)?(?:build|create|implement|add|develop|write)\b", lower_req
+        ):
             ttype = TaskType.FEATURE_IMPLEMENTATION
         elif re.search(r"^\s*(?:please\s+)?(?:refactor|restructure|simplify|extract)\b", lower_req):
             ttype = TaskType.REFACTOR
@@ -90,9 +91,13 @@ class PlanningEngine:
             ttype = TaskType.DOCUMENTATION
         elif re.search(r"^\s*(?:please\s+)?(?:explain|describe)\b", lower_req):
             ttype = TaskType.CODE_EXPLANATION
-        elif re.search(r"^\s*(?:please\s+)?(?:investigate|review|analyze|analyse|audit)\b", lower_req):
+        elif re.search(
+            r"^\s*(?:please\s+)?(?:investigate|review|analyze|analyse|audit)\b", lower_req
+        ):
             ttype = TaskType.INVESTIGATION
-        elif "fix" in lower_req or "bug" in lower_req or "error" in lower_req or "fail" in lower_req:
+        elif (
+            "fix" in lower_req or "bug" in lower_req or "error" in lower_req or "fail" in lower_req
+        ):
             ttype = TaskType.BUG_REPAIR
         elif "refactor" in lower_req or "clean" in lower_req:
             ttype = TaskType.REFACTOR
@@ -129,7 +134,9 @@ class PlanningEngine:
             assumptions=assumptions,
             unresolved_questions=questions,
         )
-        risk_info = self.risk_assessor.assess_task_risk(temp_contract, (repo_context or {}).get("relevant_files"))
+        risk_info = self.risk_assessor.assess_task_risk(
+            temp_contract, (repo_context or {}).get("relevant_files")
+        )
         temp_contract.risk_level = RiskLevel(risk_info["risk_level"])
         temp_contract.completion_definition = f"Verified completion of: {raw_request}"
 
@@ -217,7 +224,11 @@ class PlanningEngine:
         )
 
         hypotheses: List[Hypothesis] = []
-        if task_contract.task_type in {TaskType.BUG_REPAIR, TaskType.TEST_REPAIR, TaskType.SECURITY_REMEDIATION}:
+        if task_contract.task_type in {
+            TaskType.BUG_REPAIR,
+            TaskType.TEST_REPAIR,
+            TaskType.SECURITY_REMEDIATION,
+        }:
             hypotheses = [
                 Hypothesis(
                     hypothesis_id="hyp-1",
@@ -291,7 +302,7 @@ class PlanningEngine:
         exec_contract: Optional[ExecutionContract],
         run_id: str = "latest",
     ) -> Path:
-        """Store machine-readable planning artifacts under .nexus/runs/<run-id>/."""
+        """Store machine-readable planning artifacts under .noryx/runs/<run-id>/."""
         run_dir = nexus_home() / "runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 

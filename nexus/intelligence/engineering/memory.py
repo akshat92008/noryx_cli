@@ -15,13 +15,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from nexus.storage import exclusive_file_lock
 from nexus.intelligence.engineering.integrity import StateAuthenticator
+from nexus.storage import exclusive_file_lock
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
 
 
 class MemoryIntegrityError(ValueError):
@@ -146,17 +145,24 @@ class EngineeringTaskMemory:
         return memory
 
     def prompt_context(self, *, max_items: int = 12) -> str:
-        decisions = "\n".join(
-            f"- {item.statement}" + (f" — {item.rationale}" if item.rationale else "")
-            for item in self.decisions[-max_items:]
-        ) or "- None recorded"
-        changes = "\n".join(
-            f"- {item.path}: {item.reason}" for item in self.changes[-max_items:]
-        ) or "- None"
-        failures = "\n".join(
-            f"- [{item.phase}/{item.category}] {item.summary}; next={item.strategy or 're-diagnose'}"
-            for item in self.failures[-max_items:]
-        ) or "- None"
+        decisions = (
+            "\n".join(
+                f"- {item.statement}" + (f" — {item.rationale}" if item.rationale else "")
+                for item in self.decisions[-max_items:]
+            )
+            or "- None recorded"
+        )
+        changes = (
+            "\n".join(f"- {item.path}: {item.reason}" for item in self.changes[-max_items:])
+            or "- None"
+        )
+        failures = (
+            "\n".join(
+                f"- [{item.phase}/{item.category}] {item.summary}; next={item.strategy or 're-diagnose'}"
+                for item in self.failures[-max_items:]
+            )
+            or "- None"
+        )
         remaining = "\n".join(f"- {item}" for item in self.remaining_work[-max_items:]) or "- None"
         return (
             "[PERSISTENT ENGINEERING TASK MEMORY]\n"
@@ -180,7 +186,11 @@ class EngineeringMemoryStore:
     def __init__(self, repository_root: str | Path, *, state_root: str | Path | None = None):
         self.repository_root = Path(repository_root).expanduser().resolve()
         self.authenticator = StateAuthenticator.for_repository(self.repository_root)
-        root = Path(state_root).expanduser().resolve() if state_root else self.repository_root / ".nexus"
+        root = (
+            Path(state_root).expanduser().resolve()
+            if state_root
+            else self.repository_root / ".noryx"
+        )
         self.root = root / "task-memory"
         self.root.mkdir(parents=True, exist_ok=True)
 
@@ -225,7 +235,13 @@ class EngineeringMemoryStore:
                 try:
                     current_data = json.loads(path.read_text(encoding="utf-8"))
                     current = EngineeringTaskMemory.from_dict(current_data, self.authenticator)
-                except (OSError, json.JSONDecodeError, KeyError, TypeError, MemoryIntegrityError) as exc:
+                except (
+                    OSError,
+                    json.JSONDecodeError,
+                    KeyError,
+                    TypeError,
+                    MemoryIntegrityError,
+                ) as exc:
                     raise MemoryIntegrityError(
                         f"Existing task memory is unreadable; refusing to overwrite {path.name}."
                     ) from exc
@@ -235,8 +251,12 @@ class EngineeringMemoryStore:
                         f"({current.sequence}>{memory.sequence})."
                     )
             memory.seal(self.authenticator)
-            payload = json.dumps(memory.to_dict(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
-            fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent), text=True)
+            payload = (
+                json.dumps(memory.to_dict(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+            )
+            fd, temp_name = tempfile.mkstemp(
+                prefix=f".{path.name}.", dir=str(path.parent), text=True
+            )
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as handle:
                     handle.write(payload)
@@ -256,7 +276,9 @@ class EngineeringMemoryStore:
         return EngineeringTaskMemory.from_dict(data, self.authenticator)
 
     def latest(self) -> EngineeringTaskMemory | None:
-        candidates = sorted(self.root.glob("*.json"), key=lambda p: p.stat().st_mtime_ns, reverse=True)
+        candidates = sorted(
+            self.root.glob("*.json"), key=lambda p: p.stat().st_mtime_ns, reverse=True
+        )
         if not candidates:
             return None
         path = candidates[0]

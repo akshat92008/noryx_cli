@@ -1,4 +1,4 @@
-"""Allow running as: python -m nexus"""
+"""Allow running as: python -m noryx"""
 
 from nexus.cli import main
 

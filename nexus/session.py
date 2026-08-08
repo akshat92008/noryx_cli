@@ -4,6 +4,7 @@ This API is intentionally fail-closed: a session cannot become VERIFIED unless
 an injected execution controller produces a result and an independent
 verification controller explicitly approves that result.
 """
+
 from __future__ import annotations
 
 import logging
@@ -71,7 +72,9 @@ class AgentSession:
 
     def start(self) -> Dict[str, Any]:
         self.status = RunStatus.RUNNING
-        EventBus.publish(EventType.TASK_STARTED, self.session_id, "AgentSession", {"task": self.task})
+        EventBus.publish(
+            EventType.TASK_STARTED, self.session_id, "AgentSession", {"task": self.task}
+        )
         try:
             if self.execution_controller is None:
                 raise SessionConfigurationError("execution_controller is required")
@@ -88,7 +91,9 @@ class AgentSession:
                 if self.planner is not None
                 else {"objective": self.task, "steps": []}
             )
-            EventBus.publish(EventType.PLAN_CREATED, self.session_id, "AgentSession", {"plan": plan})
+            EventBus.publish(
+                EventType.PLAN_CREATED, self.session_id, "AgentSession", {"plan": plan}
+            )
 
             result = self._invoke(
                 self.execution_controller,
@@ -118,7 +123,9 @@ class AgentSession:
             self.status = RunStatus.VERIFIED
             EventBus.publish(EventType.TASK_COMPLETED, self.session_id, "AgentSession", payload)
             if self.finalizer is not None:
-                return self._invoke(self.finalizer, ("finalize", "finish"), self.session_id, payload)
+                return self._invoke(
+                    self.finalizer, ("finalize", "finish"), self.session_id, payload
+                )
             return payload
         except SessionConfigurationError as exc:
             self.status = RunStatus.BLOCKED
@@ -128,7 +135,9 @@ class AgentSession:
         except Exception as exc:  # noqa: BLE001 - normalized into durable failure output.
             self.status = RunStatus.FAILED
             logger.exception("Session failed")
-            EventBus.publish(EventType.TASK_FAILED, self.session_id, "AgentSession", {"error": str(exc)})
+            EventBus.publish(
+                EventType.TASK_FAILED, self.session_id, "AgentSession", {"error": str(exc)}
+            )
             if self.recovery_controller is not None:
                 recovery = getattr(self.recovery_controller, "attempt_recovery", None)
                 if callable(recovery):

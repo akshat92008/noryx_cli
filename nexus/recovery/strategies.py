@@ -1,12 +1,12 @@
 """
-Canonical Recovery Strategy Definitions for Nexus CLI.
+Canonical Recovery Strategy Definitions for Noryx CLI.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from collections.abc import Callable, Mapping
 from typing import Any
 
 
@@ -71,16 +71,12 @@ class RecoveryStrategy:
         ),
         RecoveryStrategyType.APPLY_SMALLER_PATCH: ("apply_smaller_patch",),
         RecoveryStrategyType.CHANGE_TOOL: ("change_tool",),
-        RecoveryStrategyType.CHANGE_VALIDATION_COMMAND: (
-            "change_validation_command",
-        ),
+        RecoveryStrategyType.CHANGE_VALIDATION_COMMAND: ("change_validation_command",),
         RecoveryStrategyType.INSTALL_OR_CONFIGURE_DEPENDENCY: (
             "install_or_configure_dependency",
             "configure_dependency",
         ),
-        RecoveryStrategyType.REPRODUCE_FAILURE_DIFFERENTLY: (
-            "reproduce_failure_differently",
-        ),
+        RecoveryStrategyType.REPRODUCE_FAILURE_DIFFERENTLY: ("reproduce_failure_differently",),
         RecoveryStrategyType.SWITCH_MODEL: ("switch_model", "escalate_model"),
         RecoveryStrategyType.REDUCE_SCOPE: ("reduce_scope",),
         RecoveryStrategyType.SPLIT_TASK: ("split_task",),
@@ -117,8 +113,7 @@ class RecoveryStrategy:
         signature = inspect.signature(handler)
         parameters = signature.parameters
         accepts_kwargs = any(
-            parameter.kind is inspect.Parameter.VAR_KEYWORD
-            for parameter in parameters.values()
+            parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
         )
         keyword_arguments = {
             "strategy": strategy,
@@ -127,11 +122,7 @@ class RecoveryStrategy:
         }
         if accepts_kwargs:
             return handler(**keyword_arguments)
-        supported = {
-            name: value
-            for name, value in keyword_arguments.items()
-            if name in parameters
-        }
+        supported = {name: value for name, value in keyword_arguments.items() if name in parameters}
         if supported:
             return handler(**supported)
         positional = [
@@ -355,7 +346,9 @@ class StrategyRegistry:
 
     @classmethod
     def get(cls, strategy_type: RecoveryStrategyType | str) -> RecoveryStrategy:
-        st = RecoveryStrategyType(strategy_type) if isinstance(strategy_type, str) else strategy_type
+        st = (
+            RecoveryStrategyType(strategy_type) if isinstance(strategy_type, str) else strategy_type
+        )
         return cls._STRATEGIES.get(
             st,
             RecoveryStrategy(
@@ -398,4 +391,3 @@ class StrategyRegistry:
 
 # Alias for backward-compat import in recovery.controller
 StrategySignatureEngine = StrategyRegistry
-

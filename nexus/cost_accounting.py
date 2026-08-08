@@ -8,7 +8,7 @@ import json
 import os
 import threading
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -73,7 +73,7 @@ class CostReservation:
 
 
 class CostLedger:
-    """Thread-safe canonical cost ledger for Nexus CLI runs."""
+    """Thread-safe canonical cost ledger for Noryx CLI runs."""
 
     def __init__(self, inr_rate: float = DEFAULT_INR_PER_USD) -> None:
         self._lock = threading.RLock()
@@ -98,7 +98,11 @@ class CostLedger:
         cache_rate = (desc.cached_input_cost or in_rate * 0.5) / 1_000_000
 
         uncached_prompt = max(0, prompt_tokens - cached_tokens)
-        cost = (uncached_prompt * in_rate) + (cached_tokens * cache_rate) + (completion_tokens * out_rate)
+        cost = (
+            (uncached_prompt * in_rate)
+            + (cached_tokens * cache_rate)
+            + (completion_tokens * out_rate)
+        )
         return float(cost)
 
     def record_call(
@@ -121,7 +125,9 @@ class CostLedger:
 
             desc = model_registry.get_descriptor(model_name)
             eff_model_id = desc.model_id if desc else model_name
-            usd_cost = self.calculate_cost(model_name, prompt_tokens, completion_tokens, cached_tokens)
+            usd_cost = self.calculate_cost(
+                model_name, prompt_tokens, completion_tokens, cached_tokens
+            )
             inr_cost = usd_cost * self.inr_rate
 
             entry = CostEntry(
@@ -154,7 +160,9 @@ class CostLedger:
     ) -> CostReservation:
         """Atomic pre-call cost reservation."""
         with self._lock:
-            est_usd = self.calculate_cost(model_name, estimated_prompt_tokens, estimated_completion_tokens)
+            est_usd = self.calculate_cost(
+                model_name, estimated_prompt_tokens, estimated_completion_tokens
+            )
             res_id = f"res-{hash(time.monotonic() + len(self.reservations)) & 0xFFFFFFFF:08x}"
             res = CostReservation(
                 reservation_id=res_id,
@@ -226,7 +234,7 @@ class CostLedger:
             }
 
     def save_run_artifacts(self, run_dir: str, run_id: str) -> None:
-        """Save ledger artifacts under .nexus/runs/<run-id>/cost/."""
+        """Save ledger artifacts under .noryx/runs/<run-id>/cost/."""
         cost_dir = os.path.join(run_dir, "cost")
         try:
             os.makedirs(cost_dir, exist_ok=True)

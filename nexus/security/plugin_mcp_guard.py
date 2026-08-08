@@ -1,4 +1,4 @@
-"""Plugin and MCP Server Security Isolation Guard for Nexus CLI.
+"""Plugin and MCP Server Security Isolation Guard for Noryx CLI.
 
 Validates manifests, permission declarations, prevents tool-name collision/spoofing,
 and enforces execution isolation for extensions.
@@ -6,8 +6,7 @@ and enforces execution isolation for extensions.
 
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Sequence
 
 CORE_RESERVED_TOOLS = frozenset(

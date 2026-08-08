@@ -51,7 +51,9 @@ class FallbackRouter(Provider):
     def capabilities(self) -> ProviderCapabilities:
         """Expose only features supported across every possible route."""
         capabilities = [provider.capabilities for provider in [self._primary, *self._fallbacks]]
-        context_limits = [item.max_context_tokens for item in capabilities if item.max_context_tokens]
+        context_limits = [
+            item.max_context_tokens for item in capabilities if item.max_context_tokens
+        ]
         supported_options = set(capabilities[0].supported_options)
         for item in capabilities[1:]:
             supported_options.intersection_update(item.supported_options)

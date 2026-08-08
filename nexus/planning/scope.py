@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -32,9 +32,7 @@ class ScopeEstimator:
     def __init__(self, repo_intelligence: Optional[RepositoryIntelligence] = None):
         self.repo_intel = repo_intelligence or RepositoryIntelligence(Path.cwd())
 
-    def estimate_scope(
-        self, target_files: List[str], task_description: str = ""
-    ) -> MutationScope:
+    def estimate_scope(self, target_files: List[str], task_description: str = "") -> MutationScope:
         expected = set(target_files)
         expansion: Set[str] = set()
         read_only: Set[str] = set()

@@ -1,6 +1,7 @@
 {
   "trials": 3,
   "timeout_seconds": 1800,
+  "evaluator_metrics_root": "/secure/evaluator-owned/noryx-metrics",
   "qualification": {
     "blind": true,
     "oracle_withheld": true,
@@ -15,7 +16,7 @@
   "agents": {
     "nexus": {
       "argv": [
-        "nexus",
+        "noryx",
         "run",
         "--working-dir",
         "{workspace}",
@@ -23,15 +24,15 @@
         "{prompt}"
       ],
       "version_argv": [
-        "nexus",
+        "noryx",
         "--version"
       ],
       "success_markers": [
         "COMPLETED_VERIFIED",
         "VERIFIED"
       ],
-      "metrics_file": ".nexus/benchmark-metrics.json",
-      "product_identity": "nexusai-cli",
+      "evaluator_metrics_file": "noryx/{task_id}-{trial}.json",
+      "product_identity": "noryx-cli",
       "model_identity": "replace-with-exact-model-and-version"
     },
     "direct_baseline": {
@@ -50,7 +51,7 @@
         "COMPLETED",
         "SUCCESS"
       ],
-      "metrics_file": ".benchmark-metrics.json",
+      "evaluator_metrics_file": "direct/{task_id}-{trial}.json",
       "product_identity": "direct-model-baseline",
       "model_identity": "replace-with-exact-model-and-version"
     },
@@ -68,7 +69,7 @@
         "COMPLETED",
         "SUCCESS"
       ],
-      "metrics_file": ".claude/benchmark-metrics.json",
+      "evaluator_metrics_file": "claude/{task_id}-{trial}.json",
       "product_identity": "anthropic-claude-code",
       "model_identity": "replace-with-claude-model-and-version"
     }

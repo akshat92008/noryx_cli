@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from nexus.planning.task_contract import Requirement, TaskContract, RiskLevel
+from nexus.planning.task_contract import RiskLevel, TaskContract
 
 
 class VerificationType(str, Enum):
@@ -63,7 +63,9 @@ class AcceptanceCriterion:
             "verification": self.verification.to_dict(),
             "expected_evidence": self.expected_evidence,
             "affected_scope": self.affected_scope,
-            "risk_level": self.risk_level.value if isinstance(self.risk_level, RiskLevel) else self.risk_level,
+            "risk_level": self.risk_level.value
+            if isinstance(self.risk_level, RiskLevel)
+            else self.risk_level,
             "status": self.status,
         }
 
@@ -127,7 +129,9 @@ class AcceptanceEngine:
                     id=f"AC-{idx}",
                     statement=req.statement,
                     mandatory=True,
-                    requirement_source=req.source.value if hasattr(req.source, "value") else str(req.source),
+                    requirement_source=req.source.value
+                    if hasattr(req.source, "value")
+                    else str(req.source),
                     verification=strat,
                     expected_evidence="Command execution exit code 0 and test log summary",
                     affected_scope=(repo_context or {}).get("relevant_files", []),

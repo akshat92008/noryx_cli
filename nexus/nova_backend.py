@@ -2,7 +2,7 @@
 Nova local backend adapter for NexusAI.
 
 Runs the existing CeilingInternPipeline in a temporary verification workspace,
-then converts guardrail-passed Nova file actions into Nexus tool calls. The
+then converts guardrail-passed Nova file actions into Noryx tool calls. The
 actual workspace mutation still goes through Agent._execute_tool_with_safety.
 """
 
@@ -45,7 +45,7 @@ PROMPT_PATH = re.compile(
 
 @dataclass
 class NovaToolProposal:
-    """A Nexus tool call proposed by Nova after Nova guardrails passed."""
+    """A Noryx tool call proposed by Nova after Nova guardrails passed."""
 
     name: str
     args: dict[str, Any]
@@ -69,7 +69,7 @@ class NovaBackendError(RuntimeError):
 
 
 class NovaPipelineBackend:
-    """Thin adapter from Nova pipeline results to Nexus tool proposals."""
+    """Thin adapter from Nova pipeline results to Noryx tool proposals."""
 
     def __init__(self, model: str = "nova_codex", working_dir: str | None = None):
         self.model = model
@@ -138,7 +138,7 @@ class NovaPipelineBackend:
                         override_prompt = self._retry_prompt(prompt, prompt_paths, failure)
                         continue
                     response_parts.append(
-                        "Nova guardrails rejected the output before Nexus tools ran:\n" + failure
+                        "Nova guardrails rejected the output before Noryx tools ran:\n" + failure
                     )
                     break
 
@@ -164,7 +164,7 @@ class NovaPipelineBackend:
             assistant_text = "\n\n".join(response_parts).strip()
             if proposals:
                 assistant_text = assistant_text or (
-                    f"Nova guardrails passed; prepared {len(proposals)} Nexus tool call(s)."
+                    f"Nova guardrails passed; prepared {len(proposals)} Noryx tool call(s)."
                 )
             elif not assistant_text:
                 assistant_text = "Nova did not produce any guardrail-approved tool calls."
@@ -351,7 +351,7 @@ class NovaPipelineBackend:
         file_action,
         guardrail_summary: str,
     ) -> list[NovaToolProposal]:
-        """Convert a parsed Nova FileAction into one or more Nexus tool calls."""
+        """Convert a parsed Nova FileAction into one or more Noryx tool calls."""
         action = file_action.action.upper()
         base_meta = {
             "passed": True,
@@ -382,7 +382,7 @@ class NovaPipelineBackend:
 
         if action == "DELETE":
             raise NovaBackendError(
-                f"Nova emitted DELETE for {file_action.path}; Nexus does not apply Nova deletions automatically."
+                f"Nova emitted DELETE for {file_action.path}; Noryx does not apply Nova deletions automatically."
             )
 
         content = file_action.content

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import json
 import os
 import shutil
 import subprocess
@@ -92,6 +93,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Include the slower wheel build/install gate in the matrix",
     )
+    parser.add_argument("--output", default="", help="Write a JSON stress report")
     return parser.parse_args()
 
 
@@ -112,11 +114,12 @@ def main() -> int:
         commands.append((python, "scripts/run_release_gate.py"))
 
     print(
-        f"Starting offline Nexus stress matrix: runs={args.runs} workers={args.workers}",
+        f"Starting offline Noryx stress matrix: runs={args.runs} workers={args.workers}",
         flush=True,
     )
     counts: Counter[str] = Counter()
     durations: list[float] = []
+    results: list[StressResult] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = [
             executor.submit(run_test, commands[index % len(commands)], args.timeout)
@@ -124,6 +127,7 @@ def main() -> int:
         ]
         for completed, future in enumerate(concurrent.futures.as_completed(futures), start=1):
             result = future.result()
+            results.append(result)
             counts["passed" if result.passed else "failed"] += 1
             durations.append(result.duration_seconds)
             label = "PASS" if result.passed else "FAIL"
@@ -141,6 +145,32 @@ def main() -> int:
         f"max_seconds={max(durations, default=0.0):.2f}",
         flush=True,
     )
+    if args.output:
+        target = Path(args.output).expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(
+                {
+                    "schema_version": "noryx.concurrent-stress.v1",
+                    "passed": counts["failed"] == 0,
+                    "summary": dict(counts),
+                    "max_seconds": max(durations, default=0.0),
+                    "results": [
+                        {
+                            "command": list(item.command),
+                            "passed": item.passed,
+                            "duration_seconds": round(item.duration_seconds, 3),
+                            "detail": item.detail,
+                        }
+                        for item in results
+                    ],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     return 1 if counts["failed"] else 0
 
 

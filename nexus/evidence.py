@@ -1,4 +1,4 @@
-"""Persistent, machine-checkable evidence for every Nexus completion claim."""
+"""Persistent, machine-checkable evidence for every Noryx completion claim."""
 
 from __future__ import annotations
 
@@ -158,9 +158,7 @@ class EvidenceTrail:
                     current = {
                         "path": str(artifact_path),
                         "exists": True,
-                        "sha256": sha256_bytes(
-                            target.encode("utf-8", errors="surrogateescape")
-                        ),
+                        "sha256": sha256_bytes(target.encode("utf-8", errors="surrogateescape")),
                         "size": len(target.encode("utf-8", errors="surrogateescape")),
                     }
                 else:
@@ -197,7 +195,7 @@ _EXIT_CODE = re.compile(r"^❌ \(exit code (\d+)\)", re.MULTILINE)
 
 
 def command_exit_code(result: str) -> int | None:
-    """Extract the literal exit code emitted by Nexus' command tool."""
+    """Extract the literal exit code emitted by Noryx' command tool."""
     if re.search(r"^✅ \$", result, re.MULTILINE):
         return 0
     match = _EXIT_CODE.search(result)

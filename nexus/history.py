@@ -51,9 +51,7 @@ class FileHistory:
         payload = self.changes if changes is None else changes
         destination = self._changes_file()
         destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary = destination.with_name(
-            f".{destination.name}.{uuid.uuid4().hex}.tmp"
-        )
+        temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
         try:
             with temporary.open("w", encoding="utf-8") as handle:
                 json.dump(payload, handle, indent=2)
@@ -75,9 +73,7 @@ class FileHistory:
         """Drop records after the matching transaction was restored independently."""
         if not transaction_id:
             return 0
-        retained = [
-            item for item in self.changes if item.get("transaction_id") != transaction_id
-        ]
+        retained = [item for item in self.changes if item.get("transaction_id") != transaction_id]
         removed = len(self.changes) - len(retained)
         if removed:
             self._save_changes(retained)
@@ -244,8 +240,7 @@ class FileHistory:
         self.changes.pop()
         self._save_changes()
         return True, (
-            f"Restored {target.name} to previous version "
-            "(digest-verified pre-command state)"
+            f"Restored {target.name} to previous version (digest-verified pre-command state)"
         )
 
     def undo_changes(self, count: int = 1) -> tuple[bool, str]:
@@ -301,9 +296,17 @@ class FileHistory:
         if not current_path.exists() and not current_path.is_symlink():
             if snapshot and Path(snapshot).exists():
                 try:
-                    old_lines = Path(snapshot).read_text(encoding="utf-8", errors="replace").splitlines(True)
+                    old_lines = (
+                        Path(snapshot)
+                        .read_text(encoding="utf-8", errors="replace")
+                        .splitlines(True)
+                    )
                     diff = difflib.unified_diff(
-                        old_lines, [], fromfile=f"a/{current_path.name}", tofile="/dev/null", lineterm=""
+                        old_lines,
+                        [],
+                        fromfile=f"a/{current_path.name}",
+                        tofile="/dev/null",
+                        lineterm="",
                     )
                     return "\n".join(diff) or f"Deleted file: {filepath}"
                 except OSError:

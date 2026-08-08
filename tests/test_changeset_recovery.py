@@ -1,19 +1,19 @@
 """Tests for MultiFileRecoveryHandler (Sprint 8)."""
+
 from __future__ import annotations
 
-import pytest
+from nexus.multifile.contracts import (
+    ChangeType,
+    EngineeringChangeSet,
+    ImpactCategory,
+    MissingChange,
+    PlannedFileChange,
+    Reference,
+)
 from nexus.multifile.recovery import (
     MultiFileRecoveryHandler,
     RecoveryContext,
     RecoveryDecision,
-)
-from nexus.multifile.contracts import (
-    ChangeType,
-    EngineeringChangeSet,
-    MissingChange,
-    PlannedFileChange,
-    Reference,
-    ImpactCategory,
 )
 
 
@@ -30,7 +30,9 @@ def test_missed_caller_triggers_scope_expansion():
     handler = MultiFileRecoveryHandler()
     cs = _cs(
         file_changes=[
-            PlannedFileChange(path="nexus/api.py", reason="Change API", change_type=ChangeType.MODIFY)
+            PlannedFileChange(
+                path="nexus/api.py", reason="Change API", change_type=ChangeType.MODIFY
+            )
         ]
     )
     context = RecoveryContext(
@@ -86,8 +88,12 @@ def test_full_rollback_when_many_files_partially_modified():
     handler = MultiFileRecoveryHandler()
     cs = _cs(
         file_changes=[
-            PlannedFileChange(path=f"nexus/file_{i}.py", reason="f", change_type=ChangeType.MODIFY,
-                              relevant_symbols=["sym"])
+            PlannedFileChange(
+                path=f"nexus/file_{i}.py",
+                reason="f",
+                change_type=ChangeType.MODIFY,
+                relevant_symbols=["sym"],
+            )
             for i in range(10)
         ]
     )

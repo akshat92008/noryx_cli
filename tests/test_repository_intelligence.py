@@ -1,15 +1,12 @@
 """Focused test suite for Sprint 5 Repository Intelligence Engine."""
 
-import pytest
-from pathlib import Path
-from nexus.intelligence.repository.discovery import RepositoryDiscovery
 from nexus.intelligence.repository.classification import FileClassifier
-from nexus.intelligence.repository.extraction import LanguageExtractor
-from nexus.intelligence.repository.secrets import SecretProtector
-from nexus.intelligence.repository.ranking import ExplainableContextRanker, TaskIntentClassifier
-from nexus.intelligence.repository.budget import ContextBudgetManager
+from nexus.intelligence.repository.discovery import RepositoryDiscovery
 from nexus.intelligence.repository.engine import RepositoryIntelligence
-from nexus.intelligence.repository.model import TaskIntent, RiskLevel, ContextBundle
+from nexus.intelligence.repository.extraction import LanguageExtractor
+from nexus.intelligence.repository.model import ContextBundle, RiskLevel, TaskIntent
+from nexus.intelligence.repository.ranking import TaskIntentClassifier
+from nexus.intelligence.repository.secrets import SecretProtector
 
 
 def test_repository_discovery(tmp_path):
@@ -75,9 +72,15 @@ def test_secret_redaction():
 
 def test_task_intent_classification():
     assert TaskIntentClassifier.classify("Fix bug in login handler") == TaskIntent.BUG_REPAIR
-    assert TaskIntentClassifier.classify("Add new API route for users") == TaskIntent.FEATURE_IMPLEMENTATION
+    assert (
+        TaskIntentClassifier.classify("Add new API route for users")
+        == TaskIntent.FEATURE_IMPLEMENTATION
+    )
     assert TaskIntentClassifier.classify("Refactor database connection pool") == TaskIntent.REFACTOR
-    assert TaskIntentClassifier.classify("Update network policy settings") == TaskIntent.CONFIGURATION_CHANGE
+    assert (
+        TaskIntentClassifier.classify("Update network policy settings")
+        == TaskIntent.CONFIGURATION_CHANGE
+    )
 
 
 def test_engine_context_bundle(tmp_path):
@@ -104,7 +107,9 @@ def test_context_expansion_loop(tmp_path):
     engine.build(force=True)
 
     bundle = engine.context_bundle("Login endpoint issue")
-    expanded = engine.expand_context(bundle, reason="Missing token verification details", additional_files=["auth.py"])
-    
+    expanded = engine.expand_context(
+        bundle, reason="Missing token verification details", additional_files=["auth.py"]
+    )
+
     assert "Expanded due to: Missing token verification details" in expanded.limitations
     assert any(f.path == "auth.py" for f in expanded.files)

@@ -29,8 +29,15 @@ from nexus.collaboration.models import (
 
 # Pattern prefixes that indicate sensitive content
 _SECRET_INDICATORS = (
-    "api_key", "secret", "password", "token", "credential",
-    "private_key", "auth", "bearer", "client_secret",
+    "api_key",
+    "secret",
+    "password",
+    "token",
+    "credential",
+    "private_key",
+    "auth",
+    "bearer",
+    "client_secret",
 )
 
 
@@ -94,21 +101,22 @@ class ContextPartitioner:
 
             # Skip prohibited paths
             if res_path and any(
-                res_path == pp or _is_subpath(res_path, pp)
-                for pp in prohibited_paths_set
+                res_path == pp or _is_subpath(res_path, pp) for pp in prohibited_paths_set
             ):
                 continue
 
             # Skip paths outside allowed scope (if assignment restricts paths)
             if res_path and allowed_paths_set:
-                if not any(
-                    res_path == ap or _is_subpath(res_path, ap)
-                    for ap in allowed_paths_set
-                ):
+                if not any(res_path == ap or _is_subpath(res_path, ap) for ap in allowed_paths_set):
                     continue
 
             # Exclude unrelated packages
-            if package and allowed_packages and package not in allowed_packages and "*" not in allowed_packages:
+            if (
+                package
+                and allowed_packages
+                and package not in allowed_packages
+                and "*" not in allowed_packages
+            ):
                 continue
 
             # Exclude secrets from content
@@ -118,29 +126,34 @@ class ContextPartitioner:
             content_hash = _hash_content(content) if content else None
             token_estimate += max(1, len(content) // 4)
 
-            filtered.append(ContextResource(
-                resource_id=f"{kind}:{path_str}",
-                kind=kind,
-                path=path_str or None,
-                content_hash=content_hash,
-            ))
+            filtered.append(
+                ContextResource(
+                    resource_id=f"{kind}:{path_str}",
+                    kind=kind,
+                    path=path_str or None,
+                    content_hash=content_hash,
+                )
+            )
 
         # Merge parent constraints with assignment requirements
-        combined_constraints = tuple(parent_constraints) + tuple(
-            f"requirement:{r}" for r in assignment.requirements
-        ) + tuple(
-            f"prohibited:{p}" for p in assignment.prohibited_paths
+        combined_constraints = (
+            tuple(parent_constraints)
+            + tuple(f"requirement:{r}" for r in assignment.requirements)
+            + tuple(f"prohibited:{p}" for p in assignment.prohibited_paths)
         )
 
         # Output schema derived from expected_outputs
-        output_schema = json.dumps({
-            "expected_outputs": list(assignment.expected_outputs),
-            "verification_requirements": list(assignment.verification_requirements),
-        })
+        output_schema = json.dumps(
+            {
+                "expected_outputs": list(assignment.expected_outputs),
+                "verification_requirements": list(assignment.verification_requirements),
+            }
+        )
 
         elapsed_ms = (time.monotonic() - start) * 1000
         if elapsed_ms > 100:
             import logging
+
             logging.getLogger(__name__).warning(
                 "ContextPartitioner exceeded 100 ms target (%.1f ms).", elapsed_ms
             )
@@ -206,6 +219,7 @@ class ContextPartitioner:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _is_subpath(candidate: Path, parent: Path) -> bool:
     """True if candidate is nested under parent."""

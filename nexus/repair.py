@@ -1,5 +1,5 @@
 """
-Autonomous Repair Loop for Nexus CLI.
+Autonomous Repair Loop for Noryx CLI.
 Integrated with canonical RecoveryController for typed diagnosis, loop prevention,
 strategy selection, and budget governance.
 """
@@ -255,8 +255,10 @@ class RepairLoop:
                 evidence = self._agent.evidence.records()[evidence_start:]
                 checks = [e for e in evidence if e.get("kind") == "verification_check"]
 
-            succeeded = bool(mutations) and bool(checks) and all(
-                item.get("status") == "verified" for item in [*mutations, *checks]
+            succeeded = (
+                bool(mutations)
+                and bool(checks)
+                and all(item.get("status") == "verified" for item in [*mutations, *checks])
             )
 
             attempt = RepairAttempt(

@@ -1,5 +1,5 @@
 """
-Diagnosis Engine for Nexus CLI Recovery Subsystem.
+Diagnosis Engine for Noryx CLI Recovery Subsystem.
 Consumes failure records, context, plan, and attempt history to produce structured FailureDiagnosis.
 """
 
@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from nexus.recovery.records import (
     FailureCategory,
@@ -36,7 +37,6 @@ class DiagnosisEngine:
         baseline_failures: list[str] | None = None,
         **kwargs: Any,
     ) -> FailureDiagnosis:
-        muts = mutations or []
         prevs = previous_attempts or []
         base_fails = baseline_failures or []
 
@@ -87,7 +87,11 @@ class DiagnosisEngine:
                 strategy = "REPRODUCE_FAILURE_DIFFERENTLY"
 
         elif failure.category == FailureCategory.MUTATION:
-            if failure.kind in (FailureKind.PATCH_CONFLICT, FailureKind.WORKSPACE_CORRUPTION, FailureKind.OUT_OF_SCOPE_MUTATION):
+            if failure.kind in (
+                FailureKind.PATCH_CONFLICT,
+                FailureKind.WORKSPACE_CORRUPTION,
+                FailureKind.OUT_OF_SCOPE_MUTATION,
+            ):
                 hypotheses.append(
                     FailureHypothesis(
                         hypothesis_id="hyp-004",
@@ -129,7 +133,10 @@ class DiagnosisEngine:
                         replan_req = True
                         strategy = "REVISE_PLAN"
 
-            elif failure.kind == FailureKind.TYPE_CHECK_FAILED or failure.kind == FailureKind.BUILD_FAILED:
+            elif (
+                failure.kind == FailureKind.TYPE_CHECK_FAILED
+                or failure.kind == FailureKind.BUILD_FAILED
+            ):
                 hypotheses.append(
                     FailureHypothesis(
                         hypothesis_id="hyp-007",

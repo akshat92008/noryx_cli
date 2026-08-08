@@ -1,8 +1,10 @@
 """Tests for ImpactAnalyzer (Sprint 8)."""
+
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from nexus.multifile.contracts import (
     ContractChange,
@@ -27,26 +29,38 @@ def _write(path: Path, content: str) -> None:
 @pytest.fixture()
 def repo(tmp_path: Path) -> Path:
     """A minimal in-memory repo with a definition and callers."""
-    _write(tmp_path / "nexus" / "api.py", """\
+    _write(
+        tmp_path / "nexus" / "api.py",
+        """\
 def get_data(user_id: str) -> dict:
     return {}
-""")
-    _write(tmp_path / "nexus" / "service.py", """\
+""",
+    )
+    _write(
+        tmp_path / "nexus" / "service.py",
+        """\
 from nexus.api import get_data
 
 def process(uid):
     return get_data(uid)
-""")
-    _write(tmp_path / "nexus" / "other.py", """\
+""",
+    )
+    _write(
+        tmp_path / "nexus" / "other.py",
+        """\
 # No reference to get_data
 def foo(): pass
-""")
-    _write(tmp_path / "tests" / "test_api.py", """\
+""",
+    )
+    _write(
+        tmp_path / "tests" / "test_api.py",
+        """\
 from nexus.api import get_data
 
 def test_get_data():
     assert get_data("u1") == {}
-""")
+""",
+    )
     return tmp_path
 
 
@@ -116,11 +130,14 @@ def test_source_to_test_relationship(repo):
 
 def test_unresolved_dynamic_caller_surfaced(repo):
     """Dynamic references are surfaced in unresolved_dynamic_dependencies."""
-    _write(repo / "nexus" / "dynamic.py", """\
+    _write(
+        repo / "nexus" / "dynamic.py",
+        """\
 import importlib
 mod = importlib.import_module("nexus.api")
 fn = getattr(mod, "get_data")
-""")
+""",
+    )
     analyzer = ImpactAnalyzer(repo_root=repo)
     callers = analyzer.discover_callers("get_data", definition_path="nexus/api.py")
     dynamic = [c for c in callers if c.dynamic]
@@ -136,7 +153,9 @@ def test_monorepo_package_boundary(tmp_path):
 
     pkg_b = tmp_path / "packages" / "pkg_b" / "caller.py"
     pkg_b.parent.mkdir(parents=True)
-    pkg_b.write_text("from packages.pkg_a.service import helper\n\nresult = helper()\n", encoding="utf-8")
+    pkg_b.write_text(
+        "from packages.pkg_a.service import helper\n\nresult = helper()\n", encoding="utf-8"
+    )
 
     analyzer = ImpactAnalyzer(repo_root=tmp_path)
     callers = analyzer.discover_callers("helper", definition_path="packages/pkg_a/service.py")

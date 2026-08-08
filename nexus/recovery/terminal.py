@@ -1,5 +1,5 @@
 """
-Terminal States Governance for Nexus CLI Recovery Subsystem.
+Terminal States Governance for Noryx CLI Recovery Subsystem.
 """
 
 from __future__ import annotations

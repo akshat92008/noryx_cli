@@ -1,5 +1,5 @@
 """
-Execution Controller — The central execution authority for Nexus.
+Execution Controller — The central execution authority for Noryx.
 
 Models propose. Runtime executes.
 All tool calls, shell commands, file operations, and mutations go through this layer.
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExecutionResult:
     """Structured execution result replacing primitive returns."""
+
     status: str
     command: str = ""
     arguments: list[str] = field(default_factory=list)
@@ -46,7 +47,7 @@ class ExecutionResult:
 
 class ExecutionController:
     """Central authority for executing tools and processes safely."""
-    
+
     def __init__(self, workspace_manager: Any = None):
         self.workspace = workspace_manager
 
@@ -58,21 +59,21 @@ class ExecutionController:
         timeout: float = 120.0,
         purpose: str = "general_execution",
         network: bool = False,
-        isolation_policy: str = "required"
+        isolation_policy: str = "required",
     ) -> ExecutionResult:
         import shlex
         import uuid
-        
+
         exec_id = str(uuid.uuid4())
         start_time = datetime.now(timezone.utc)
-        
+
         if isinstance(command, str):
             cmd_args = shlex.split(command, posix=True)
             cmd_str = command
         else:
             cmd_args = list(command)
             cmd_str = shlex.join(cmd_args)
-            
+
         req = ProcessRequest.create(
             purpose=purpose,
             command=cmd_args,
@@ -82,10 +83,10 @@ class ExecutionController:
             network_policy="allow" if network else "deny",
             isolation_policy=isolation_policy,
         )
-        
+
         result: CommandResult = ProcessExecutionGateway.run(req)
         end_time = datetime.now(timezone.utc)
-        
+
         if result.timed_out:
             status = "TIMEOUT"
             error_type = "COMMAND_TIMEOUT"
@@ -95,7 +96,7 @@ class ExecutionController:
         else:
             status = "FAILED"
             error_type = "COMMAND_FAILED"
-            
+
         return ExecutionResult(
             status=status,
             command=cmd_str,
@@ -111,5 +112,5 @@ class ExecutionController:
             killed_process=result.timed_out,
             error_type=error_type,
             execution_id=exec_id,
-            evidence=result.format_tool_output()
+            evidence=result.format_tool_output(),
         )

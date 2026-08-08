@@ -1,4 +1,5 @@
 """Persistent completion ledger for repository-wide change obligations."""
+
 from __future__ import annotations
 
 import hashlib
@@ -7,7 +8,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Iterable
 
 from nexus.intelligence.concurrency import ConcurrencyAnalyzer
 from nexus.intelligence.task_profiles import RepositoryTaskKind, TaskProfile
@@ -55,10 +56,14 @@ class LedgerAssessment:
 class CompletionLedger:
     """Track obligations independently of model claims of completion."""
 
-    def __init__(self, objective: str, repository_tree_hash: str, obligations: Iterable[LedgerObligation]):
+    def __init__(
+        self, objective: str, repository_tree_hash: str, obligations: Iterable[LedgerObligation]
+    ):
         self.objective = objective
         self.repository_tree_hash = repository_tree_hash
-        self.obligations: dict[str, LedgerObligation] = {item.obligation_id: item for item in obligations}
+        self.obligations: dict[str, LedgerObligation] = {
+            item.obligation_id: item for item in obligations
+        }
 
     @classmethod
     def from_contract(
@@ -74,11 +79,27 @@ class CompletionLedger:
             # completion blocker. Explicit change/verification obligations and
             # every obligation in a hard contract remain fail-closed.
             blocking = item.blocking and (contract.hard_enforcement or item.obligation != "inspect")
-            obligations.append(cls._obligation(item.path, item.obligation, item.reason, blocking, "completion_contract"))
+            obligations.append(
+                cls._obligation(
+                    item.path, item.obligation, item.reason, blocking, "completion_contract"
+                )
+            )
         for path in contract.required_change_files:
-            obligations.append(cls._obligation(path, "change", "Explicit required change file.", True, "completion_contract"))
+            obligations.append(
+                cls._obligation(
+                    path, "change", "Explicit required change file.", True, "completion_contract"
+                )
+            )
         for path in contract.required_verification_files:
-            obligations.append(cls._obligation(path, "verify", "Mapped regression verification file.", True, "completion_contract"))
+            obligations.append(
+                cls._obligation(
+                    path,
+                    "verify",
+                    "Mapped regression verification file.",
+                    True,
+                    "completion_contract",
+                )
+            )
 
         if profile.kind in {
             RepositoryTaskKind.REPOSITORY_API_CHANGE,
@@ -103,18 +124,14 @@ class CompletionLedger:
                         )
                     )
 
-            closure_seeds = list(
-                dict.fromkeys([*owner_paths, *contract.required_change_files])
-            )
+            closure_seeds = list(dict.fromkeys([*owner_paths, *contract.required_change_files]))
             closure = repository.impact_closure(
                 closure_seeds,
                 symbols=resolved_symbols or objective_symbols,
                 max_hops=profile.max_graph_hops,
                 limit=max(250, profile.max_files * 8),
                 include_tests=True,
-                include_configuration=(
-                    profile.kind == RepositoryTaskKind.FRAMEWORK_MIGRATION
-                ),
+                include_configuration=(profile.kind == RepositoryTaskKind.FRAMEWORK_MIGRATION),
             )
             for impact in closure:
                 path = str(impact["path"])
@@ -143,18 +160,28 @@ class CompletionLedger:
 
         if profile.kind == RepositoryTaskKind.STATE_CONCURRENCY_DEFECT:
             # Contract obligations are FileObligation objects; inspect all state-bearing candidates.
-            candidate_paths = list(dict.fromkeys([
-                *contract.required_change_files,
-                *(item.path for item in contract.obligations if item.obligation in {"inspect", "change"}),
-            ]))
+            candidate_paths = list(
+                dict.fromkeys(
+                    [
+                        *contract.required_change_files,
+                        *(
+                            item.path
+                            for item in contract.obligations
+                            if item.obligation in {"inspect", "change"}
+                        ),
+                    ]
+                )
+            )
             for finding in ConcurrencyAnalyzer.analyze(repository.root, candidate_paths):
-                obligations.append(cls._obligation(
-                    finding.path,
-                    "verify",
-                    f"Concurrency finding {finding.kind} at line {finding.line}: {finding.required_check}",
-                    True,
-                    "concurrency_analysis",
-                ))
+                obligations.append(
+                    cls._obligation(
+                        finding.path,
+                        "verify",
+                        f"Concurrency finding {finding.kind} at line {finding.line}: {finding.required_check}",
+                        True,
+                        "concurrency_analysis",
+                    )
+                )
 
         deduped: dict[tuple[str, str], LedgerObligation] = {}
         for item in obligations:
@@ -169,11 +196,17 @@ class CompletionLedger:
     @staticmethod
     def _objective_symbols(objective: str) -> list[str]:
         quoted = re.findall(r"[`'\"]([A-Za-z_][A-Za-z0-9_.]*)[`'\"]", objective)
-        explicit = re.findall(r"(?:rename|change|migrate|replace|remove)\s+(?:the\s+)?(?:api|method|function|class|symbol)?\s*([A-Za-z_][A-Za-z0-9_.]*)", objective, re.I)
+        explicit = re.findall(
+            r"(?:rename|change|migrate|replace|remove)\s+(?:the\s+)?(?:api|method|function|class|symbol)?\s*([A-Za-z_][A-Za-z0-9_.]*)",
+            objective,
+            re.I,
+        )
         return list(dict.fromkeys(item.split(".")[-1] for item in [*quoted, *explicit]))
 
     @staticmethod
-    def _obligation(path: str, action: str, reason: str, blocking: bool, source: str) -> LedgerObligation:
+    def _obligation(
+        path: str, action: str, reason: str, blocking: bool, source: str
+    ) -> LedgerObligation:
         normalized = str(path).replace("\\", "/")
         digest = hashlib.sha256(f"{normalized}|{action}|{source}".encode()).hexdigest()[:16]
         return LedgerObligation(digest, normalized, action, reason, blocking, source)
@@ -193,20 +226,28 @@ class CompletionLedger:
 
     def assess(self) -> LedgerAssessment:
         unresolved_items = [
-            item for item in self.obligations.values()
+            item
+            for item in self.obligations.values()
             if item.blocking and item.state == ObligationState.PENDING
         ]
-        unresolved = tuple(sorted(f"{item.action}:{item.path}:{item.reason}" for item in unresolved_items))
+        unresolved = tuple(
+            sorted(f"{item.action}:{item.path}:{item.reason}" for item in unresolved_items)
+        )
         paths = tuple(sorted({item.path for item in unresolved_items}))
         satisfied = sum(item.state != ObligationState.PENDING for item in self.obligations.values())
-        return LedgerAssessment(not unresolved_items, unresolved, paths, satisfied, len(self.obligations))
+        return LedgerAssessment(
+            not unresolved_items, unresolved, paths, satisfied, len(self.obligations)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": "nexus.completion-ledger.v1",
             "objective": self.objective,
             "repository_tree_hash": self.repository_tree_hash,
-            "obligations": [item.to_dict() for item in sorted(self.obligations.values(), key=lambda x: (x.path, x.action))],
+            "obligations": [
+                item.to_dict()
+                for item in sorted(self.obligations.values(), key=lambda x: (x.path, x.action))
+            ],
             "assessment": self.assess().to_dict(),
         }
 

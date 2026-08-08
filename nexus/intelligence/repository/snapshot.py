@@ -38,7 +38,7 @@ class WorkspaceSnapshot:
                 if path.is_file():
                     files.append(path)
 
-        # Nexus operational state is not repository truth.  Test and local
+        # Noryx operational state is not repository truth.  Test and local
         # deployments may deliberately place NEXUS_HOME beneath the workspace;
         # exclude that exact directory so evidence/log writes cannot invalidate
         # a source revision after a successful check.
@@ -58,9 +58,7 @@ class WorkspaceSnapshot:
                 hashes[rel] = discovery.calculate_file_hash(path)
             except (OSError, ValueError):
                 continue
-        revision = discovery.calculate_tree_hash(
-            [repository_root / path for path in hashes]
-        )
+        revision = discovery.calculate_tree_hash([repository_root / path for path in hashes])
         return cls(str(repository_root), revision, hashes)
 
     def to_dict(self) -> dict[str, object]:

@@ -6,7 +6,7 @@ from nexus.plugins.loader import PluginLoader
 def test_actual_plugin_subprocess(tmp_path):
     # We will create a local plugin in a temporary working dir and use discover_local_plugins
     project_dir = tmp_path / "my_project"
-    plugin_dir = project_dir / ".nexus" / "plugins" / "my_actual_plugin"
+    plugin_dir = project_dir / ".noryx" / "plugins" / "my_actual_plugin"
     plugin_dir.mkdir(parents=True)
 
     # Write a real manifest
@@ -37,11 +37,13 @@ def register():
 """)
 
     loader = PluginLoader(
-        working_dir=str(project_dir), plugins_enabled=True, trust_checker=lambda x, expected_digest=None: True
+        working_dir=str(project_dir),
+        plugins_enabled=True,
+        trust_checker=lambda x, expected_digest=None: True,
     )
 
     # Manually load the plugin directory since discover_local_plugins might require specific layout
-    # Wait, discover_local_plugins scans project_dir / ".nexus" / "plugins"
+    # Wait, discover_local_plugins scans project_dir / ".noryx" / "plugins"
     # Actually, we can just call _load_plugin_dir directly to avoid layout issues.
     plugin = loader._load_plugin_dir(plugin_dir, "local")
 
@@ -70,7 +72,7 @@ def test_isolated_plugin_tool_executes_through_rpc(tmp_path):
         encoding="utf-8",
     )
     (plugin_dir / "plugin_entry.py").write_text(
-        '''
+        """
 class RpcPlugin:
     name = "rpc-plugin"
 
@@ -101,12 +103,14 @@ class RpcPlugin:
 
     def echo(self, value):
         return {"echo": value, "isolated": True}
-''',
+""",
         encoding="utf-8",
     )
 
     loader = PluginLoader(
-        working_dir=str(project_dir), plugins_enabled=True, trust_checker=lambda _path, expected_digest=None: True
+        working_dir=str(project_dir),
+        plugins_enabled=True,
+        trust_checker=lambda _path, expected_digest=None: True,
     )
     plugin = loader._load_plugin_dir(plugin_dir, "local")
     assert plugin is not None

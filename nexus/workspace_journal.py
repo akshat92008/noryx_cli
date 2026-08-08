@@ -54,7 +54,7 @@ class ContentAddressedWorkspaceJournal:
     DEFAULT_IGNORED_PARTS = frozenset(
         {
             ".git",
-            ".nexus",
+            ".noryx",
             ".nexusai",
             "node_modules",
             "venv",
@@ -133,9 +133,7 @@ class ContentAddressedWorkspaceJournal:
             relative = path.relative_to(self.root)
         except ValueError:
             return True
-        return self._is_excluded(path) or any(
-            part in self.ignored_parts for part in relative.parts
-        )
+        return self._is_excluded(path) or any(part in self.ignored_parts for part in relative.parts)
 
     def _store_preimage(self, source: Path, digest: str) -> str:
         destination = self.preimage_dir / digest[:2] / digest
@@ -144,18 +142,14 @@ class ContentAddressedWorkspaceJournal:
             # The digest is encoded in the immutable filename.  Restoration
             # verifies bytes against the recorded digest before claiming success.
             if not destination.is_file():
-                raise WorkspaceSnapshotError(
-                    f"Invalid preimage store entry for digest {digest}"
-                )
+                raise WorkspaceSnapshotError(f"Invalid preimage store entry for digest {digest}")
             return str(destination)
         temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
         try:
             shutil.copyfile(source, temporary)
             copied_digest, _ = self._digest_file(temporary)
             if copied_digest != digest:
-                raise WorkspaceSnapshotError(
-                    f"File changed while snapshotting: {source}"
-                )
+                raise WorkspaceSnapshotError(f"File changed while snapshotting: {source}")
             os.replace(temporary, destination)
             try:
                 destination.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
@@ -172,9 +166,7 @@ class ContentAddressedWorkspaceJournal:
 
         def candidates():
             def fail_walk(error: OSError) -> None:
-                raise WorkspaceSnapshotError(
-                    f"Unable to enumerate workspace: {error}"
-                ) from error
+                raise WorkspaceSnapshotError(f"Unable to enumerate workspace: {error}") from error
 
             try:
                 for directory, dirnames, filenames in os.walk(
@@ -187,17 +179,14 @@ class ContentAddressedWorkspaceJournal:
                     dirnames[:] = sorted(
                         name
                         for name in dirnames
-                        if name not in self.ignored_parts
-                        and not self._is_excluded(base / name)
+                        if name not in self.ignored_parts and not self._is_excluded(base / name)
                     )
                     for name in sorted(dirnames + filenames):
                         path = base / name
                         if path.is_symlink() or path.is_file():
                             yield path
             except OSError as exc:
-                raise WorkspaceSnapshotError(
-                    f"Unable to enumerate workspace: {exc}"
-                ) from exc
+                raise WorkspaceSnapshotError(f"Unable to enumerate workspace: {exc}") from exc
 
         for path in candidates():
             if self._is_ignored(path):
@@ -247,13 +236,9 @@ class ContentAddressedWorkspaceJournal:
             count += 1
             total_bytes += state.size
             if count > self.max_files:
-                raise WorkspaceSnapshotError(
-                    f"Workspace snapshot exceeds {self.max_files} entries"
-                )
+                raise WorkspaceSnapshotError(f"Workspace snapshot exceeds {self.max_files} entries")
             if total_bytes > self.max_bytes:
-                raise WorkspaceSnapshotError(
-                    f"Workspace snapshot exceeds {self.max_bytes} bytes"
-                )
+                raise WorkspaceSnapshotError(f"Workspace snapshot exceeds {self.max_bytes} bytes")
             entries[relative] = state
 
         return WorkspaceSnapshot(str(self.root), entries, total_bytes)

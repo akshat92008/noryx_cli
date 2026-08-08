@@ -1,4 +1,4 @@
-"""Authoritative Repository Intelligence Engine for Nexus CLI — Sprint 5."""
+"""Authoritative Repository Intelligence Engine for Noryx CLI — Sprint 5."""
 
 from __future__ import annotations
 
@@ -11,7 +11,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from nexus.paths import nexus_home
+from nexus.intelligence.repository.adaptive import AdaptiveContextSelector
+from nexus.intelligence.repository.budget import ContextBudgetManager
+from nexus.intelligence.repository.classification import FileClassifier
+from nexus.intelligence.repository.discovery import RepositoryDiscovery
+from nexus.intelligence.repository.extraction import LanguageExtractor
 from nexus.intelligence.repository.model import (
     ArchitectureBoundary,
     ContextBundle,
@@ -23,13 +27,9 @@ from nexus.intelligence.repository.model import (
     RiskLevel,
     TestRelationship,
 )
-from nexus.intelligence.repository.discovery import RepositoryDiscovery
-from nexus.intelligence.repository.classification import FileClassifier
-from nexus.intelligence.repository.extraction import LanguageExtractor
 from nexus.intelligence.repository.ranking import ExplainableContextRanker, TaskIntentClassifier
-from nexus.intelligence.repository.budget import ContextBudgetManager
-from nexus.intelligence.repository.adaptive import AdaptiveContextSelector
 from nexus.intelligence.repository.secrets import SecretProtector
+from nexus.paths import nexus_home
 
 GRAPH_SCHEMA_VERSION = "nexus.repograph.v5"
 
@@ -183,16 +183,16 @@ class RepositoryIntelligence:
         )
         candidates = list(adaptive.candidates)
 
-        search_terms = {
-            t.lower() for t in query.split() if len(t) > 2
-        }
+        search_terms = {t.lower() for t in query.split() if len(t) > 2}
 
         # Budget assembly
         self.budget_manager.max_files = max_files
         self.budget_manager.max_total_tokens = max_total_tokens
 
-        selected_files, omitted_candidates, token_count = self.budget_manager.assemble_context_files(
-            candidates, self.files, self.root, search_terms
+        selected_files, omitted_candidates, token_count = (
+            self.budget_manager.assemble_context_files(
+                candidates, self.files, self.root, search_terms
+            )
         )
 
         # Related tests, symbols, and architecture constraints
@@ -201,9 +201,7 @@ class RepositoryIntelligence:
         boundaries = self._infer_architecture_boundaries()
         risks = self._collect_risk_annotations(selected_files)
 
-        rationales = {
-            f.path: [f.selection_reason] for f in selected_files
-        }
+        rationales = {f.path: [f.selection_reason] for f in selected_files}
 
         adaptive_relationships = [
             ContextRelationship(
@@ -278,7 +276,9 @@ class RepositoryIntelligence:
                         "is_test": file_record.is_test,
                     }
                 )
-        return sorted(results, key=lambda item: (not item["is_test"], item["path"]))[: max(1, limit)]
+        return sorted(results, key=lambda item: (not item["is_test"], item["path"]))[
+            : max(1, limit)
+        ]
 
     def resolve_import_targets(self, importer_path: str, import_name: str) -> list[str]:
         """Resolve a repository import to indexed file paths without executing code."""
@@ -336,9 +336,7 @@ class RepositoryIntelligence:
         # Package prefixes are useful for languages whose extractors preserve
         # package identifiers rather than exact paths. Keep this deterministic
         # and bounded to avoid fuzzy repository-wide matches.
-        suffixes = tuple(
-            item for item in dict.fromkeys(candidates) if item and len(item) >= 3
-        )
+        suffixes = tuple(item for item in dict.fromkeys(candidates) if item and len(item) >= 3)
         return sorted(
             path
             for path in self.files
@@ -371,9 +369,9 @@ class RepositoryIntelligence:
                         "is_migration": record.migration_file,
                     }
                 )
-        return sorted(
-            results, key=lambda item: (not item["is_test"], item["path"])
-        )[: max(1, limit)]
+        return sorted(results, key=lambda item: (not item["is_test"], item["path"]))[
+            : max(1, limit)
+        ]
 
     def impact_closure(
         self,
@@ -512,7 +510,10 @@ class RepositoryIntelligence:
                 if candidate.path in visited:
                     continue
                 deps = candidate.imports
-                if any(target in deps or any(target in dep for dep in deps) for target in frontier_stems):
+                if any(
+                    target in deps or any(target in dep for dep in deps)
+                    for target in frontier_stems
+                ):
                     if candidate.test_file or getattr(candidate, "is_test", False):
                         impacted.add(candidate.path)
                     else:
@@ -614,16 +615,25 @@ class RepositoryIntelligence:
         content_hash: str | None = None,
     ) -> RepositoryFile:
         classification = FileClassifier.classify(rel_path)
-        
+
         try:
             source = full_path.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
             source = ""
             classification["parse_error"] = str(exc)
 
-        extracted = self.extractor.extract(rel_path, source) if source else {
-            "imports": [], "symbols": [], "references": [], "routes": [], "database_models": [], "parse_error": ""
-        }
+        extracted = (
+            self.extractor.extract(rel_path, source)
+            if source
+            else {
+                "imports": [],
+                "symbols": [],
+                "references": [],
+                "routes": [],
+                "database_models": [],
+                "parse_error": "",
+            }
+        )
 
         # Check for secrets
         _, has_secrets = SecretProtector.sanitize(source, rel_path)
@@ -648,7 +658,9 @@ class RepositoryIntelligence:
             risk_level=classification["risk_level"],
             category=classification["category"],
             imports=extracted["imports"],
-            exports=[s.name for s in extracted["symbols"] if s.kind in {"class", "function", "interface"}],
+            exports=[
+                s.name for s in extracted["symbols"] if s.kind in {"class", "function", "interface"}
+            ],
             references=extracted.get("references", []),
             routes=extracted.get("routes", []),
             database_models=extracted.get("database_models", []),
@@ -691,9 +703,15 @@ class RepositoryIntelligence:
 
     def _infer_architecture_boundaries(self) -> list[ArchitectureBoundary]:
         boundaries = [
-            ArchitectureBoundary(layer_name="verification", files=[p for p in self.files if "verification" in p]),
-            ArchitectureBoundary(layer_name="provider", files=[p for p in self.files if "providers/" in p]),
-            ArchitectureBoundary(layer_name="execution", files=[p for p in self.files if "execution/" in p]),
+            ArchitectureBoundary(
+                layer_name="verification", files=[p for p in self.files if "verification" in p]
+            ),
+            ArchitectureBoundary(
+                layer_name="provider", files=[p for p in self.files if "providers/" in p]
+            ),
+            ArchitectureBoundary(
+                layer_name="execution", files=[p for p in self.files if "execution/" in p]
+            ),
         ]
         return [b for b in boundaries if b.files]
 
@@ -731,14 +749,18 @@ class RepositoryIntelligence:
                 p: {
                     **asdict(r),
                     "symbols": [asdict(s) for s in r.symbols],
-                    "risk_level": r.risk_level.value if isinstance(r.risk_level, RiskLevel) else r.risk_level,
+                    "risk_level": r.risk_level.value
+                    if isinstance(r.risk_level, RiskLevel)
+                    else r.risk_level,
                 }
                 for p, r in sorted(self.files.items())
             },
         }
         tmp = self.cache_path.with_name(f".{self.cache_path.name}.{os.getpid()}.tmp")
         try:
-            tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            tmp.write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
             os.replace(tmp, self.cache_path)
         finally:
             tmp.unlink(missing_ok=True)

@@ -1,6 +1,7 @@
-"""Nexus Engineering Brain: repository-aware control plane for coding agents."""
+"""Noryx Engineering Brain: repository-aware control plane for coding agents."""
 
 from .brain import EngineeringBrain, EngineeringContract
+from .constraints import CompiledConstraint, ConstraintCompiler, ConstraintKind
 from .failure_learning import FailureLearningIntegrityError, FailureLearningStore, FailureLesson
 from .long_horizon import (
     LongHorizonConflictError,
@@ -9,8 +10,12 @@ from .long_horizon import (
     LongHorizonPhase,
     LongHorizonState,
 )
-from .memory import EngineeringMemoryStore, EngineeringTaskMemory, MemoryConflictError, MemoryIntegrityError
-from .constraints import CompiledConstraint, ConstraintCompiler, ConstraintKind
+from .memory import (
+    EngineeringMemoryStore,
+    EngineeringTaskMemory,
+    MemoryConflictError,
+    MemoryIntegrityError,
+)
 from .scope import (
     ScopeContract,
     ScopeDecision,

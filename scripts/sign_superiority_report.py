@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Seal a competitive report in an independent evaluator environment."""
+
 from __future__ import annotations
 
 import argparse

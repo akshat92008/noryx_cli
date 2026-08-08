@@ -2,7 +2,7 @@
 Change Set Persistence — Sprint 8.
 
 Persists and loads multi-stage execution state outside model context.
-All artifacts are stored under .nexus/runs/<run-id>/ with schema version,
+All artifacts are stored under .noryx/runs/<run-id>/ with schema version,
 repository snapshot, plan version, and timestamps.
 
 On resume:
@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any
 
 from nexus.multifile.contracts import (
-    ChangeSetValidationResult,
     ChangeStageStatus,
     EngineeringChangeSet,
 )
@@ -151,8 +150,7 @@ class ChangeSetPersistence:
                 return {
                     "safe_to_resume": False,
                     "reason": (
-                        f"Repository changed externally. "
-                        f"Stages {invalidated} may be invalidated."
+                        f"Repository changed externally. Stages {invalidated} may be invalidated."
                     ),
                     "last_safe_stage_id": None,
                     "invalidated_stages": invalidated,
@@ -171,14 +169,11 @@ class ChangeSetPersistence:
             "safe_to_resume": True,
             "last_safe_stage_id": last_safe,
             "pending_stages": [
-                s.stage_id for s in cs.stages
-                if s.stage_id not in cs.completed_stage_ids
+                s.stage_id for s in cs.stages if s.stage_id not in cs.completed_stage_ids
             ],
         }
 
-    def _detect_invalidated_stages(
-        self, cs: EngineeringChangeSet, repo_root: Path
-    ) -> list[str]:
+    def _detect_invalidated_stages(self, cs: EngineeringChangeSet, repo_root: Path) -> list[str]:
         """Check completed stages to see if their files were changed externally."""
         invalidated: list[str] = []
 
@@ -232,7 +227,7 @@ def _compute_tree_hash(root: Path, max_files: int = 2000) -> str:
         if count >= max_files:
             break
         rel = str(f.relative_to(root))
-        if any(skip in rel for skip in (".git", ".venv", "__pycache__", ".nexus")):
+        if any(skip in rel for skip in (".git", ".venv", "__pycache__", ".noryx")):
             continue
         if f.is_file():
             digest.update(f"{rel}:{f.stat().st_size}".encode())

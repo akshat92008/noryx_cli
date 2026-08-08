@@ -1,5 +1,5 @@
 """
-User Intervention Formatting and Triggers for Nexus CLI.
+User Intervention Formatting and Triggers for Noryx CLI.
 """
 
 from __future__ import annotations

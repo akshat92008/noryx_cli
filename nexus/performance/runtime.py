@@ -138,15 +138,18 @@ class ContentHashCache:
     def _save(self) -> None:
         while len(self._entries) > self.max_entries:
             self._entries.popitem(last=False)
-        payload = json.dumps(
-            {
-                "version": "nexus.performance.cache.v2",
-                "parser_version": self.parser_version,
-                "entries": dict(self._entries),
-            },
-            indent=2,
-            sort_keys=True,
-        ) + "\n"
+        payload = (
+            json.dumps(
+                {
+                    "version": "nexus.performance.cache.v2",
+                    "parser_version": self.parser_version,
+                    "entries": dict(self._entries),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
         with exclusive_file_lock(self.path):
             fd, temp_name = tempfile.mkstemp(
                 prefix=f".{self.path.name}.", dir=str(self.path.parent), text=True

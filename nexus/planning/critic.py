@@ -1,15 +1,15 @@
-"""Independent Plan Critic Stage for Nexus CLI (Sprint 6)."""
+"""Independent Plan Critic Stage for Noryx CLI (Sprint 6)."""
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from nexus.planning.engineering_plan import ActionType, EngineeringPlan, PlanStep
-from nexus.planning.task_contract import TaskContract, RiskLevel
-from nexus.planning.validator import DeterministicValidator, ValidationIssue, IssueSeverity
+from nexus.planning.engineering_plan import ActionType, EngineeringPlan
+from nexus.planning.task_contract import TaskContract
+from nexus.planning.validator import DeterministicValidator, IssueSeverity
 
 
 class CritiqueDecision(str, Enum):
@@ -51,7 +51,9 @@ class PlanCritique:
             "critique_id": self.critique_id,
             "plan_id": self.plan_id,
             "plan_version": self.plan_version,
-            "decision": self.decision.value if isinstance(self.decision, CritiqueDecision) else self.decision,
+            "decision": self.decision.value
+            if isinstance(self.decision, CritiqueDecision)
+            else self.decision,
             "blocking_issues": [b.to_dict() for b in self.blocking_issues],
             "warnings": [w.to_dict() for w in self.warnings],
             "missing_evidence": self.missing_evidence,
@@ -64,7 +66,9 @@ class PlanCritique:
             critique_id=data.get("critique_id", f"critique-{uuid.uuid4().hex[:8]}"),
             plan_id=data.get("plan_id", ""),
             plan_version=data.get("plan_version", 1),
-            decision=CritiqueDecision(data["decision"]) if "decision" in data else CritiqueDecision.APPROVE,
+            decision=CritiqueDecision(data["decision"])
+            if "decision" in data
+            else CritiqueDecision.APPROVE,
             blocking_issues=[PlanIssue.from_dict(b) for b in data.get("blocking_issues", [])],
             warnings=[PlanIssue.from_dict(w) for w in data.get("warnings", [])],
             missing_evidence=data.get("missing_evidence", []),
@@ -114,7 +118,10 @@ class PlanCritic:
                 warnings.append(issue)
 
         # 2. Check for missing test strategy
-        has_test_step = any(s.action_type in ("verify", ActionType.VERIFY) or "test" in s.title.lower() for s in plan.steps)
+        has_test_step = any(
+            s.action_type in ("verify", ActionType.VERIFY) or "test" in s.title.lower()
+            for s in plan.steps
+        )
         if not has_test_step and not plan.verification_strategy.get("command"):
             warnings.append(
                 PlanIssue(
@@ -128,7 +135,11 @@ class PlanCritic:
             suggestions.append("Add automated test run step to verification strategy")
 
         # 3. Check for broad rewrite / over-scoping
-        if len(plan.affected_scope) > 10 and task_contract and task_contract.task_type == "bug_repair":
+        if (
+            len(plan.affected_scope) > 10
+            and task_contract
+            and task_contract.task_type == "bug_repair"
+        ):
             blocking.append(
                 PlanIssue(
                     issue_id="CRIT-OVERBROAD-REWRITE",

@@ -1,5 +1,5 @@
 """
-State machine for the Nexus execution engine.
+State machine for the Noryx execution engine.
 """
 
 import logging

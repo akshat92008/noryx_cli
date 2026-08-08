@@ -13,7 +13,7 @@ import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from nexus.collaboration.models import (
     CollaborationBudget,
@@ -21,7 +21,6 @@ from nexus.collaboration.models import (
     CollaborationPolicyProfile,
     CollaborationRunState,
     CollaborationState,
-    WorkerState,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,11 +72,14 @@ class CollaborationPersistence:
             "cancelled": state.cancelled,
             "created_at": state.created_at.isoformat(),
             "updated_at": datetime.now(tz=timezone.utc).isoformat(),
-            "worker_states": {
-                wid: ws.value for wid, ws in state.worker_states.items()
-            },
+            "worker_states": {wid: ws.value for wid, ws in state.worker_states.items()},
             "assignments": {
-                aid: {"assignment_id": a.assignment_id, "role": a.role.value, "objective": a.objective, "dependencies": list(a.dependencies)}
+                aid: {
+                    "assignment_id": a.assignment_id,
+                    "role": a.role.value,
+                    "objective": a.objective,
+                    "dependencies": list(a.dependencies),
+                }
                 for aid, a in state.assignments.items()
             },
             "accepted_assignments": list(state.worker_reviews.keys()),
@@ -126,8 +128,7 @@ class CollaborationPersistence:
             return state
 
         except Exception as exc:
-            logger.error("CollaborationPersistence: load failed for %s: %s",
-                         collaboration_id, exc)
+            logger.error("CollaborationPersistence: load failed for %s: %s", collaboration_id, exc)
             return None
 
     def delete(self, collaboration_id: str) -> bool:
@@ -138,7 +139,4 @@ class CollaborationPersistence:
         return False
 
     def list_collaboration_ids(self) -> list[str]:
-        return [
-            f.stem.removeprefix("collab_")
-            for f in self._dir.glob("collab_*.json")
-        ]
+        return [f.stem.removeprefix("collab_") for f in self._dir.glob("collab_*.json")]

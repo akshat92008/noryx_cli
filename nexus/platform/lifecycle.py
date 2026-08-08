@@ -86,7 +86,11 @@ class ExtensionLifecycleManager:
         existing = self.registry.get(manifest.name)
         if existing and not force:
             if existing.manifest.version == manifest.version:
-                return False, f"Extension '{manifest.name}' v{manifest.version} already installed", None
+                return (
+                    False,
+                    f"Extension '{manifest.name}' v{manifest.version} already installed",
+                    None,
+                )
 
         dest = self.registry.extensions_dir / manifest.name
         if dest.exists():
@@ -189,13 +193,15 @@ class ExtensionLifecycleManager:
         to_state: ExtensionState,
         reason: str = "",
     ) -> None:
-        self._events.append(LifecycleEvent(
-            extension_name=name,
-            from_state=from_state,
-            to_state=to_state,
-            timestamp=time.time(),
-            reason=reason,
-        ))
+        self._events.append(
+            LifecycleEvent(
+                extension_name=name,
+                from_state=from_state,
+                to_state=to_state,
+                timestamp=time.time(),
+                reason=reason,
+            )
+        )
 
     @property
     def events(self) -> list[LifecycleEvent]:

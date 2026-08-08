@@ -29,8 +29,6 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 from nexus.collaboration.models import (
     AgentAssignment,
     AssignmentResult,
-    AssignmentStatus,
-    CollaborationBudget,
     CollaborationState,
     CoordinationMessage,
     CoordinationMessageType,
@@ -42,8 +40,14 @@ logger = logging.getLogger(__name__)
 
 # Tokens that must not appear in coordination messages
 _CREDENTIAL_PATTERNS = (
-    "api_key", "secret", "password", "token", "bearer",
-    "private_key", "client_secret", "auth",
+    "api_key",
+    "secret",
+    "password",
+    "token",
+    "bearer",
+    "private_key",
+    "client_secret",
+    "auth",
 )
 
 _MAX_CONTENT_SIZE = 32_768  # characters
@@ -119,10 +123,7 @@ class CoordinationBus:
         content: Mapping[str, Any],
         evidence_ids: Tuple[str, ...] = (),
     ) -> CoordinationMessage:
-        if (
-            sender_id != self.ORCHESTRATOR_ID
-            and recipient_id != self.ORCHESTRATOR_ID
-        ):
+        if sender_id != self.ORCHESTRATOR_ID and recipient_id != self.ORCHESTRATOR_ID:
             raise DirectPeerMessageBlocked(
                 f"Worker '{sender_id}' attempted direct message to '{recipient_id}'. "
                 "All messages must route through the orchestrator."
@@ -166,7 +167,10 @@ class CoordinationBus:
 
         logger.debug(
             "CoordinationBus: %s → %s [%s] assignment=%s",
-            sender_id, recipient_id, message_type.value, assignment_id,
+            sender_id,
+            recipient_id,
+            message_type.value,
+            assignment_id,
         )
 
         if self._on_message:
@@ -235,21 +239,25 @@ class CoordinationBlackboard:
         with self._lock:
             self.assignments[assignment.assignment_id] = assignment
             self.assignment_states[assignment.assignment_id] = WorkerState.CREATED
-            self.audit_trail.append({
-                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-                "event": "assignment_registered",
-                "assignment_id": assignment.assignment_id,
-            })
+            self.audit_trail.append(
+                {
+                    "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                    "event": "assignment_registered",
+                    "assignment_id": assignment.assignment_id,
+                }
+            )
 
     def update_assignment_state(self, assignment_id: str, state: WorkerState) -> None:
         with self._lock:
             self.assignment_states[assignment_id] = state
-            self.audit_trail.append({
-                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-                "event": "worker_state_updated",
-                "assignment_id": assignment_id,
-                "state": state.value,
-            })
+            self.audit_trail.append(
+                {
+                    "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                    "event": "worker_state_updated",
+                    "assignment_id": assignment_id,
+                    "state": state.value,
+                }
+            )
 
     def add_result(self, result: AssignmentResult) -> None:
         with self._lock:
@@ -270,12 +278,14 @@ class CoordinationBlackboard:
                 "approved": False,
             }
             self.scope_expansion_requests.append(req)
-            self.audit_trail.append({
-                "timestamp": req["timestamp"],
-                "event": "scope_expansion_requested",
-                "assignment_id": assignment_id,
-                "requested_path": requested_path,
-            })
+            self.audit_trail.append(
+                {
+                    "timestamp": req["timestamp"],
+                    "event": "scope_expansion_requested",
+                    "assignment_id": assignment_id,
+                    "requested_path": requested_path,
+                }
+            )
 
     def get_summary(self) -> Dict[str, Any]:
         with self._lock:

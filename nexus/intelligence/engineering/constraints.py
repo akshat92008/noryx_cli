@@ -11,9 +11,7 @@ import fnmatch
 import re
 from dataclasses import asdict, dataclass
 from enum import Enum
-from pathlib import PurePosixPath
 from typing import Iterable
-
 
 _PATH = r"(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.(?:py|pyi|js|jsx|mjs|cjs|ts|tsx|go|rs|java|kt|kts|rb|php|cs|cpp|c|h|hpp|json|ya?ml|toml|md|sql|sh|css|html|xml|graphql|prisma)"
 
@@ -117,10 +115,7 @@ class ConstraintCompilation:
 
     def is_path_forbidden(self, path: str) -> bool:
         normalized = path.replace("\\", "/")
-        return any(
-            fnmatch.fnmatch(normalized, pattern)
-            for pattern in self.forbidden_patterns()
-        )
+        return any(fnmatch.fnmatch(normalized, pattern) for pattern in self.forbidden_patterns())
 
 
 class ConstraintCompiler:
@@ -128,9 +123,9 @@ class ConstraintCompiler:
 
     _NEGATIVE_PATTERNS = (
         re.compile(
-            rf"\b(?:without|do\s+not|don't|dont|never|must\s+not|should\s+not|avoid)\s+"
-            rf"(?:changing|change|modifying|modify|editing|edit|touching|touch|altering|alter|rewriting|rewrite|updating|update)\s+"
-            rf"(?P<target>[^;\n]+)",
+            r"\b(?:without|do\s+not|don't|dont|never|must\s+not|should\s+not|avoid)\s+"
+            r"(?:changing|change|modifying|modify|editing|edit|touching|touch|altering|alter|rewriting|rewrite|updating|update)\s+"
+            r"(?P<target>[^;\n]+)",
             re.IGNORECASE,
         ),
         re.compile(
@@ -177,20 +172,36 @@ class ConstraintCompiler:
         text = objective.strip()
         lowered = text.lower()
 
-        if re.search(r"\b(?:no|without|do\s+not\s+add|don't\s+add|avoid(?:\s+adding)?)\s+(?:new|additional)?\s*dependenc", lowered):
+        if re.search(
+            r"\b(?:no|without|do\s+not\s+add|don't\s+add|avoid(?:\s+adding)?)\s+(?:new|additional)?\s*dependenc",
+            lowered,
+        ):
             add(ConstraintKind.FORBID_NEW_DEPENDENCY, "no new dependencies")
-        if re.search(r"\b(?:preserve|keep|leave|do\s+not\s+change|without\s+changing)\b[^.;\n]*\b(?:database\s+)?schema\b", lowered):
+        if re.search(
+            r"\b(?:preserve|keep|leave|do\s+not\s+change|without\s+changing)\b[^.;\n]*\b(?:database\s+)?schema\b",
+            lowered,
+        ):
             add(ConstraintKind.FORBID_SCHEMA_CHANGE, "preserve database schema")
-        if re.search(r"\b(?:public\s+api|api\s+contract)\b[^.;\n]*(?:unchanged|stable|compatible)|(?:preserve|keep|leave)\b[^.;\n]*\b(?:public\s+api|api\s+contract)\b", lowered):
+        if re.search(
+            r"\b(?:public\s+api|api\s+contract)\b[^.;\n]*(?:unchanged|stable|compatible)|(?:preserve|keep|leave)\b[^.;\n]*\b(?:public\s+api|api\s+contract)\b",
+            lowered,
+        ):
             add(ConstraintKind.FORBID_PUBLIC_API_CHANGE, "keep public API unchanged")
-        if re.search(r"\b(?:backward|backwards)\s+compatib", lowered) or re.search(r"\bmaintain\s+compatib", lowered):
+        if re.search(r"\b(?:backward|backwards)\s+compatib", lowered) or re.search(
+            r"\bmaintain\s+compatib", lowered
+        ):
             add(ConstraintKind.REQUIRE_BACKWARD_COMPATIBILITY, "maintain backward compatibility")
-        if re.search(r"\b(?:do\s+not|don't|without|avoid)\b[^.;\n]*\b(?:auth|authentication|authorization)\b", lowered):
+        if re.search(
+            r"\b(?:do\s+not|don't|without|avoid)\b[^.;\n]*\b(?:auth|authentication|authorization)\b",
+            lowered,
+        ):
             add(ConstraintKind.FORBID_AUTH_CHANGE, "do not modify authentication")
 
         for pattern in cls._NEGATIVE_PATTERNS:
             for match in pattern.finditer(text):
-                target = (match.groupdict().get("target") or match.groupdict().get("value") or "").strip()
+                target = (
+                    match.groupdict().get("target") or match.groupdict().get("value") or ""
+                ).strip()
                 source = match.group(0).strip()
                 paths = re.findall(_PATH, target, flags=re.IGNORECASE)
                 if paths:

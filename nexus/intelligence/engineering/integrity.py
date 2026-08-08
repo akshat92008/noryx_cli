@@ -1,6 +1,6 @@
 """Authenticated integrity primitives for persistent engineering state.
 
-Repository-local state is writable by the task process.  Nexus therefore stores the
+Repository-local state is writable by the task process.  Noryx therefore stores the
 signing key outside the repository (or accepts it from the environment) and protects
 state with HMAC-SHA256 rather than an adjacent, unkeyed checksum.
 """
@@ -10,13 +10,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
-
-_ENV_KEY = "NEXUS_STATE_HMAC_KEY"
+_ENV_KEYS = ("NORYX_STATE_HMAC_KEY", "NEXUS_STATE_HMAC_KEY")
 
 
 def _canonical_bytes(payload: Any) -> bytes:
@@ -35,25 +34,51 @@ def _repository_id(repository_root: Path) -> str:
 
 
 def _load_or_create_key(repository_root: Path) -> bytes:
-    configured = os.environ.get(_ENV_KEY, "").encode("utf-8")
+    configured = next(
+        (os.environ.get(name, "") for name in _ENV_KEYS if os.environ.get(name, "")),
+        "",
+    ).encode("utf-8")
     if configured:
         return hashlib.sha256(configured).digest()
 
     # Keep signing material outside the editable repository and outside
-    # NEXUS_HOME, because embedders commonly place NEXUS_HOME inside a
+    # NORYX_HOME, because embedders commonly place NORYX_HOME inside a
     # workspace for portable state.  A repository-local key would allow the
     # task process to rewrite both state and signature.
-    key_dir = (Path.home() / ".nexusai" / "state-keys").expanduser().resolve()
-    try:
-        key_dir.relative_to(repository_root.resolve())
-    except ValueError:
-        pass
-    else:
+    uid = getattr(os, "getuid", lambda: 0)()
+    configured_dir = os.environ.get("NORYX_STATE_KEY_DIR", "").strip()
+    candidates = [
+        Path(configured_dir).expanduser() if configured_dir else None,
+        Path.home() / ".noryx" / "state-keys",
+        Path.cwd() / ".noryx" / "state-keys",
+        Path(tempfile.gettempdir()) / f".noryx-state-keys-{uid}",
+    ]
+    key_dir: Path | None = None
+    root = repository_root.resolve()
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        resolved = candidate.expanduser().resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError:
+            pass
+        else:
+            continue
+        try:
+            resolved.mkdir(parents=True, exist_ok=True)
+            probe = resolved / f".write-probe-{os.getpid()}"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink()
+        except OSError:
+            continue
+        key_dir = resolved
+        break
+    if key_dir is None:
         raise RuntimeError(
-            "Authenticated state requires NEXUS_STATE_HMAC_KEY when the user "
-            "configuration directory is inside the repository"
+            "Authenticated state needs a writable external key directory; set "
+            "NORYX_STATE_KEY_DIR or NORYX_STATE_HMAC_KEY"
         )
-    key_dir.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(key_dir, 0o700)
     except OSError:
@@ -65,9 +90,7 @@ def _load_or_create_key(repository_root: Path) -> bytes:
         pass
     else:
         if len(existing) != 32:
-            raise RuntimeError(
-                f"Authenticated-state key has invalid length: {key_path}"
-            )
+            raise RuntimeError(f"Authenticated-state key has invalid length: {key_path}") from None
         try:
             os.chmod(key_path, 0o600)
         except OSError:
@@ -78,12 +101,10 @@ def _load_or_create_key(repository_root: Path) -> bytes:
     flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
     try:
         descriptor = os.open(key_path, flags, 0o600)
-    except FileExistsError:
+    except FileExistsError as exc:
         existing = key_path.read_bytes()
         if len(existing) != 32:
-            raise RuntimeError(
-                f"Authenticated-state key has invalid length: {key_path}"
-            )
+            raise RuntimeError(f"Authenticated-state key has invalid length: {key_path}") from exc
         return existing
     try:
         os.write(descriptor, key)

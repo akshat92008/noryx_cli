@@ -1,4 +1,4 @@
-"""Canonical data structures for Nexus Repository Intelligence — Sprint 5."""
+"""Canonical data structures for Noryx Repository Intelligence — Sprint 5."""
 
 from __future__ import annotations
 
@@ -121,7 +121,9 @@ class TestRelationship:
 class ConfigurationRelationship:
     config_file: str
     target_path: str
-    relationship_type: str  # CONFIGURES, VALIDATES, GENERATES, SERIALIZES, DEPLOYS, MIGRATES, SECURES, BUILDS
+    relationship_type: (
+        str  # CONFIGURES, VALIDATES, GENERATES, SERIALIZES, DEPLOYS, MIGRATES, SECURES, BUILDS
+    )
     confidence: float = 1.0
     details: str = ""
 
@@ -137,7 +139,9 @@ class HistoricalRelationship:
 
 @dataclass
 class ArchitectureBoundary:
-    layer_name: str  # ui, api, domain, persistence, provider_adapter, controller, verification, plugin
+    layer_name: (
+        str  # ui, api, domain, persistence, provider_adapter, controller, verification, plugin
+    )
     files: list[str] = field(default_factory=list)
     allowed_imports: list[str] = field(default_factory=list)
     forbidden_imports: list[str] = field(default_factory=list)
@@ -277,12 +281,16 @@ class ContextBundle:
         if self.risks:
             sections.append("[RISK ANNOTATIONS]")
             for risk in self.risks:
-                sections.append(f"- {risk.path} [{risk.risk_level.value.upper()}]: {', '.join(risk.reasons)}")
+                sections.append(
+                    f"- {risk.path} [{risk.risk_level.value.upper()}]: {', '.join(risk.reasons)}"
+                )
         if self.tests:
             sections.append("[RELATED TESTS]")
             for test_rel in self.tests:
-                sections.append(f"- {test_rel.test_file} ({test_rel.relationship_type}, conf={test_rel.confidence}) -> {test_rel.source_file}")
-        
+                sections.append(
+                    f"- {test_rel.test_file} ({test_rel.relationship_type}, conf={test_rel.confidence}) -> {test_rel.source_file}"
+                )
+
         sections.append("\n[DECISIVE FILES]")
         for ctx_file in self.files:
             sections.append(
@@ -290,10 +298,12 @@ class ContextBundle:
                 f"(lines {ctx_file.start_line}-{ctx_file.end_line}, reason: {ctx_file.selection_reason}) ---\n"
                 f"{ctx_file.excerpt}"
             )
-        
+
         if self.omitted_candidates:
-            sections.append(f"\n[OMITTED CONTEXT (Budget Limit)]\nOmitted {len(self.omitted_candidates)} candidates: {', '.join(self.omitted_candidates[:10])}")
-        
+            sections.append(
+                f"\n[OMITTED CONTEXT (Budget Limit)]\nOmitted {len(self.omitted_candidates)} candidates: {', '.join(self.omitted_candidates[:10])}"
+            )
+
         return "\n".join(sections)
 
 

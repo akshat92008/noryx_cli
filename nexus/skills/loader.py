@@ -3,7 +3,7 @@ Skill Loader — auto-discovery, registration, and trigger matching for skills.
 
 Discovers skills from:
 1. nexus/skills/builtin/ — built-in skills
-2. trusted .nexus/skills/*.md — repository workflows
+2. trusted .noryx/skills/*.md — repository workflows
 3. ~/.nexusai/skills/ — user-defined custom skills
 4. Plugin skills — loaded via the plugin system
 """
@@ -252,10 +252,10 @@ class SkillLoader:
                 pass  # Don't let bad custom skills break anything
 
     def load_project(self):
-        """Load trusted, declarative ``.nexus/skills/*.md`` workflows."""
+        """Load trusted, declarative ``.noryx/skills/*.md`` workflows."""
         if not self.working_dir:
             return
-        directory = self.working_dir / ".nexus" / "skills"
+        directory = self.working_dir / ".noryx" / "skills"
         if not directory.is_dir():
             return
         for path in sorted(directory.glob("*.md")):

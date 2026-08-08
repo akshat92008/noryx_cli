@@ -1,4 +1,4 @@
-"""Regression coverage for the integrated Nexus final runtime."""
+"""Regression coverage for the integrated Noryx final runtime."""
 
 from __future__ import annotations
 
@@ -270,7 +270,7 @@ def test_run_ledger_uses_complete_canonical_artifact_contract(tmp_path):
     assert expected <= {item.name for item in ledger.turn_dir.iterdir()}
     inspected = RunCatalog(tmp_path / "state").inspect("ledger-session")
     assert inspected["final_report"]["status"] == "VERIFIED"
-    with pytest.raises(FileNotFoundError, match="Invalid Nexus run"):
+    with pytest.raises(FileNotFoundError, match="Invalid Noryx run"):
         RunCatalog(tmp_path / "state").inspect("../../etc")
 
 
@@ -304,7 +304,7 @@ def test_repograph_discovers_routes_models_owners_and_relevance(tmp_path):
 
 
 def test_policy_deny_precedes_allow_and_defaults_ask(tmp_path):
-    policy_dir = tmp_path / ".nexus"
+    policy_dir = tmp_path / ".noryx"
     policy_dir.mkdir()
     (policy_dir / "policies.yml").write_text(
         "allow:\n"
@@ -333,7 +333,7 @@ def test_all_nearest_project_instruction_files_are_combined(tmp_path):
 
 
 def test_trusted_project_markdown_skill_is_declarative(tmp_path):
-    skills_dir = tmp_path / ".nexus" / "skills"
+    skills_dir = tmp_path / ".noryx" / "skills"
     skills_dir.mkdir(parents=True)
     skill_path = skills_dir / "api-review.md"
     skill_path.write_text(

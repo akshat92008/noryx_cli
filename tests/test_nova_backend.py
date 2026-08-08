@@ -1,4 +1,4 @@
-"""Focused tests for Nexus' Nova adapter."""
+"""Focused tests for Noryx' Nova adapter."""
 
 import json
 

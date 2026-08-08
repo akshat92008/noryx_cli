@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source-checkout compatibility entrypoint for Nexus CLI.
+"""Source-checkout compatibility entrypoint for Noryx CLI.
 
 Production users should use the installed ``nexus`` console script.  This file
 exists so source archives, smoke tests, and contributors have one explicit,

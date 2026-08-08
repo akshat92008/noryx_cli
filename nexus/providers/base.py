@@ -67,9 +67,7 @@ class ChatRequest:
             raise ProviderContractError("provider does not support tool calls")
         unsupported = sorted(set(self.options) - set(capabilities.supported_options))
         if unsupported:
-            raise ProviderContractError(
-                "Unsupported provider option(s): " + ", ".join(unsupported)
-            )
+            raise ProviderContractError("Unsupported provider option(s): " + ", ".join(unsupported))
         if self.options.get("parallel_tool_calls") and not capabilities.parallel_tool_calls:
             raise ProviderContractError("provider does not support parallel tool calls")
         return self
@@ -172,6 +170,7 @@ class Provider(ABC):
         method on the base protocol gives callers one deterministic lifecycle
         hook without forcing light-weight test doubles to implement it.
         """
+        return None
 
     def __enter__(self) -> "Provider":
         return self
@@ -179,14 +178,16 @@ class Provider(ABC):
     def __exit__(self, _exc_type, _exc, _tb) -> None:
         self.close()
 
+
 class ModelProvider(Provider):
     """
     Modern target interface for Sprint 3.
     """
+
     @abstractmethod
     def complete(self, messages: list[dict], tools: list[dict] | None = None, **kwargs: Any) -> Any:
         pass
-        
+
     @abstractmethod
     def stream(self, messages: list[dict], tools: list[dict] | None = None, **kwargs: Any) -> Any:
         pass

@@ -1,4 +1,4 @@
-"""Regression coverage for Nexus execution-intelligence and safety upgrades."""
+"""Regression coverage for Noryx execution-intelligence and safety upgrades."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from nexus.planner import (
 )
 from nexus.policy import get_mode_policy
 from nexus.repo_graph import RepoGraph
-from nexus.tools import tool_context, tool_multi_edit, ToolResult
+from nexus.tools import ToolResult, tool_context, tool_multi_edit
 from nexus.verification import CheckStatus, CheckType, VerificationEngine
 
 
@@ -31,7 +31,9 @@ def test_confirmed_command_keeps_required_os_isolation(tmp_path):
     )
     captured: dict = {}
     agent._tool_controller._dispatch_tool_execution = (  # type: ignore[method-assign]
-        lambda name, args: captured.update(name=name, args=dict(args)) or ToolResult(output="✅ ok", status=0)
+        lambda name, args: (
+            captured.update(name=name, args=dict(args)) or ToolResult(output="✅ ok", status=0)
+        )
     )
     try:
         output, success = agent._execute_tool_with_safety(
@@ -144,11 +146,11 @@ def test_change_aware_verification_stops_on_targeted_failure(tmp_path, monkeypat
         return CheckResult(check_type, CheckStatus.FAILED, command, "targeted failure")
 
     monkeypatch.setattr(engine, "_execute_check", fake_execute)
-    monkeypatch.setattr(engine, "run_all", lambda: (_ for _ in ()).throw(AssertionError("full gate should not run")))
-
-    report = engine.run_change_aware(
-        ["app/service.py"], impacted_tests=["tests/test_service.py"]
+    monkeypatch.setattr(
+        engine, "run_all", lambda: (_ for _ in ()).throw(AssertionError("full gate should not run"))
     )
+
+    report = engine.run_change_aware(["app/service.py"], impacted_tests=["tests/test_service.py"])
 
     assert report.all_passed is False
     assert len(report.checks) == 1

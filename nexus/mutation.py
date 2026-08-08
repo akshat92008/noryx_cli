@@ -8,10 +8,10 @@ from __future__ import annotations
 import difflib
 import hashlib
 import os
-import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
 from nexus.events import EventBus, EventType
 
 
@@ -53,14 +53,14 @@ class MutationController:
         try:
             target = self._resolve_and_verify(path)
             hash_before = self._hash(target)
-            
+
             lines_before = []
             if target.exists():
                 with target.open("r", encoding="utf-8", errors="replace") as f:
                     lines_before = f.readlines()
-                    
+
             target.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Write to temporary file first for atomicity
             fd, temp_path = tempfile.mkstemp(dir=target.parent, text=isinstance(content, str))
             try:
@@ -72,17 +72,20 @@ class MutationController:
                 raise
 
             hash_after = self._hash(target)
-            
+
             lines_after = []
             with target.open("r", encoding="utf-8", errors="replace") as f:
                 lines_after = f.readlines()
-                
-            diff = "".join(difflib.unified_diff(
-                lines_before, lines_after,
-                fromfile=f"a/{target.relative_to(self.workspace)}",
-                tofile=f"b/{target.relative_to(self.workspace)}"
-            ))
-            
+
+            diff = "".join(
+                difflib.unified_diff(
+                    lines_before,
+                    lines_after,
+                    fromfile=f"a/{target.relative_to(self.workspace)}",
+                    tofile=f"b/{target.relative_to(self.workspace)}",
+                )
+            )
+
             result = MutationResult(
                 path=str(target),
                 success=True,
@@ -90,12 +93,13 @@ class MutationController:
                 hash_before=hash_before,
                 hash_after=hash_after,
             )
-            EventBus.publish(EventType.FILE_MODIFIED, "global", "MutationController", {"path": str(target), "diff": diff})
-            return result
-            
-        except Exception as e:
-            return MutationResult(
-                path=str(path),
-                success=False,
-                error=str(e)
+            EventBus.publish(
+                EventType.FILE_MODIFIED,
+                "global",
+                "MutationController",
+                {"path": str(target), "diff": diff},
             )
+            return result
+
+        except Exception as e:
+            return MutationResult(path=str(path), success=False, error=str(e))

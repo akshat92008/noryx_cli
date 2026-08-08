@@ -1,4 +1,4 @@
-# Nexus CLI 3.8.2 — Launch Remediation Report
+# Noryx CLI 3.8.2 — Launch Remediation Report
 
 Release date: 2026-08-07
 
@@ -16,7 +16,7 @@ Release date: 2026-08-07
 - Qualification validates every direct runtime dependency against `pyproject.toml` and runs `pip check`.
 - Source evidence carries an exact Git revision when available, otherwise a deterministic archive tree hash, plus the dependency-lock hash.
 - Sandbox qualification always carries source revision identity.
-- `nexus --doctor --output-format json` emits canonical JSON rather than mixed console text.
+- `noryx --doctor --output-format json` emits canonical JSON rather than mixed console text.
 - Release CI requires native autonomous sandbox qualification before autonomous artifacts are accepted.
 
 ## Evidence boundary

@@ -42,10 +42,6 @@ from nexus.collaboration.lifecycle import WorkerLifecycleManager
 from nexus.collaboration.models import (
     AgentAssignment,
     AgentRole,
-    AssignmentResult,
-    AssignmentStatus,
-    CollaborationBudget,
-    CollaborationDecision,
     CollaborationMode,
     CollaborationPolicyProfile,
     CollaborationRunState,
@@ -62,8 +58,8 @@ from nexus.collaboration.observability import (
     CENTRAL_VERIFICATION_STARTED,
     COLLABORATION_COMPLETED,
     COLLABORATION_DECISION_CREATED,
-    COLLABORATION_FALLBACK_SELECTED,
     COLLABORATION_FAILED,
+    COLLABORATION_FALLBACK_SELECTED,
     COLLABORATION_STARTED,
     INTEGRATION_COMPLETED,
     INTEGRATION_CONFLICT_DETECTED,
@@ -138,7 +134,7 @@ class LeadOrchestrator:
             budget=self._policy_engine.budget,
         )
 
-        pdir = persistence_dir or (self._lead_root / ".nexus" / "runs" / run_id / "collaboration")
+        pdir = persistence_dir or (self._lead_root / ".noryx" / "runs" / run_id / "collaboration")
         self._persistence = CollaborationPersistence(pdir)
         self._worker_runtime = WorkerRuntime(
             capability_registry=self._capabilities,
@@ -185,7 +181,9 @@ class LeadOrchestrator:
                 independent_workstreams=[a.assignment_id for a in assignments],
                 sequential_dependencies=[],
                 estimated_context_tokens=15000,
-                requires_security_review=any(a.role == AgentRole.SECURITY_REVIEWER for a in assignments),
+                requires_security_review=any(
+                    a.role == AgentRole.SECURITY_REVIEWER for a in assignments
+                ),
                 requires_architecture_review=False,
                 dependency_coupling_score=0.2,
                 time_budget_seconds=300,
@@ -196,7 +194,9 @@ class LeadOrchestrator:
 
         decision = planner.decide(task_characteristics)
         self._state.mode = decision.recommended_mode
-        self._blackboard.record_transition(CollaborationState.ANALYZING, f"Eligibility: {decision.recommended_mode.value}")
+        self._blackboard.record_transition(
+            CollaborationState.ANALYZING, f"Eligibility: {decision.recommended_mode.value}"
+        )
 
         self._emitter.emit(
             COLLABORATION_DECISION_CREATED,
@@ -207,7 +207,10 @@ class LeadOrchestrator:
         )
 
         # Single-Agent Fallback check
-        if not decision.use_collaboration or decision.recommended_mode == CollaborationMode.SINGLE_AGENT:
+        if (
+            not decision.use_collaboration
+            or decision.recommended_mode == CollaborationMode.SINGLE_AGENT
+        ):
             logger.info("LeadOrchestrator: task selected SINGLE_AGENT mode.")
             self._state.mode = CollaborationMode.SINGLE_AGENT
             self._emitter.emit(
@@ -237,7 +240,9 @@ class LeadOrchestrator:
             except AssignmentValidationError as exc:
                 logger.error("LeadOrchestrator: rejected assignment: %s", exc)
                 self._state.state = CollaborationState.FAILED
-                self._blackboard.record_transition(CollaborationState.FAILED, f"Invalid assignment: {exc}")
+                self._blackboard.record_transition(
+                    CollaborationState.FAILED, f"Invalid assignment: {exc}"
+                )
                 return self._state
 
         # 3. Reserve Scope for Mutating Assignments
@@ -247,7 +252,9 @@ class LeadOrchestrator:
         for assignment in assignments:
             mutation_paths = assignment.allowed_mutation_paths or assignment.allowed_paths
             is_mutating = assignment.mutation_policy.allowed or assignment.role in (
-                AgentRole.IMPLEMENTER, AgentRole.TEST_ENGINEER, AgentRole.INTEGRATION_ENGINEER
+                AgentRole.IMPLEMENTER,
+                AgentRole.TEST_ENGINEER,
+                AgentRole.INTEGRATION_ENGINEER,
             )
             if is_mutating and mutation_paths:
                 try:
@@ -261,10 +268,13 @@ class LeadOrchestrator:
                 except Exception as exc:
                     logger.error(
                         "LeadOrchestrator: scope reservation failed for '%s': %s",
-                        assignment.assignment_id, exc,
+                        assignment.assignment_id,
+                        exc,
                     )
                     self._state.state = CollaborationState.FAILED
-                    self._blackboard.record_transition(CollaborationState.FAILED, f"Scope reservation conflict: {exc}")
+                    self._blackboard.record_transition(
+                        CollaborationState.FAILED, f"Scope reservation conflict: {exc}"
+                    )
                     return self._state
 
         # 4. Prepare Workers & Execute
@@ -345,9 +355,14 @@ class LeadOrchestrator:
                 conflicts=list(integration_result.conflicts),
             )
 
-        if integration_result.status in (IntegrationStatus.FAILED, IntegrationStatus.CONFLICTED) and not integration_result.integrated_assignments:
+        if (
+            integration_result.status in (IntegrationStatus.FAILED, IntegrationStatus.CONFLICTED)
+            and not integration_result.integrated_assignments
+        ):
             self._state.state = CollaborationState.FAILED
-            self._blackboard.record_transition(CollaborationState.FAILED, "Integration failed or blocked by conflicts")
+            self._blackboard.record_transition(
+                CollaborationState.FAILED, "Integration failed or blocked by conflicts"
+            )
             self._emitter.emit(
                 INTEGRATION_FAILED,
                 parent_run_id=self._run_id,
@@ -372,7 +387,10 @@ class LeadOrchestrator:
             collaboration_id=self._state.collaboration_id,
         )
 
-        verification_passed = any(v.startswith("central_verification:PASS") for v in integration_result.verification_results)
+        verification_passed = any(
+            v.startswith("central_verification:PASS")
+            for v in integration_result.verification_results
+        )
         self._blackboard.verification_passed = verification_passed
 
         self._emitter.emit(
@@ -384,7 +402,9 @@ class LeadOrchestrator:
 
         if not verification_passed:
             self._state.state = CollaborationState.FAILED
-            self._blackboard.record_transition(CollaborationState.FAILED, "Central verification failed")
+            self._blackboard.record_transition(
+                CollaborationState.FAILED, "Central verification failed"
+            )
             self._cleanup_all()
             return self._state
 
@@ -445,7 +465,9 @@ class LeadOrchestrator:
             )
 
             is_mutating = assignment.mutation_policy.allowed or assignment.role in (
-                AgentRole.IMPLEMENTER, AgentRole.TEST_ENGINEER, AgentRole.INTEGRATION_ENGINEER
+                AgentRole.IMPLEMENTER,
+                AgentRole.TEST_ENGINEER,
+                AgentRole.INTEGRATION_ENGINEER,
             )
 
             strategy = (

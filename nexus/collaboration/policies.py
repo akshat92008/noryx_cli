@@ -20,6 +20,7 @@ from nexus.collaboration.models import CollaborationBudget, CollaborationPolicyP
 # Default budgets per policy profile
 # ---------------------------------------------------------------------------
 
+
 def default_budget(profile: CollaborationPolicyProfile) -> CollaborationBudget:
     """Return the conservative default budget for a given policy profile."""
     if profile == CollaborationPolicyProfile.DISABLED:

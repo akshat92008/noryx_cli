@@ -31,7 +31,7 @@ env/
 .DS_Store
 Thumbs.db
 
-# NexusAI internal
+# Legacy NexusAI internal
 .nexusai/
 
 # Testing
@@ -40,6 +40,7 @@ Thumbs.db
 .tox/
 coverage/
 htmlcov/
+.coverage.shard-*
 verification_evidence/
 benchmarks/results/
 benchmarks/results.json
@@ -50,7 +51,8 @@ nexus_cli_v*_release_bundle.zip
 # Node (if any)
 node_modules/
 
-# Nexus runtime and qualification outputs
+# Noryx runtime and qualification outputs
+/.noryx/
 /.nexus/
 /release_evidence/
 /release-artifacts/
