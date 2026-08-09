@@ -409,6 +409,8 @@ class Agent:
         self._next_confirmation_id = 1
         self._agent_id = str(uuid.uuid4())
         self._cancelled: bool = False
+        import threading
+        self._run_lock = threading.Lock()
         self._pending_edits: dict[str, dict[str, Any]] = {}
         self._next_edit_id = 1
         self.evidence = EvidenceTrail(self.conversation_id)
@@ -1119,7 +1121,8 @@ class Agent:
             for item in evidence
             if item.get("kind") == "verification_check"
         ]
-        reviewer_model = os.environ.get("NEXUS_REVIEW_MODEL_ID", "").strip()
+        from nexus.env import noryx_env
+        reviewer_model = noryx_env("REVIEW_MODEL_ID", "").strip()
         if not reviewer_model and self.model_key == "custom":
             reviewer_model = self.model_cfg["id"]
         if not reviewer_model:
@@ -1340,6 +1343,11 @@ class Agent:
 
     def _build_messages(self) -> list[dict]:
         """Build the full message list with system prompt and plan context."""
+        
+        # Phase 7 Fix: Auto-compact long conversations to prevent provider token overflows
+        if len(self.messages) > 100:
+            self.compact_conversation()
+            
         cwd_info = f"\n\nCurrent working directory: {self.working_dir}"
         time_info = f"\nCurrent time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         os_info = f"\nOS: {sys.platform}"
@@ -1593,13 +1601,42 @@ class Agent:
         return candidates
 
     def _queue_edit(self, name: str, args: dict, diff: str) -> str:
+        # Fix #16: Idempotency — return existing ID if (name, args) OR diff-hash matches.
+        import hashlib
+        diff_hash = hashlib.sha256(diff.encode("utf-8", errors="replace")).hexdigest()[:16]
         for edit_id, pending in self._pending_edits.items():
-            if pending["name"] == name and pending["args"] == args:
+            if (pending["name"] == name and pending["args"] == args) or (
+                pending.get("diff_hash") == diff_hash
+            ):
                 return edit_id
         edit_id = f"edit-{self._next_edit_id:04d}"
         self._next_edit_id += 1
-        self._pending_edits[edit_id] = {"name": name, "args": dict(args), "diff": diff}
+        self._pending_edits[edit_id] = {
+            "name": name,
+            "args": dict(args),
+            "diff": diff,
+            "diff_hash": diff_hash,
+        }
         return edit_id
+
+
+    def resume_after_approval(self, emit_ui: bool = False) -> tuple[str, list[dict]]:
+        """Resume an interactive turn that was paused for approval."""
+        if not getattr(self, "_run_lock", None):
+            import threading
+            self._run_lock = threading.Lock()
+        if not self._run_lock.acquire(blocking=False):
+            raise RuntimeError("Agent is already running. Cannot resume concurrently.")
+        try:
+            return self._run_hosted_turn(
+                user_input="",
+                analysis={"intent": IntentType.CHAT}, # dummy, not used when resume=True
+                plan=getattr(self.planner, "current_plan", None),
+                emit_ui=emit_ui,
+                resume=True
+            )
+        finally:
+            self._run_lock.release()
 
     def apply_pending_edit(self, edit_id: str = "") -> tuple[str, bool]:
         edit_id = edit_id.strip()
@@ -1611,6 +1648,13 @@ class Agent:
         result = self._execute_tool_with_safety(
             pending["name"], dict(pending["args"]), _edit_confirmed=True
         )
+        if pending.get("tool_call_id"):
+            self.messages.append({
+                "role": "tool",
+                "tool_call_id": pending["tool_call_id"],
+                "content": result[0]
+            })
+            self._auto_save()
         self._refresh_final_report_after_approval()
         return result
 
@@ -1622,6 +1666,13 @@ class Agent:
         if not pending:
             return f"Unknown or expired edit id: {edit_id or '(none)'}", False
         result = f"Rejected {edit_id}; no file was changed.", True
+        if pending.get("tool_call_id"):
+            self.messages.append({
+                "role": "tool",
+                "tool_call_id": pending["tool_call_id"],
+                "content": result[0]
+            })
+            self._auto_save()
         self._refresh_final_report_after_approval()
         return result
 
@@ -1692,6 +1743,13 @@ class Agent:
             _user_confirmed=True,
             _edit_confirmed=bool(pending.get("edit_confirmed")),
         )
+        if pending.get("tool_call_id"):
+            self.messages.append({
+                "role": "tool",
+                "tool_call_id": pending["tool_call_id"],
+                "content": result[0]
+            })
+            self._auto_save()
         self._refresh_final_report_after_approval()
         return result
 
@@ -1715,6 +1773,13 @@ class Agent:
         if not pending:
             return f"Unknown or expired confirmation id: {confirmation_id}", False
         result = f"Cancelled {confirmation_id}; the operation was not executed.", True
+        if pending.get("tool_call_id"):
+            self.messages.append({
+                "role": "tool",
+                "tool_call_id": pending["tool_call_id"],
+                "content": result[0]
+            })
+            self._auto_save()
         self._refresh_final_report_after_approval()
         return result
 
@@ -1919,14 +1984,22 @@ class Agent:
         Delegates to the canonical ExecutionPipeline.
         """
         # Reload project rules on each turn
-        self._load_rules_and_preferences()
-        self._update_system_prompt()
-
-        from nexus.pipeline import ExecutionPipeline
-
-        pipeline = ExecutionPipeline(self)
-        result = pipeline.run(user_input, interactive=True, emit_ui=True)
-        return result.response
+        if not getattr(self, "_run_lock", None):
+            import threading
+            self._run_lock = threading.Lock()
+        if not self._run_lock.acquire(blocking=False):
+            raise RuntimeError("Agent is already running. Cannot start a new turn concurrently.")
+        try:
+            self._load_rules_and_preferences()
+            self._update_system_prompt()
+    
+            from nexus.pipeline import ExecutionPipeline
+    
+            pipeline = ExecutionPipeline(self)
+            result = pipeline.run(user_input, interactive=True, emit_ui=True)
+            return result.response
+        finally:
+            self._run_lock.release()
 
     # ── Non-Interactive Run (Web API) ────────────────────────────────────
 
@@ -1936,14 +2009,22 @@ class Agent:
         Used by the web API for structured responses.
         Delegates to the canonical ExecutionPipeline.
         """
-        self._load_rules_and_preferences()
-        self._update_system_prompt()
-
-        from nexus.pipeline import ExecutionPipeline
-
-        pipeline = ExecutionPipeline(self)
-        result = pipeline.run(user_input, interactive=False, emit_ui=False)
-        return result.response, result.events
+        if not getattr(self, "_run_lock", None):
+            import threading
+            self._run_lock = threading.Lock()
+        if not self._run_lock.acquire(blocking=False):
+            raise RuntimeError("Agent is already running. Cannot start a new turn concurrently.")
+        try:
+            self._load_rules_and_preferences()
+            self._update_system_prompt()
+    
+            from nexus.pipeline import ExecutionPipeline
+    
+            pipeline = ExecutionPipeline(self)
+            result = pipeline.run(user_input, interactive=False, emit_ui=False)
+            return result.response, result.events
+        finally:
+            self._run_lock.release()
 
     def _run_hosted_turn(
         self,
@@ -1953,6 +2034,7 @@ class Agent:
         interactive: bool = False,
         emit_ui: bool = False,
         max_turns_override: int | None = None,
+        resume: bool = False,
     ) -> tuple[str, list[dict]]:
         """Run a standard hosted-model execution loop (single-node)."""
         _run_id = (
@@ -1975,19 +2057,22 @@ class Agent:
         engine.tool_executor = handle_tool
 
         # Auto-activate skills
-        try:
-            self.skills.auto_activate(
-                user_input,
-                intent=analysis["intent"].value
-                if hasattr(analysis["intent"], "value")
-                else str(analysis.get("intent", "unknown")),
-            )
-            self._update_system_prompt()
-        except Exception as exc:
-            logger.debug("Automatic skill activation failed: %s", exc)
+        if not resume:
+            try:
+                self.skills.auto_activate(
+                    user_input,
+                    intent=analysis["intent"].value
+                    if hasattr(analysis["intent"], "value")
+                    else str(analysis.get("intent", "unknown")),
+                )
+                self._update_system_prompt()
+            except Exception as exc:
+                logger.debug("Automatic skill activation failed: %s", exc)
 
         self._cancelled = False
-        self.messages.append({"role": "user", "content": user_input})
+        if not resume:
+            self.messages.append({"role": "user", "content": user_input})
+            
         events = engine.run_interactive(self._build_messages(), tools=self._get_tools())
 
         live = ui.LiveStatus() if emit_ui else None
@@ -2020,6 +2105,8 @@ class Agent:
                         live.stop()
                     if emit_ui:
                         ui.console.print(event.text, end="", style=ui.WHITE, highlight=False)
+                elif event.type == EventType.TURN_COMPLETED:
+                    self._last_turn_assistant_msg = getattr(event, "assistant_msg", None)
                 elif event.type == EventType.TOOL_CALL_STARTED:
                     if live:
                         live.update(f"Running tool {event.tool_name}...")
@@ -2032,10 +2119,76 @@ class Agent:
                             "result": event.result,
                             "success": event.success,
                             "node": "interactive",
+                            "tool_call_id": getattr(event, "tool_call_id", ""),
                         }
                     )
+                elif event.type == EventType.RUN_AWAITING_APPROVAL:
+                    if live:
+                        live.stop()
+                    
+                    if getattr(self, "_last_turn_assistant_msg", None):
+                        self.messages.append(self._last_turn_assistant_msg)
+                        self._last_turn_assistant_msg = None
+                        
+                        # We must also append all successful tool calls that happened before the paused one
+                        for ev in accumulated_events:
+                            if ev.get("type") == "tool_call" and ev.get("tool_call_id"):
+                                self.messages.append({
+                                    "role": "tool",
+                                    "tool_call_id": ev["tool_call_id"],
+                                    "content": ev.get("result", "")
+                                })
+                    
+                    if event.confirmation_id in self._pending_edits:
+                        self._pending_edits[event.confirmation_id]["tool_call_id"] = getattr(event, "tool_call_id", "")
+                    elif event.confirmation_id in self._pending_confirmations:
+                        self._pending_confirmations[event.confirmation_id]["tool_call_id"] = getattr(event, "tool_call_id", "")
+                        
+                    accumulated_events.append(
+                        {
+                            "type": "run_awaiting_approval",
+                            "confirmation_id": event.confirmation_id,
+                            "diff_preview": event.diff_preview,
+                            "tool_name": event.tool_name,
+                        }
+                    )
+                    content = f"⏸️ The file edit has been queued for review.\nEnter `/apply {event.confirmation_id}` or `/reject {event.confirmation_id}`."
+                elif event.type == EventType.RUN_AWAITING_CONFIRMATION:
+                    if live:
+                        live.stop()
+                    
+                    if getattr(self, "_last_turn_assistant_msg", None):
+                        self.messages.append(self._last_turn_assistant_msg)
+                        self._last_turn_assistant_msg = None
+                        
+                        # We must also append all successful tool calls that happened before the paused one
+                        for ev in accumulated_events:
+                            if ev.get("type") == "tool_call" and ev.get("tool_call_id"):
+                                self.messages.append({
+                                    "role": "tool",
+                                    "tool_call_id": ev["tool_call_id"],
+                                    "content": ev.get("result", "")
+                                })
+                    
+                    if event.confirmation_id in self._pending_confirmations:
+                        self._pending_confirmations[event.confirmation_id]["tool_call_id"] = getattr(event, "tool_call_id", "")
+                    elif event.confirmation_id in self._pending_edits:
+                        self._pending_edits[event.confirmation_id]["tool_call_id"] = getattr(event, "tool_call_id", "")
+                        
+                    accumulated_events.append(
+                        {
+                            "type": "run_awaiting_confirmation",
+                            "confirmation_id": event.confirmation_id,
+                            "action_type": getattr(event, "action_type", "COMMAND_CONFIRMATION"),
+                            "display_message": getattr(event, "display_message", ""),
+                            "tool_name": event.tool_name,
+                        }
+                    )
+                    content = getattr(event, "display_message", "") or f"⏸️ PENDING_CONFIRMATION [{event.confirmation_id}]. Enter `/confirm {event.confirmation_id}` or `/cancel {event.confirmation_id}`."
                 elif event.type == EventType.RUN_FAILED:
-                    raise RuntimeError(event.error)
+                    if live:
+                        live.stop()
+                    return f"❌ Run failed: {event.error}", accumulated_events
                 elif event.type == EventType.RUN_COMPLETED:
                     content = event.content
         except Exception as e:
@@ -2116,7 +2269,15 @@ class Agent:
                 response_failed = (
                     (content or "").lstrip().upper().startswith(("ERROR:", "BLOCKED:"))
                 )
-                if response_failed or contract_missing:
+                is_awaiting_approval = any(
+                    isinstance(e, dict) and e.get("type") == "run_awaiting_approval"
+                    for e in accumulated_events
+                )
+                if is_awaiting_approval:
+                    # Do not fail or complete the step; the outer execution loop will intercept
+                    # this and transition the run state, leaving the step in_progress.
+                    pass
+                elif response_failed or contract_missing:
                     self.planner.advance_step(
                         current_step.id,
                         TaskStatus.FAILED,
@@ -2188,6 +2349,7 @@ class Agent:
         if state.get("status") in {
             RunStatus.VERIFIED.value,
             RunStatus.ROLLED_BACK.value,
+            RunStatus.FAILED.value,
         }:
             raise ValueError(f"Run is already terminal: {state.get('status')}")
         request_record = inspected.get("request", {})

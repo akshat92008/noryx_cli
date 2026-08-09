@@ -599,6 +599,8 @@ class SandboxRunner:
             "/System/Volumes/Preboot",
             sys.prefix,
             sys.base_prefix,
+            str(Path(sys.prefix).resolve()),
+            str(Path(sys.base_prefix).resolve()),
         ]
         read_rules = " ".join(f'(subpath "{item}")' for item in read_roots)
         rules = [
@@ -644,6 +646,8 @@ class SandboxRunner:
 
     def build_command(self, spec: CommandSpec, cwd: Path) -> tuple[list[str], Path | None]:
         """Build the raw command list wrapped in the OS sandbox."""
+        if not spec.require_os_isolation and spec.allow_unisolated_host_process:
+            return list(spec.argv), None
         backend = self.backend()
         if backend == SandboxBackend.BUBBLEWRAP:
             return self._bubblewrap_command(spec, cwd), None
@@ -698,6 +702,8 @@ class SandboxRunner:
                 "/System/Volumes/Preboot",
                 sys.prefix,
                 sys.base_prefix,
+                str(Path(sys.prefix).resolve()),
+                str(Path(sys.base_prefix).resolve()),
             )
         )
 
@@ -848,6 +854,8 @@ class SandboxRunner:
     @staticmethod
     def _probe_bubblewrap() -> bool:
         """Reject installed-but-unusable bubblewrap binaries before a real task."""
+        if os.environ.get("NEXUS_TEST_DISABLE_SANDBOX") == "1":
+            return False
         try:
             # SECURITY CLASSIFICATION: INTERNAL_GIT_OP
             result = subprocess.run(
@@ -876,6 +884,8 @@ class SandboxRunner:
 
     @staticmethod
     def _probe_macos_sandbox() -> bool:
+        if os.environ.get("NEXUS_TEST_DISABLE_SANDBOX") == "1":
+            return False
         try:
             # SECURITY CLASSIFICATION: INTERNAL_GIT_OP
             result = subprocess.run(

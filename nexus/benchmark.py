@@ -346,7 +346,8 @@ class BenchmarkRunner:
         from nexus.models import resolve_model
         from nexus.preflight import BackendProbe, probe_model
 
-        model = os.environ.get("NEXUS_MODEL", "nova")
+        from nexus.env import noryx_env
+        model = noryx_env("MODEL", "nova")
         model_cfg = resolve_model(model)
         if not model_cfg:
             return BackendProbe(
@@ -379,8 +380,9 @@ class BenchmarkRunner:
         started = _utc_now()
         probe = None if dry_run else self._preflight()
 
+        from nexus.env import noryx_env
         strict_preflight = (
-            os.environ.get("NEXUS_BENCHMARK_STRICT_PREFLIGHT", "0") == "1"
+            noryx_env("BENCHMARK_STRICT_PREFLIGHT", "0") == "1"
             or not self._uses_custom_execution_gateway()
         )
         if probe is not None and not probe.ready and strict_preflight:

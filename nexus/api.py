@@ -22,7 +22,18 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_NVIDIA_TIMEOUT = float(noryx_env("NVIDIA_TIMEOUT", "120.0"))
 DEFAULT_GROQ_TIMEOUT = float(noryx_env("GROQ_TIMEOUT", "60.0"))
 
-# Automatic replacements for NVIDIA models that reached End-Of-Life (410 Gone)
+# Fix #6: Maximum physical provider attempts across all providers, keys, and
+# SDK retries combined.  This prevents unbounded retry multiplication when
+# multiple retry layers stack on top of each other.
+MAX_PHYSICAL_ATTEMPTS = int(noryx_env("MAX_PHYSICAL_ATTEMPTS", "3"))
+
+# Fix #10: Strict model mode.  When NORYX_STRICT_MODEL=1 any silent model
+# substitution (e.g. EOL replacements) raises an error instead of silently
+# redirecting.  Set this in benchmarks / CI to ensure the correct model is used.
+STRICT_MODEL_MODE = noryx_env("NORYX_STRICT_MODEL", "0") == "1"
+
+# Automatic replacements for NVIDIA models that reached End-Of-Life (410 Gone).
+# In strict mode these replacements raise instead of silently redirecting.
 NVIDIA_MODEL_REPLACEMENTS = {
     "deepseek-ai/deepseek-v4-flash": "meta/llama-3.3-70b-instruct",
     "deepseek-ai/deepseek-v4-pro": "z-ai/glm-5.2",
@@ -122,6 +133,8 @@ class _ObservedStream:
 
 def _load_env_file():
     """Load local Noryx environment files without overriding process values."""
+    if noryx_env("IGNORE_ENV_FILE", "0") == "1":
+        return
     cwd = os.getcwd()
     checkout = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     possible_paths = [
@@ -144,11 +157,13 @@ def _load_env_file():
                                 if k.startswith(
                                     (
                                         "NEXUS_",
+                                        "NORYX_",
                                         "OPENAI_",
                                         "ANTHROPIC_",
                                         "GROQ_",
                                         "NVIDIA_",
                                         "OPENROUTER_",
+                                        "OMNIROUTE_",
                                     )
                                 ) or k in {
                                     "HTTP_PROXY",
@@ -275,11 +290,25 @@ class NvidiaClient:
         self.groq_key = self.groq_keys[0] if self.groq_keys else ""
         self.groq_pool = RoundRobinKeyPool(self.groq_keys, cooldown_seconds=60.0)
 
+        omniroute_key = (
+            str(noryx_env("OMNIROUTE_API_KEY", "")).strip()
+            or os.environ.get("OMNIROUTE_API_KEY", "").strip()
+        )
+        omniroute_url = str(
+            noryx_env("OMNIROUTE_BASE_URL", "https://api.omniroute.ai/v1")
+        ).strip().rstrip("/")
+
         # Pre-instantiate the highest-priority configured client.
         if self.custom_base_url and self.custom_api_key:
             self.client = self._get_client(
                 self.custom_base_url,
                 self.custom_api_key,
+                self.timeout,
+            )
+        elif omniroute_key:
+            self.client = self._get_client(
+                omniroute_url,
+                omniroute_key,
                 self.timeout,
             )
         elif self.nvidia_keys:
@@ -298,7 +327,7 @@ class NvidiaClient:
             )
         else:
             raise ValueError(
-                "No valid API key found for a custom OpenAI-compatible endpoint, NVIDIA, Groq, or OpenRouter."
+                "No valid API key found for a custom OpenAI-compatible endpoint, OmniRoute, NVIDIA, Groq, or OpenRouter."
             )
 
     @property
@@ -328,7 +357,7 @@ class NvidiaClient:
                 return cached
             import httpx
 
-            client_timeout = httpx.Timeout(max(300.0, float(timeout)), connect=30.0)
+            client_timeout = httpx.Timeout(float(timeout), connect=30.0)
             client = OpenAI(
                 base_url=base_url,
                 api_key=api_key,
@@ -508,10 +537,26 @@ class NvidiaClient:
             kwargs["top_p"] = float(top_p)
 
         if model_id in NVIDIA_MODEL_REPLACEMENTS:
-            model_id = NVIDIA_MODEL_REPLACEMENTS[model_id]
+            replacement = NVIDIA_MODEL_REPLACEMENTS[model_id]
+            if STRICT_MODEL_MODE:
+                # Fix #10: Strict mode — refuse silent model substitution.
+                raise ValueError(
+                    f"NORYX_STRICT_MODEL=1: requested model '{model_id}' would be silently "
+                    f"replaced by '{replacement}' (EOL substitution). Refusing — "
+                    f"explicitly select '{replacement}' or unset NORYX_STRICT_MODEL."
+                )
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "Model substitution: requested=%s effective=%s reason=EOL-replacement",
+                model_id, replacement,
+            )
+            model_id = replacement
 
         errors = []
         connection_timed_out = False
+        # Fix #6: Track physical attempts across all providers/keys to prevent
+        # unbounded retry multiplication from nested retry layers.
+        total_physical_attempts = 0
 
         # ── Step 0: Explicit custom OpenAI-compatible endpoint ───────────
         if self.custom_base_url and self.custom_api_key:
@@ -573,14 +618,21 @@ class NvidiaClient:
                         self.key_cooldowns[key] = time.time() + 60.0
                     if any(
                         t in err_str.lower()
-                        for t in ("timeout", "timed out", "connection", "connect", "unreachable")
+                        for t in ("connection refused", "connecterror", "unreachable", "name resolution")
                     ):
                         connection_timed_out = True
-                        break  # Fast exit on host timeout
+                        break  # Fast exit on unreachable host
                     self.switch_to_fallback()
 
         # ── Step 2: Try NVIDIA fallback models (Llama 3.3 70B & GLM 5.2) ──
-        if not connection_timed_out:
+        # Fix #11: Skip fallback chains entirely in strict model mode.
+        if STRICT_MODEL_MODE:
+            summary_err = " | ".join(errors[-3:]) if errors else "Primary NVIDIA model failed"
+            raise RuntimeError(
+                f"NORYX_STRICT_MODEL=1: primary model failed and fallback chains are disabled. "
+                f"Detail: {summary_err}"
+            )
+        if True:  # Always evaluate fallback NVIDIA models if available
             fallback_nvidia_models = [
                 "meta/llama-3.3-70b-instruct",
                 "z-ai/glm-5.2",
@@ -631,6 +683,13 @@ class NvidiaClient:
                     break
 
         # ── Step 3: Ultimate Fallback to Groq API (multi-key & multi-model) ──
+        # Fix #6: Abort if physical attempt budget is exhausted.
+        if len(errors) >= MAX_PHYSICAL_ATTEMPTS:
+            summary_err = " | ".join(errors[-3:])
+            raise RuntimeError(
+                f"Noryx AI Provider Failover Error (MAX_PHYSICAL_ATTEMPTS={MAX_PHYSICAL_ATTEMPTS} "
+                f"reached): {summary_err}"
+            )
         if self.groq_keys:
             primary_groq = self.resolve_groq_model(model_id)
             groq_candidates = [
@@ -681,8 +740,9 @@ class NvidiaClient:
                 or_kwargs = dict(kwargs)
                 if or_kwargs.get("max_tokens", 16384) > 8192:
                     or_kwargs["max_tokens"] = 8192
+                from nexus.env import noryx_env
                 openrouter_model = (
-                    os.environ.get("NEXUS_OPENROUTER_MODEL", "").strip()
+                    noryx_env("OPENROUTER_MODEL", "").strip()
                     or self.custom_model
                     or model_id
                 )

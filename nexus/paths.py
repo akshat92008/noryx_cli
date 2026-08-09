@@ -19,9 +19,9 @@ def _usable_state_dir(path: Path) -> bool:
 
 def noryx_home() -> Path:
     """Return the configurable Noryx state directory with safe fallback."""
-    configured = (
-        os.environ.get("NORYX_HOME", "").strip() or os.environ.get("NEXUS_HOME", "").strip()
-    )
+    import os
+    from nexus.env import noryx_env
+    configured = noryx_env("HOME", "").strip()
     if configured:
         p = Path(configured).expanduser().resolve()
         if _usable_state_dir(p):

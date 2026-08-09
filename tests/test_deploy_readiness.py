@@ -20,6 +20,7 @@ def _env(tmp_path: Path) -> dict[str, str]:
         "NVIDIA_API_KEY": "test-deploy-key",
         "NEXUS_DISABLE_NETWORK": "1",
         "NEXUS_OFFLINE": "1",
+        "NEXUS_TEST_DISABLE_SANDBOX": "1",
     }
 
 

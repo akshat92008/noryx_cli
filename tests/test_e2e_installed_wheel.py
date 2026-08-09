@@ -227,6 +227,8 @@ def test_installed_no_credentials_exits_nonzero():
             "NEXUS_OPENAI_BASE_URL",
         }
     }
+    clean_env["NORYX_DISABLE_NETWORK"] = "1"
+    clean_env["NORYX_IGNORE_ENV_FILE"] = "1"
     # Use an innocuous prompt that doesn't trigger the direct-command path
     result = subprocess.run(
         [sys.executable, "-m", "noryx", "write hello world"],

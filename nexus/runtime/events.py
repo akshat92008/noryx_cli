@@ -14,6 +14,8 @@ class EventType(str, Enum):
     RUN_STARTED = "run_started"
     RUN_COMPLETED = "run_completed"
     RUN_FAILED = "run_failed"
+    RUN_AWAITING_APPROVAL = "run_awaiting_approval"
+    RUN_AWAITING_CONFIRMATION = "run_awaiting_confirmation"
     TURN_STARTED = "turn_started"
     TURN_COMPLETED = "turn_completed"
     MODEL_REQUEST_STARTED = "model_request_started"
@@ -54,6 +56,42 @@ class RunFailed(BaseEvent):
 
 
 @dataclass
+class RunAwaitingApproval(BaseEvent):
+    """Emitted when a tool call is paused pending human review.
+
+    The agentic loop should halt and surface this to the user.  The run
+    is NOT failed — it is paused at a known checkpoint.  Resume by
+    calling ``/apply <confirmation_id>`` or ``/reject <confirmation_id>``.
+    """
+
+    type: EventType = EventType.RUN_AWAITING_APPROVAL
+    confirmation_id: str = ""
+    diff_preview: str = ""
+    tool_name: str = ""
+    tool_call_id: str = ""
+
+
+@dataclass
+class RunAwaitingConfirmation(BaseEvent):
+    """Emitted when a dangerous command or operation is paused pending user confirmation.
+
+    The agentic loop should halt and surface this to the user.  The run is
+    NOT failed — it is suspended at a known checkpoint.  Resume by calling
+    ``/confirm <confirmation_id>`` or ``/cancel <confirmation_id>``.
+
+    action_type is one of: COMMAND_CONFIRMATION, CAPABILITY_CONFIRMATION,
+    SCOPE_CONFIRMATION, PACKAGE_CONFIRMATION, NETWORK_CONFIRMATION.
+    """
+
+    type: EventType = EventType.RUN_AWAITING_CONFIRMATION
+    confirmation_id: str = ""
+    action_type: str = "COMMAND_CONFIRMATION"
+    display_message: str = ""
+    tool_name: str = ""
+    tool_call_id: str = ""
+
+
+@dataclass
 class TurnStarted(BaseEvent):
     type: EventType = EventType.TURN_STARTED
     turn_number: int = 1
@@ -65,6 +103,7 @@ class TurnCompleted(BaseEvent):
     turn_number: int = 1
     content: str = ""
     tool_calls: list[dict] = field(default_factory=list)
+    assistant_msg: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -102,6 +141,7 @@ class ToolCallCompleted(BaseEvent):
     result: str = ""
     success: bool = True
     error: str | None = None
+    tool_call_id: str = ""
 
 
 @dataclass

@@ -258,6 +258,21 @@ DEFAULT_DESCRIPTORS: list[ModelDescriptor] = [
         category="custom",
         description="Custom hosted model via NEXUS_MODEL_ID / OpenAI endpoint",
     ),
+    ModelDescriptor(
+        model_id="omniroute",
+        provider_id="omniroute",
+        display_name="OmniRoute Gateway",
+        model_family="omniroute",
+        local=False,
+        context_window=200000,
+        input_cost=0.50,
+        output_cost=1.50,
+        privacy_class=PrivacyClass.ANY_ALLOWED_PROVIDER,
+        tier=ModelTier.STRONG,
+        backend="custom",
+        category="custom",
+        description="Unified LLM router & gateway model via OmniRoute",
+    ),
 ]
 
 
@@ -288,6 +303,8 @@ ALIASES: dict[str, str] = {
     "nova3b": "nova3b",
     "nova345": "nova3b",
     "nova3b11": "nova3b",
+    "omniroute": "omniroute",
+    "omni": "omniroute",
     "nova_codex": "nova3b",
     "local": "nova3b",
     "custom": "custom",
@@ -295,7 +312,7 @@ ALIASES: dict[str, str] = {
     "openrouter": "custom",
 }
 
-DEFAULT_MODEL = "glm-5.2"
+DEFAULT_MODEL = "llama-3.3-70b"
 
 
 class ModelRegistry:
@@ -376,7 +393,8 @@ class ModelRegistry:
             if not desc:
                 return None
             if key == "custom":
-                custom_id = os.environ.get("NEXUS_MODEL_ID", "").strip()
+                from nexus.env import noryx_env
+                custom_id = noryx_env("MODEL_ID", "").strip()
                 if custom_id:
                     return ModelDescriptor(
                         model_id=custom_id,

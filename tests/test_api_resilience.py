@@ -49,8 +49,8 @@ def test_groq_model_resolution():
 def test_client_timeout():
     """Verify hosted inference gets enough time to produce a first token."""
     client = NvidiaClient()
-    assert client.timeout == 60.0
-    assert client.client.timeout == 60.0
+    assert client.timeout == 120.0
+    assert getattr(client.client.timeout, "read", client.client.timeout) == 120.0
 
 
 def test_groq_only_configuration_is_supported(monkeypatch):

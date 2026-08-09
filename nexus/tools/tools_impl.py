@@ -91,6 +91,8 @@ class ToolStatus(Enum):
     INVALID_INPUT = "invalid_input"
     ENVIRONMENT_UNAVAILABLE = "environment_unavailable"
     PARTIAL = "partial"
+    # Fix #2: Pending human-review — NOT a failure; the run is paused.
+    AWAITING_APPROVAL = "awaiting_approval"
 
 
 @dataclass
@@ -1428,8 +1430,14 @@ def tool_edit_file(path: str, old_text: str, new_text: str) -> str:
         if not p.exists():
             return f"❌ File not found: {path}"
 
-        with open(p, "r", encoding="utf-8") as f:
-            content = f.read()
+        if p.stat().st_size > 2 * 1024 * 1024:
+            return f"❌ File too large ({p.stat().st_size} bytes). Max edit size is 2MB."
+
+        import hashlib
+        with open(p, "rb") as f:
+            raw_bytes = f.read()
+            expected_hash = hashlib.sha256(raw_bytes).hexdigest()
+            content = raw_bytes.decode("utf-8", errors="replace")
 
         # 1. Exact match
         count = content.count(old_text)
@@ -1476,7 +1484,7 @@ def tool_edit_file(path: str, old_text: str, new_text: str) -> str:
         from nexus.mutation import MutationController
 
         mutator = MutationController(p.parent)
-        res = mutator.write_file(p, new_content)
+        res = mutator.write_file(p, new_content, expected_hash=expected_hash)
         if not res.success:
             return f"❌ Error editing file: {res.error}"
 
@@ -1496,8 +1504,14 @@ def tool_patch_file(path: str, start_line: int, end_line: int, new_content: str)
         if not p.exists():
             return f"❌ File not found: {path}"
 
-        with open(p, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+        if p.stat().st_size > 2 * 1024 * 1024:
+            return f"❌ File too large ({p.stat().st_size} bytes). Max edit size is 2MB."
+
+        import hashlib
+        with open(p, "rb") as f:
+            raw_bytes = f.read()
+            expected_hash = hashlib.sha256(raw_bytes).hexdigest()
+            lines = raw_bytes.decode("utf-8", errors="replace").splitlines(keepends=True)
 
         try:
             start_line = int(start_line)
@@ -1533,7 +1547,7 @@ def tool_patch_file(path: str, start_line: int, end_line: int, new_content: str)
         from nexus.mutation import MutationController
 
         mutator = MutationController(p.parent)
-        res = mutator.write_file(p, new_content_final)
+        res = mutator.write_file(p, new_content_final, expected_hash=expected_hash)
         if not res.success:
             return f"❌ Error patching file: {res.error}"
 
@@ -1578,10 +1592,15 @@ def tool_multi_edit(edits: list[dict]) -> str:
             return f"❌ Multi-edit aborted: edit #{index} path error — {exc}. No files changed."
         if not target.is_file():
             return f"❌ Multi-edit aborted: edit #{index} file not found: {path}. No files changed."
+        if target.stat().st_size > 2 * 1024 * 1024:
+            return f"❌ Multi-edit aborted: file {target.name} too large ({target.stat().st_size} bytes). Max edit size is 2MB."
 
         if target not in originals:
             try:
-                originals[target] = target.read_text(encoding="utf-8")
+                raw_bytes = target.read_bytes()
+                originals[target] = raw_bytes.decode("utf-8")
+                import hashlib
+                edit_counts[target] = 0 # Ensure key exists
             except (OSError, UnicodeError) as exc:
                 return f"❌ Multi-edit aborted: cannot read {path}: {exc}. No files changed."
             final_bodies[target] = originals[target]
@@ -1619,7 +1638,12 @@ def tool_multi_edit(edits: list[dict]) -> str:
                 pass
             temp_paths[target] = temp
 
+        import hashlib
         for target, temp in temp_paths.items():
+            # Check for stale read right before commit
+            current_raw = target.read_bytes() if target.exists() else b""
+            if hashlib.sha256(current_raw).hexdigest() != hashlib.sha256(originals[target].encode("utf-8")).hexdigest():
+                raise OSError(f"Stale read detected: {target.name} was modified externally during transaction.")
             os.replace(temp, target)
             committed.append(target)
 

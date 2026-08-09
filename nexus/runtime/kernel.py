@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Generator
 
+from nexus.memory import compact_messages
 from nexus.planner import ExecutionPlan, PlanStep, TaskStatus
 from nexus.providers.base import Provider
 from nexus.recovery import RecoveryController
@@ -23,6 +24,7 @@ from nexus.runtime.events import (
     ModelRequestCompleted,
     ModelRequestStarted,
     ModelStreamChunk,
+    RunAwaitingApproval,
     RunCompleted,
     RunFailed,
     RunStarted,
@@ -30,6 +32,7 @@ from nexus.runtime.events import (
     ToolCallStarted,
     TurnCompleted,
     TurnStarted,
+    RunAwaitingConfirmation,
 )
 from nexus.runtime.state_machine import RunState, StateMachine
 
@@ -54,6 +57,27 @@ class FailureKind(str, Enum):
     ENVIRONMENT = "environment"
     SECURITY = "security"
     UNKNOWN = "unknown"
+
+
+# Per-difficulty wall-clock budgets (seconds). Operators can override via
+# NORYX_WALL_CLOCK_BUDGET_<DIFFICULTY> env vars.
+_WALL_CLOCK_BUDGETS: dict[str, int] = {
+    "trivial": int(__import__("nexus.env", fromlist=["noryx_env"]).noryx_env("NORYX_WALL_CLOCK_TRIVIAL", "90")),
+    "simple": int(__import__("nexus.env", fromlist=["noryx_env"]).noryx_env("NORYX_WALL_CLOCK_SIMPLE", "300")),
+    "moderate": int(__import__("nexus.env", fromlist=["noryx_env"]).noryx_env("NORYX_WALL_CLOCK_MODERATE", "900")),
+    "complex": int(__import__("nexus.env", fromlist=["noryx_env"]).noryx_env("NORYX_WALL_CLOCK_COMPLEX", "1800")),
+    "massive": int(__import__("nexus.env", fromlist=["noryx_env"]).noryx_env("NORYX_WALL_CLOCK_MASSIVE", "3600")),
+}
+
+
+def get_wall_clock_budget(difficulty: str) -> int:
+    """Return the wall-clock time budget in seconds for the given difficulty label."""
+    return _WALL_CLOCK_BUDGETS.get(difficulty.lower(), _WALL_CLOCK_BUDGETS["moderate"])
+
+
+class StreamInterruptedError(OSError):
+    """Raised when a provider stream is interrupted mid-delivery (transient)."""
+    pass
 
 
 @dataclass
@@ -133,6 +157,7 @@ class ExecutionKernel:
         plan: ExecutionPlan | None = None,
         ledger: RunLedger | None = None,
         max_total_repairs: int | None = None,
+        wall_clock_deadline: float | None = None,
     ):
         self.provider = provider
         self.max_turns = max_turns
@@ -150,6 +175,12 @@ class ExecutionKernel:
         self.tool_executor: Callable[[str, dict], tuple[bool, str]] | None = None
         self.before_tool_hook: Callable[[str, dict], None] | None = None
         self.after_tool_hook: Callable[[str, dict, bool, str], None] | None = None
+        # Optional wall-clock deadline (monotonic seconds). When set, the loop
+        # aborts with RunFailed if time.monotonic() exceeds this value.
+        self.wall_clock_deadline: float | None = wall_clock_deadline
+        # Consecutive empty-response retries before giving up.
+        self._empty_response_retries: int = 0
+        self._max_empty_retries: int = 2
 
         # Event handler registry
         self._event_handlers: list[Callable[[BaseEvent], None]] = []
@@ -225,6 +256,22 @@ class ExecutionKernel:
         current_messages = list(messages)
 
         while iteration < self.max_turns:
+            # Phase 7 Fix: Auto-compact long execution context inside the loop
+            if len(current_messages) > 100:
+                current_messages = compact_messages(current_messages)
+                
+            # ── Fix #4: Wall-clock deadline enforcement ──────────────────────
+            if self.wall_clock_deadline is not None and time.monotonic() > self.wall_clock_deadline:
+                logger.warning(
+                    "ExecutionKernel: wall-clock deadline exceeded after %d turn(s).",
+                    iteration,
+                )
+                self.state_machine.transition_to(RunState.FAILED)
+                yield self._create_and_emit(
+                    RunFailed(error="Wall-clock deadline exceeded for this task complexity tier.")
+                )
+                return
+
             iteration += 1
             yield self._create_and_emit(TurnStarted(turn_number=iteration))
 
@@ -350,11 +397,44 @@ class ExecutionKernel:
                     turn_number=iteration,
                     content=full_content,
                     tool_calls=tool_calls,
+                    assistant_msg=assistant_msg,
                 )
             )
 
+            # ── Fix #3: Empty response detection ─────────────────────────────
+            if not tool_calls and not full_content.strip():
+                self._empty_response_retries += 1
+                logger.warning(
+                    "ExecutionKernel: provider returned empty response (retry %d/%d).",
+                    self._empty_response_retries,
+                    self._max_empty_retries,
+                )
+                yield self._create_and_emit(
+                    FailureEvent(
+                        kind="PROVIDER_EMPTY_RESPONSE",
+                        message=(
+                            f"Provider returned an empty response with no content and no tool calls "
+                            f"(attempt {self._empty_response_retries}/{self._max_empty_retries})."
+                        ),
+                    )
+                )
+                if self._empty_response_retries >= self._max_empty_retries:
+                    self.state_machine.transition_to(RunState.FAILED)
+                    yield self._create_and_emit(
+                        RunFailed(
+                            error="Provider repeatedly returned empty responses. Aborting."
+                        )
+                    )
+                    return
+                # Pop the empty assistant message we just appended and retry the turn
+                if current_messages and current_messages[-1].get("role") == "assistant":
+                    current_messages.pop()
+                iteration -= 1  # Don't count empty-retry as a productive turn
+                continue
+
             if not tool_calls:
                 # No more tools to call — clean completion
+                self._empty_response_retries = 0
                 break
 
             # Execute Tools
@@ -388,6 +468,75 @@ class ExecutionKernel:
                 else:
                     success, result_text = False, "No tool executor registered"
 
+                # ── Fix #2: AWAITING_APPROVAL detection ──────────────────────
+                # When a mutation tool is pending human review the executor
+                # embeds a "__AWAITING_APPROVAL__:<id>" sentinel in result_text.
+                # We halt the run cleanly and emit RunAwaitingApproval so the
+                # CLI can surface the approval UI instead of treating this as a
+                # tool failure that triggers retry/replan loops.
+                if isinstance(result_text, str) and result_text.startswith("__AWAITING_APPROVAL__:"):
+                    first_line = result_text.split("\n", 1)[0]
+                    confirmation_id = first_line.removeprefix("__AWAITING_APPROVAL__:").strip()
+                    display_text = result_text[len(first_line):].strip()
+                    yield self._create_and_emit(
+                        ToolCallCompleted(
+                            tool_name=tool_name,
+                            arguments=safe_args,
+                            result=display_text,
+                            success=False,
+                            error=None,
+                        )
+                    )
+                    self.state_machine.transition_to(RunState.COMPLETED)
+                    tool_call_id = tc.get("id", "")
+                    yield self._create_and_emit(
+                        RunAwaitingApproval(
+                            confirmation_id=confirmation_id,
+                            diff_preview=display_text,
+                            tool_name=tool_name or "",
+                            tool_call_id=tool_call_id,
+                        )
+                    )
+                    return
+
+                # ── Fix: PENDING_CONFIRMATION / HUMAN_ACTION_REQUIRED detection ─
+                # When a command/package/scope/capability gate requires human
+                # review, the executor embeds a
+                # "__HUMAN_ACTION_REQUIRED__:<type>:<id>" sentinel in result_text.
+                # We halt the run cleanly and emit RunAwaitingConfirmation so the
+                # CLI returns the prompt to the user without feeding this back to
+                # the LLM (which would trigger infinite retries).
+                elif isinstance(result_text, str) and result_text.startswith("__HUMAN_ACTION_REQUIRED__:"):
+                    first_line = result_text.split("\n", 1)[0]
+                    rest = first_line.removeprefix("__HUMAN_ACTION_REQUIRED__:")
+                    # Format: <action_type>:<confirmation_id>
+                    parts = rest.split(":", 1)
+                    action_type = parts[0] if parts else "COMMAND_CONFIRMATION"
+                    confirmation_id = parts[1] if len(parts) > 1 else ""
+                    display_text = result_text[len(first_line):].strip()
+                    tool_call_id = tc.get("id", "")
+                    yield self._create_and_emit(
+                        ToolCallCompleted(
+                            tool_name=tool_name,
+                            arguments=safe_args,
+                            result=display_text,
+                            success=False,
+                            error=None,
+                            tool_call_id=tool_call_id,
+                        )
+                    )
+                    self.state_machine.transition_to(RunState.COMPLETED)
+                    yield self._create_and_emit(
+                        RunAwaitingConfirmation(
+                            confirmation_id=confirmation_id,
+                            action_type=action_type,
+                            display_message=display_text,
+                            tool_name=tool_name or "",
+                            tool_call_id=tool_call_id,
+                        )
+                    )
+                    return
+
                 if self.after_tool_hook:
                     try:
                         self.after_tool_hook(tool_name, safe_args, success, result_text)
@@ -401,8 +550,21 @@ class ExecutionKernel:
                         result=result_text,
                         success=success,
                         error=None if success else result_text,
+                        tool_call_id=tc.get("id", ""),
                     )
                 )
+
+                # ── Fix #1: Append tool result to conversation ───────────────
+                # The model MUST see role=tool messages for every tool_call it
+                # made in the previous assistant turn.  Without this the next
+                # model request violates the OpenAI tool-calling protocol and
+                # the model cannot know whether its action succeeded.
+                tool_call_id = tc.get("id", f"call_{list(tool_calls).index(tc)}")
+                current_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": result_text if result_text else "(no output)",
+                })
 
         else:
             # Max turns exhausted with tool calls still pending — this is a
@@ -427,47 +589,69 @@ class ExecutionKernel:
         yield self._create_and_emit(RunCompleted(content=final_content))
 
     def _process_stream(self, stream) -> tuple[str, list[dict], dict[str, int], str]:
-        """Process the generator from the provider."""
+        """Process the generator from the provider.
+
+        Fix #12: Mid-stream transient failures (connection reset, read timeout)
+        are re-raised as StreamInterruptedError so the kernel can retry the
+        entire provider request without counting it as a successful turn.
+        """
         full_content = ""
         tool_calls_accum: dict[int, dict] = {}
         usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         request_id = ""
 
-        for chunk in stream:
-            request_id = request_id or str(getattr(chunk, "id", "") or "")
-            chunk_usage = getattr(chunk, "usage", None)
-            if chunk_usage is not None:
-                for key in usage:
-                    value = (
-                        chunk_usage.get(key, 0)
-                        if isinstance(chunk_usage, dict)
-                        else getattr(chunk_usage, key, 0)
-                    )
-                    usage[key] = max(usage[key], int(value or 0))
-            if not hasattr(chunk, "choices") or not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
+        try:
+            for chunk in stream:
+                request_id = request_id or str(getattr(chunk, "id", "") or "")
+                chunk_usage = getattr(chunk, "usage", None)
+                if chunk_usage is not None:
+                    for key in usage:
+                        value = (
+                            chunk_usage.get(key, 0)
+                            if isinstance(chunk_usage, dict)
+                            else getattr(chunk_usage, key, 0)
+                        )
+                        usage[key] = max(usage[key], int(value or 0))
+                if not hasattr(chunk, "choices") or not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
 
-            if hasattr(delta, "content") and delta.content:
-                full_content += delta.content
-                yield self._create_and_emit(ModelStreamChunk(text=delta.content))
+                if hasattr(delta, "content") and delta.content:
+                    full_content += delta.content
+                    yield self._create_and_emit(ModelStreamChunk(text=delta.content))
 
-            if hasattr(delta, "tool_calls") and delta.tool_calls:
-                for tc in delta.tool_calls:
-                    idx = tc.index
-                    if idx not in tool_calls_accum:
-                        tool_calls_accum[idx] = {
-                            "id": tc.id or "",
-                            "name": "",
-                            "arguments": "",
-                        }
-                    if tc.id:
-                        tool_calls_accum[idx]["id"] = tc.id
-                    if hasattr(tc, "function") and tc.function:
-                        if tc.function.name:
-                            tool_calls_accum[idx]["name"] = tc.function.name
-                        if tc.function.arguments:
-                            tool_calls_accum[idx]["arguments"] += tc.function.arguments
+                if hasattr(delta, "tool_calls") and delta.tool_calls:
+                    for tc in delta.tool_calls:
+                        idx = tc.index
+                        if idx not in tool_calls_accum:
+                            tool_calls_accum[idx] = {
+                                "id": tc.id or "",
+                                "name": "",
+                                "arguments": "",
+                            }
+                        if tc.id:
+                            tool_calls_accum[idx]["id"] = tc.id
+                        if hasattr(tc, "function") and tc.function:
+                            if tc.function.name:
+                                tool_calls_accum[idx]["name"] = tc.function.name
+                            if tc.function.arguments:
+                                tool_calls_accum[idx]["arguments"] += tc.function.arguments
+        except (OSError, ValueError):
+            # Re-raise as-is; these are caught by the kernel's outer try/except.
+            raise
+        except Exception as exc:
+            # Transient mid-stream failure (e.g. connection reset, read timeout).
+            # Wrap it so the kernel can distinguish it from a pre-stream error.
+            _transient_signals = (
+                "connection", "reset", "eof", "read timeout", "chunked",
+                "incomplete", "remotedisconnected", "brokenassertion",
+            )
+            exc_lower = str(exc).lower()
+            if any(s in exc_lower for s in _transient_signals):
+                raise StreamInterruptedError(
+                    f"Provider stream interrupted mid-delivery: {exc}"
+                ) from exc
+            raise
 
         tool_calls = []
         for idx in sorted(tool_calls_accum.keys()):

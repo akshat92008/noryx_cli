@@ -252,64 +252,78 @@ class ProviderManagerMixin:
                     for event in accumulated_events
                     if isinstance(event, dict) and event.get("type") == "tool_call"
                 ]
-                successful_tools = {
-                    str(event.get("name", ""))
+                # Fix #2: If any tool result is awaiting human approval the run
+                # is paused — not failed.  Skip contract verification entirely;
+                # the step will be re-evaluated after /apply or /reject.
+                any_awaiting_approval = any(
+                    isinstance(event.get("result", ""), str)
+                    and event["result"].startswith("__AWAITING_APPROVAL__:")
                     for event in tool_events
-                    if event.get("success", False)
-                }
-                mutation_tools = {"write_file", "edit_file", "patch_file", "multi_edit"}
-                expected_tools = set(current_step.tools_needed)
-                expected_mutation = bool(expected_tools & mutation_tools)
-                expected_command = bool(expected_tools & {"run_command", "run_process"})
-                mutated = bool(successful_tools & mutation_tools)
-                contract_missing = (
-                    (expected_mutation and not mutated)
-                    or (expected_command and not successful_tools & {"run_command", "run_process"})
-                    or (expected_tools and not successful_tools)
                 )
-                response_failed = (
-                    (content or "").lstrip().upper().startswith(("ERROR:", "BLOCKED:"))
-                )
-                if response_failed or contract_missing:
-                    self.planner.advance_step(
+                if any_awaiting_approval:
+                    logger.debug(
+                        "post-plan verifier: step %d is awaiting approval; skipping contract check.",
                         current_step.id,
-                        TaskStatus.FAILED,
-                        (
-                            "The model stopped with an execution error."
-                            if response_failed
-                            else "The step ended without satisfying its required tool contract."
-                        ),
                     )
-                elif mutated:
-                    # Read-only diagnostic steps may inspect a broken tree. A
-                    # mutating step must leave syntax and imports coherent.
-                    syntax_check = self.verifier.verify_syntax()
-                    import_check = self.verifier.verify_imports()
-                    syntax_ok = syntax_check.status in {
-                        CheckStatus.PASSED,
-                        CheckStatus.NOT_APPLICABLE,
+                else:
+                    successful_tools = {
+                        str(event.get("name", ""))
+                        for event in tool_events
+                        if event.get("success", False)
                     }
-                    imports_ok = import_check.status in {
-                        CheckStatus.PASSED,
-                        CheckStatus.NOT_APPLICABLE,
-                    }
-                    if syntax_ok and imports_ok:
+                    mutation_tools = {"write_file", "edit_file", "patch_file", "multi_edit"}
+                    expected_tools = set(current_step.tools_needed)
+                    expected_mutation = bool(expected_tools & mutation_tools)
+                    expected_command = bool(expected_tools & {"run_command", "run_process"})
+                    mutated = bool(successful_tools & mutation_tools)
+                    contract_missing = (
+                        (expected_mutation and not mutated)
+                        or (expected_command and not successful_tools & {"run_command", "run_process"})
+                        or (expected_tools and not successful_tools)
+                    )
+                    response_failed = (
+                        (content or "").lstrip().upper().startswith(("ERROR:", "BLOCKED:"))
+                    )
+                    if response_failed or contract_missing:
                         self.planner.advance_step(
                             current_step.id,
-                            TaskStatus.COMPLETED,
-                            "Step executed successfully",
+                            TaskStatus.FAILED,
+                            (
+                                "The model stopped with an execution error."
+                                if response_failed
+                                else "The step ended without satisfying its required tool contract."
+                            ),
                         )
+                    elif mutated:
+                        # Read-only diagnostic steps may inspect a broken tree. A
+                        # mutating step must leave syntax and imports coherent.
+                        syntax_check = self.verifier.verify_syntax()
+                        import_check = self.verifier.verify_imports()
+                        syntax_ok = syntax_check.status in {
+                            CheckStatus.PASSED,
+                            CheckStatus.NOT_APPLICABLE,
+                        }
+                        imports_ok = import_check.status in {
+                            CheckStatus.PASSED,
+                            CheckStatus.NOT_APPLICABLE,
+                        }
+                        if syntax_ok and imports_ok:
+                            self.planner.advance_step(
+                                current_step.id,
+                                TaskStatus.COMPLETED,
+                                "Step executed successfully",
+                            )
+                        else:
+                            err_msg = ""
+                            if not syntax_ok:
+                                err_msg += f"Syntax error: {syntax_check.output}\n"
+                            if not imports_ok:
+                                err_msg += f"Import error: {import_check.output}\n"
+                            self.planner.advance_step(current_step.id, TaskStatus.FAILED, err_msg)
                     else:
-                        err_msg = ""
-                        if not syntax_ok:
-                            err_msg += f"Syntax error: {syntax_check.output}\n"
-                        if not imports_ok:
-                            err_msg += f"Import error: {import_check.output}\n"
-                        self.planner.advance_step(current_step.id, TaskStatus.FAILED, err_msg)
-                else:
-                    self.planner.advance_step(
-                        current_step.id, TaskStatus.COMPLETED, "Step executed successfully"
-                    )
+                        self.planner.advance_step(
+                            current_step.id, TaskStatus.COMPLETED, "Step executed successfully"
+                        )
 
         if plan and plan.is_complete:
             if emit_ui:

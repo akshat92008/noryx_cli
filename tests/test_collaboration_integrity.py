@@ -20,9 +20,9 @@ class AsyncMock(MagicMock):
         return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
-def test_integration_coordinator_rejects_missing_verifier():
+def test_integration_coordinator_rejects_missing_verifier(tmp_path: Path):
     """Verify that absent verifier produces VERIFICATION_UNAVAILABLE, not a stub pass."""
-    coordinator = IntegrationCoordinator(current_revision="HEAD", verification_service=None)
+    coordinator = IntegrationCoordinator(current_revision="HEAD", verification_service=None, lead_workspace_root=tmp_path)
 
     mock_result = WorkerResult(
         assignment_id="test-assign-1",

@@ -125,8 +125,23 @@ def compact_messages(messages: list[dict], keep_recent: int = 10) -> list[dict]:
     if len(messages) <= keep_recent + 2:
         return messages  # Nothing to compact
 
-    old_messages = messages[:-keep_recent]
-    recent_messages = messages[-keep_recent:]
+    # Ensure we don't split an assistant tool_call and its tool response
+    split_index = len(messages) - keep_recent
+    
+    # Walk backwards to find if we are splitting inside a tool call sequence
+    while split_index > 0:
+        msg = messages[split_index]
+        if msg.get("role") == "tool":
+            # We are keeping a tool response, we MUST also keep the assistant that called it
+            split_index -= 1
+        elif msg.get("role") == "assistant" and msg.get("tool_calls"):
+            # We are keeping the assistant, this is a clean break
+            break
+        else:
+            break
+            
+    old_messages = messages[:split_index]
+    recent_messages = messages[split_index:]
 
     # Build a summary of old messages
     summary_parts = []

@@ -90,11 +90,12 @@ class ContentAddressedWorkspaceJournal:
     ) -> None:
         self.root = Path(root).expanduser().resolve()
         self.preimage_dir = Path(preimage_dir).expanduser().resolve()
+        from nexus.env import noryx_env
         self.max_files = max_files or int(
-            os.environ.get("NEXUS_COMMAND_SNAPSHOT_MAX_FILES", "20000")
+            noryx_env("COMMAND_SNAPSHOT_MAX_FILES", "20000")
         )
         self.max_bytes = max_bytes or int(
-            os.environ.get("NEXUS_COMMAND_SNAPSHOT_MAX_BYTES", str(512 * 1024 * 1024))
+            noryx_env("COMMAND_SNAPSHOT_MAX_BYTES", str(512 * 1024 * 1024))
         )
         self.ignored_parts = frozenset(ignored_parts or self.DEFAULT_IGNORED_PARTS)
         candidates = [self.preimage_dir, *(excluded_roots or ())]

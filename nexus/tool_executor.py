@@ -187,6 +187,27 @@ class ToolExecutionController:
     # Public interface
     # ──────────────────────────────────────────────────────────────────────────
 
+    def _pending_confirmation_sentinel(
+        self,
+        confirmation_id: str,
+        action_type: str,
+        display_text: str,
+    ) -> str:
+        """Return a structured sentinel string that kernel.py detects to halt the loop.
+
+        Format::
+
+            __HUMAN_ACTION_REQUIRED__:<action_type>:<confirmation_id>\n<display_text>
+
+        The kernel detects the ``__HUMAN_ACTION_REQUIRED__:`` prefix and emits a
+        ``RunAwaitingConfirmation`` event, halting the model loop immediately
+        without feeding the message back to the LLM as a tool failure.
+        """
+        return (
+            f"__HUMAN_ACTION_REQUIRED__:{action_type}:{confirmation_id}\n"
+            f"{display_text}"
+        )
+
     def execute(
         self,
         name: str,
@@ -482,14 +503,18 @@ class ToolExecutionController:
                     safety_check=policy_check,
                     edit_confirmed=_edit_confirmed,
                 )
+                display_text = (
+                    f"⏸️ PENDING_CONFIRMATION [{confirmation_id}]: {policy_check.reason}.\n"
+                    "This operation was not executed.\n"
+                    f"Enter /confirm {confirmation_id} or /cancel {confirmation_id}."
+                )
                 return (
                     False,
                     "",
                     (
-                        "⏸️ PENDING_CONFIRMATION "
-                        f"[{confirmation_id}]: {policy_check.reason}. "
-                        "This operation was not executed. "
-                        f"Enter /confirm {confirmation_id} or /cancel {confirmation_id}.",
+                        self._pending_confirmation_sentinel(
+                            confirmation_id, "COMMAND_CONFIRMATION", display_text
+                        ),
                         False,
                     ),
                 )
@@ -520,10 +545,14 @@ class ToolExecutionController:
                 safety_check=network_check,
                 edit_confirmed=_edit_confirmed,
             )
+            display_text = (
+                f"⏸️ PENDING_CONFIRMATION [{confirmation_id}]: {network_check.reason}.\n"
+                f"Enter /confirm {confirmation_id} or /cancel {confirmation_id}."
+            )
             return False, (
-                "⏸️ PENDING_CONFIRMATION "
-                f"[{confirmation_id}]: {network_check.reason}. "
-                f"Enter /confirm {confirmation_id} or /cancel {confirmation_id}.",
+                self._pending_confirmation_sentinel(
+                    confirmation_id, "NETWORK_CONFIRMATION", display_text
+                ),
                 False,
             )
         return True, ("", False)
@@ -597,15 +626,19 @@ class ToolExecutionController:
                     safety_check=uncertainty_check,
                     edit_confirmed=_edit_confirmed,
                 )
+                display_text = (
+                    f"⏸️ PENDING_CONFIRMATION [{confirmation_id}]: {uncertainty_check.reason}.\n"
+                    "This operation was not executed. Review the exact operation, then\n"
+                    f"enter /confirm {confirmation_id} or /cancel {confirmation_id}.\n"
+                    f"{details}"
+                )
                 return (
                     False,
                     "",
                     (
-                        "⏸️ PENDING_CONFIRMATION "
-                        f"[{confirmation_id}]: {uncertainty_check.reason}. "
-                        "This operation was not executed. Review the exact operation, then "
-                        f"enter /confirm {confirmation_id} or /cancel {confirmation_id}.\n"
-                        f"{details}",
+                        self._pending_confirmation_sentinel(
+                            confirmation_id, "PACKAGE_CONFIRMATION", display_text
+                        ),
                         False,
                     ),
                 )
@@ -632,16 +665,19 @@ class ToolExecutionController:
                 return False, "", (f"❌ Cannot create a safe diff preview: {mutation_diff}", False)
             if self._agent.mode_policy.require_review and not _edit_confirmed:
                 confirmation_id = self._agent._queue_edit(name, pending_args, mutation_diff)
+                # Fix #2: Return a structured sentinel that signals AWAITING_APPROVAL.
+                # The kernel detects the "__AWAITING_APPROVAL__:" prefix and emits a
+                # RunAwaitingApproval event instead of treating this as a failure.
+                approval_sentinel = (
+                    f"__AWAITING_APPROVAL__:{confirmation_id}\n"
+                    f"⏸️ The file edit has been queued for review.\n"
+                    f"Enter `/apply {confirmation_id}` or `/reject {confirmation_id}`.\n"
+                    f"Diff preview:\n```diff\n{mutation_diff}\n```"
+                )
                 return (
                     False,
                     "",
-                    (
-                        "⏸️ PENDING_EDIT_CONFIRMATION "
-                        f"[{confirmation_id}]: The file edit has been queued for review.\n"
-                        f"Enter `/apply {confirmation_id}` or `/reject {confirmation_id}`.\n"
-                        f"Diff preview:\n```diff\n{mutation_diff}\n```",
-                        False,
-                    ),
+                    (approval_sentinel, False),
                 )
         return True, mutation_diff, ("", False)
 
@@ -1283,6 +1319,32 @@ class ToolExecutionController:
             args["network"] = True
             pending_args["network"] = True
 
+    def _collect_scope_paths(self, name: str, args: dict, file_path: str) -> list[str]:
+        scope_paths = []
+        if name == "multi_edit":
+            scope_paths.extend(str(item.get("path", "")) for item in args.get("edits", []))
+        elif file_path:
+            scope_paths.append(str(file_path))
+        if name == "diff_files":
+            scope_paths.extend(str(args.get(key, "")) for key in ("file_a", "file_b"))
+        elif name in {"search_code", "find_files"}:
+            scope_paths.append(str(args.get("directory", "")))
+        elif name in {"run_command", "run_process", "process_run"}:
+            scope_paths.append(str(args.get("cwd", "")))
+        elif name == "repo_impact":
+            scope_paths.extend(str(item) for item in args.get("paths", []))
+        elif name == "security_scan":
+            scope_paths.extend(str(item) for item in args.get("paths", []) or [])
+        elif name == "browser_check":
+            scope_paths.append(str(args.get("screenshot_path", "")))
+        for argument_name in self._agent._external_tool_path_arguments.get(name, ()):
+            value = args.get(argument_name)
+            if isinstance(value, (list, tuple, set)):
+                scope_paths.extend(str(item) for item in value)
+            elif value not in (None, ""):
+                scope_paths.append(str(value))
+        return list(dict.fromkeys(item for item in scope_paths if item))
+
     def _execute_impl(
         self,
         name: str,
@@ -1318,10 +1380,14 @@ class ToolExecutionController:
                 safety_check=capability_check,
                 edit_confirmed=_edit_confirmed,
             )
+            display_text = (
+                f"⏸️ PENDING_CONFIRMATION [{confirmation_id}]: {capability_check.reason}.\n"
+                f"Enter /confirm {confirmation_id} or /cancel {confirmation_id}."
+            )
             return (
-                "⏸️ PENDING_CONFIRMATION "
-                f"[{confirmation_id}]: {capability_check.reason}. "
-                f"Enter /confirm {confirmation_id} or /cancel {confirmation_id}.",
+                self._pending_confirmation_sentinel(
+                    confirmation_id, "CAPABILITY_CONFIRMATION", display_text
+                ),
                 False,
             )
         if name == "run_command" and not self._agent.mode_policy.allow_shell_command:
@@ -1364,30 +1430,7 @@ class ToolExecutionController:
             "security_scan",
         }
 
-        scope_paths = []
-        if name == "multi_edit":
-            scope_paths.extend(str(item.get("path", "")) for item in args.get("edits", []))
-        elif file_path:
-            scope_paths.append(str(file_path))
-        if name == "diff_files":
-            scope_paths.extend(str(args.get(key, "")) for key in ("file_a", "file_b"))
-        elif name in {"search_code", "find_files"}:
-            scope_paths.append(str(args.get("directory", "")))
-        elif name in {"run_command", "run_process", "process_run"}:
-            scope_paths.append(str(args.get("cwd", "")))
-        elif name == "repo_impact":
-            scope_paths.extend(str(item) for item in args.get("paths", []))
-        elif name == "security_scan":
-            scope_paths.extend(str(item) for item in args.get("paths", []) or [])
-        elif name == "browser_check":
-            scope_paths.append(str(args.get("screenshot_path", "")))
-        for argument_name in self._agent._external_tool_path_arguments.get(name, ()):
-            value = args.get(argument_name)
-            if isinstance(value, (list, tuple, set)):
-                scope_paths.extend(str(item) for item in value)
-            elif value not in (None, ""):
-                scope_paths.append(str(value))
-        scope_paths = list(dict.fromkeys(item for item in scope_paths if item))
+        scope_paths = self._collect_scope_paths(name, args, file_path)
 
         # ── 1. Enforce Tool Policy
         ok, policy_capability, err_res = self._enforce_tool_policy(
@@ -1471,12 +1514,16 @@ class ToolExecutionController:
                     safety_check=scope_check,
                     edit_confirmed=_edit_confirmed,
                 )
-                return (
-                    "⏸️ PENDING_CONFIRMATION "
-                    f"[{confirmation_id}]: {scope_check.reason}. "
-                    "This operation was not executed. Review the exact operation, then "
+                display_text = (
+                    f"⏸️ PENDING_CONFIRMATION [{confirmation_id}]: {scope_check.reason}.\n"
+                    "This operation was not executed. Review the exact operation, then\n"
                     f"enter /confirm {confirmation_id} or /cancel {confirmation_id}.\n"
-                    f"{scope_check.details}",
+                    f"{scope_check.details}"
+                )
+                return (
+                    self._pending_confirmation_sentinel(
+                        confirmation_id, "SCOPE_CONFIRMATION", display_text
+                    ),
                     False,
                 )
 
@@ -1552,12 +1599,16 @@ class ToolExecutionController:
                 safety_check=safety_check,
                 edit_confirmed=_edit_confirmed,
             )
-            return (
-                "⏸️ PENDING_CONFIRMATION "
-                f"[{confirmation_id}]: {safety_check.reason}. "
-                "This operation was not executed. Review the exact operation, then "
+            display_text = (
+                f"⏸️ PENDING_CONFIRMATION [{confirmation_id}]: {safety_check.reason}.\n"
+                "This operation was not executed. Review the exact operation, then\n"
                 f"enter /confirm {confirmation_id} or /cancel {confirmation_id}.\n"
-                f"{safety_check.details}",
+                f"{safety_check.details}"
+            )
+            return (
+                self._pending_confirmation_sentinel(
+                    confirmation_id, "COMMAND_CONFIRMATION", display_text
+                ),
                 False,
             )
         # A safe-looking command is not a containment boundary. Production

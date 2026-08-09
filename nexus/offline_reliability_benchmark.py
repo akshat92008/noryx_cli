@@ -196,12 +196,12 @@ def _scenario_repository_repair(base: Path) -> ScenarioResult:
     root = base / "calculator-repair"
     root.mkdir()
     (root / "calculator.py").write_text(
-        "def add(a, b):\n    return a + b\n\ndef multiply(a, b):\n    return a + b\n",
+        "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a + b\n",
         encoding="utf-8",
     )
     (root / "test_calculator.py").write_text(
-        "from calculator import add, multiply\n\n"
-        "def test_add():\n    assert add(2, 3) == 5\n\n"
+        "from calculator import add, multiply\n\n\n"
+        "def test_add():\n    assert add(2, 3) == 5\n\n\n"
         "def test_multiply():\n    assert multiply(2, 3) == 6\n",
         encoding="utf-8",
     )

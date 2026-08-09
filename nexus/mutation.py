@@ -48,11 +48,18 @@ class MutationController:
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def write_file(self, path: str | Path, content: str | bytes) -> MutationResult:
+    def write_file(self, path: str | Path, content: str | bytes, expected_hash: str | None = None) -> MutationResult:
         """Write content to a file atomically, returning a unified diff."""
         try:
             target = self._resolve_and_verify(path)
             hash_before = self._hash(target)
+
+            if expected_hash is not None and expected_hash != hash_before:
+                return MutationResult(
+                    path=str(target), 
+                    success=False, 
+                    error=f"Stale read detected: expected hash {expected_hash}, but found {hash_before}"
+                )
 
             lines_before = []
             if target.exists():

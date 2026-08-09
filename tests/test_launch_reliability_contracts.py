@@ -22,8 +22,9 @@ from nexus.planner import (
     TaskStatus,
 )
 from nexus.policy import get_mode_policy
-from nexus.run_state import RunLedger
+from nexus.run_state import RunLedger, RunStatus
 from nexus.runtime.kernel import ExecutionKernel
+from nexus.safety import SafetyCheck, SafetyLevel
 from nexus.subagents.orchestrator import SubagentOrchestrator
 from nexus.subagents.templates import SecurityAuditor
 from nexus.tools import tool_context, tool_process_run, tool_process_status
@@ -611,3 +612,247 @@ def test_workspace_manager_resolves_custom_state_root(tmp_path):
     assert resolved is not None
     assert resolved.info == info
     assert resolved.info_path == state / "worktrees" / "custom-root.json"
+
+
+def test_pending_confirmation_halts_execution_loop(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXUS_HOME", str(tmp_path / "state"))
+    agent = Agent(api_key="test", working_dir=str(tmp_path), permission_mode="review")
+
+    # Queue a confirmation manually via policy check
+    check = SafetyCheck(
+        level=SafetyLevel.DANGEROUS,
+        operation="command: rm -rf /tmp/test",
+        reason="Repository policy requires approval for dangerous command",
+        requires_confirmation=True,
+    )
+    cid = agent._queue_confirmation(
+        name="run_command",
+        args={"command": "rm -rf /tmp/test"},
+        safety_check=check,
+    )
+    assert cid.startswith("danger-")
+    assert cid in agent._pending_confirmations
+
+
+def test_duplicate_pending_confirmation_deduplicates_id(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXUS_HOME", str(tmp_path / "state"))
+    agent = Agent(api_key="test", working_dir=str(tmp_path), permission_mode="review")
+
+    check = SafetyCheck(
+        level=SafetyLevel.DANGEROUS,
+        operation="command: dangerous_cmd",
+        reason="Dangerous",
+        requires_confirmation=True,
+    )
+    cid1 = agent._queue_confirmation(
+        name="run_command", args={"command": "dangerous_cmd"}, safety_check=check
+    )
+    cid2 = agent._queue_confirmation(
+        name="run_command", args={"command": "dangerous_cmd"}, safety_check=check
+    )
+
+    assert cid1 == cid2
+    assert len(agent._pending_confirmations) == 1
+
+
+def test_confirm_pending_operation_executes_stored_command(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXUS_HOME", str(tmp_path / "state"))
+    agent = Agent(
+        api_key="test",
+        working_dir=str(tmp_path),
+        permission_mode="review",
+        allow_unisolated_host_process=True,
+    )
+
+    script = tmp_path / "test_script.py"
+    script.write_text("print('Executing confirmed command')", encoding="utf-8")
+
+    check = SafetyCheck(
+        level=SafetyLevel.DANGEROUS,
+        operation="run_command",
+        reason="Manual confirmation test",
+        requires_confirmation=True,
+    )
+    cid = agent._queue_confirmation(
+        name="run_command",
+        args={"command": f"{sys.executable} {script}", "cwd": str(tmp_path)},
+        safety_check=check,
+    )
+
+    res, ok = agent.confirm_pending_operation(cid)
+
+    assert ok is True
+    assert "Executing confirmed command" in res
+    assert cid not in agent._pending_confirmations
+
+
+def test_duplicate_confirm_is_idempotent_and_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXUS_HOME", str(tmp_path / "state"))
+    agent = Agent(
+        api_key="test",
+        working_dir=str(tmp_path),
+        permission_mode="review",
+        allow_unisolated_host_process=True,
+    )
+
+    script = tmp_path / "test_once.py"
+    script.write_text("print('Executed once')", encoding="utf-8")
+
+    check = SafetyCheck(
+        level=SafetyLevel.DANGEROUS,
+        operation="run_command",
+        reason="Test idempotency",
+        requires_confirmation=True,
+    )
+    cid = agent._queue_confirmation(
+        name="run_command",
+        args={"command": f"{sys.executable} {script}", "cwd": str(tmp_path)},
+        safety_check=check,
+    )
+
+    # First confirm executes
+    res1, ok1 = agent.confirm_pending_operation(cid)
+    assert ok1 is True
+    assert "Executed once" in res1
+
+    # Second confirm fails closed (already consumed)
+    res2, ok2 = agent.confirm_pending_operation(cid)
+    assert ok2 is False
+    assert "Unknown or expired confirmation id" in res2
+
+
+def test_cancel_pending_operation_never_executes_command(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXUS_HOME", str(tmp_path / "state"))
+    agent = Agent(api_key="test", working_dir=str(tmp_path), permission_mode="review")
+
+    sentinel_file = tmp_path / "should_not_exist.txt"
+
+    check = SafetyCheck(
+        level=SafetyLevel.DANGEROUS,
+        operation="run_command",
+        reason="Test cancel",
+        requires_confirmation=True,
+    )
+    cid = agent._queue_confirmation(
+        name="run_command",
+        args={"command": f"touch {sentinel_file}"},
+        safety_check=check,
+    )
+
+    res, ok = agent.cancel_pending_operation(cid)
+
+    assert ok is True
+    assert "Cancelled" in res
+    assert not sentinel_file.exists()
+    assert cid not in agent._pending_confirmations
+
+
+def test_full_hello_world_edit_apply_resume_lifecycle(tmp_path, monkeypatch):
+    state_root = tmp_path.parent / f"{tmp_path.name}-state"
+    monkeypatch.setenv("NEXUS_HOME", str(state_root))
+    monkeypatch.setenv("PYTHON", sys.executable)
+
+    test_policy = get_mode_policy("review")
+    test_policy.require_os_isolation = False
+    test_policy.allow_shell_command = True
+
+    class HostedFakeHello:
+        id = "hosted-fake-hello"
+        model_id = "fake/model"
+        attempt_telemetry_enabled = False
+
+        def __init__(self):
+            self.calls = 0
+
+        @staticmethod
+        def _chunk(*, content=None, tool_name=None, arguments=None, request_id="request"):
+            tool_calls = []
+            if tool_name:
+                tool_calls = [
+                    SimpleNamespace(
+                        index=0,
+                        id=f"call-{tool_name}",
+                        function=SimpleNamespace(
+                            name=tool_name,
+                            arguments=json.dumps(arguments or {}),
+                        ),
+                    )
+                ]
+            return SimpleNamespace(
+                id=request_id,
+                choices=[
+                    SimpleNamespace(delta=SimpleNamespace(content=content, tool_calls=tool_calls))
+                ],
+                usage=SimpleNamespace(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+            )
+
+        def chat(self, **_kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                chunk = self._chunk(
+                    tool_name="write_file",
+                    arguments={
+                        "path": "hello.py",
+                        "content": "print('Hello from Noryx!')\n",
+                    },
+                    request_id="req-write",
+                )
+            elif self.calls == 2:
+                chunk = self._chunk(
+                    tool_name="run_command",
+                    arguments={
+                        "command": f"{sys.executable} hello.py",
+                        "cwd": str(tmp_path),
+                    },
+                    request_id="req-run",
+                )
+            else:
+                chunk = self._chunk(
+                    content="Verified: created hello.py, ran it, output was 'Hello from Noryx!'.",
+                    request_id="req-final",
+                )
+            return iter([chunk])
+
+        def chat_sync(self, **_kwargs):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content='{"approved": true, "summary": "hello.py created and output verified", "findings": []}'
+                        )
+                    )
+                ]
+            )
+
+    agent = Agent(
+        api_key="test",
+        working_dir=str(tmp_path),
+        permission_mode="review",
+        mode_policy=test_policy,
+        workspace_isolation=False,
+        allow_unisolated_host_process=True,
+    )
+    agent.client = HostedFakeHello()
+    agent.planner.analyze = lambda _prompt: {
+        "intent": IntentType.BUILD,
+        "difficulty": Difficulty.SIMPLE,
+        "plan_type": "direct",
+        "skills_needed": [],
+    }
+
+    # Step 1: Initial run stops at AWAITING_APPROVAL
+    pipeline = ExecutionPipeline(agent)
+    res1 = pipeline.run("Create hello.py and verify its output", interactive=False, emit_ui=False)
+    assert res1.status in ("AWAITING_APPROVAL", RunStatus.AWAITING_APPROVAL.value)
+
+    # Step 2: Apply the pending edit
+    edit_id = next(iter(agent._pending_edits))
+    apply_res, apply_ok = agent.apply_pending_edit(edit_id)
+    assert apply_ok is True
+    assert (tmp_path / "hello.py").read_text(encoding="utf-8") == "print('Hello from Noryx!')\n"
+
+    # Step 3: Resume after approval
+    res2_text, events2 = agent.resume_after_approval(emit_ui=False)
+    assert (tmp_path / "hello.py").exists()
+    assert agent.client.calls >= 2
+

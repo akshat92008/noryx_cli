@@ -10,7 +10,12 @@ def noryx_env(suffix: str, default: str | None = None) -> str | None:
     canonical = f"NORYX_{suffix}"
     if canonical in os.environ:
         return os.environ[canonical]
-    return os.environ.get(f"NEXUS_{suffix}", default)
+    legacy = f"NEXUS_{suffix}"
+    if legacy in os.environ:
+        import warnings
+        warnings.warn(f"Environment variable {legacy} is deprecated, use {canonical} instead.", DeprecationWarning, stacklevel=2)
+        return os.environ[legacy]
+    return default
 
 
 def noryx_env_flag(suffix: str, *, default: bool = False) -> bool:

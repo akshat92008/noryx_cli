@@ -493,3 +493,21 @@ def test_dynamic_capability_registry_is_agent_scoped(tmp_path):
 
     assert "session_only" in first._tool_capabilities
     assert "session_only" not in second._tool_capabilities
+
+
+def test_omniroute_provider_initialization(monkeypatch):
+    from nexus.api import NvidiaClient
+    from nexus.models import ModelRegistry
+    from nexus.preflight import configured_hosted_credentials
+
+    monkeypatch.setenv("NORYX_OMNIROUTE_API_KEY", "sk-test-omniroute-key")
+    assert "NORYX_OMNIROUTE_API_KEY" in configured_hosted_credentials()
+
+    client = NvidiaClient()
+    assert client.client is not None
+
+    registry = ModelRegistry()
+    desc = registry.get_descriptor("omniroute")
+    assert desc is not None
+    assert desc.model_id == "omniroute"
+    assert desc.provider_id == "omniroute"

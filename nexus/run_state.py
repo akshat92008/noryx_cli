@@ -10,8 +10,11 @@ JSON state behind.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
+
+logger = logging.getLogger(__name__)
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -32,6 +35,7 @@ class RunStatus(str, Enum):
     PARTIALLY_VERIFIED = "PARTIALLY_VERIFIED"
     UNVERIFIED = "UNVERIFIED"
     AWAITING_APPROVAL = "AWAITING_APPROVAL"
+    AWAITING_CONFIRMATION = "AWAITING_CONFIRMATION"
     BLOCKED = "BLOCKED"
     FAILED = "FAILED"
     ROLLED_BACK = "ROLLED_BACK"
@@ -71,8 +75,8 @@ def _json_default(value: Any) -> Any:
     return str(value)
 
 
-def _atomic_write_json(path: Path, value: Any) -> None:
-    """Atomically replace *path* with formatted JSON."""
+def _atomic_write_json(path: Path, value: Any) -> bool:
+    """Atomically replace *path* with formatted JSON. Returns True on success, False on OSError."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     try:
@@ -81,6 +85,10 @@ def _atomic_write_json(path: Path, value: Any) -> None:
             encoding="utf-8",
         )
         os.replace(temporary, path)
+        return True
+    except OSError as e:
+        logger.warning("Failed to atomically write %s: %s", path, e)
+        return False
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -117,9 +125,13 @@ class RunLedger:
         self.turn_dir: Path | None = None
         self._event_counter = 0
         self._checkpoint_counter = 0
+        self._degraded = False
         self._ensure_session()
 
     def _ensure_session(self) -> None:
+        if getattr(self, "_degraded", False):
+            return
+            
         existing = self._read_json(self.session_path) or {}
         payload = {
             "schema_version": RUN_SCHEMA_VERSION,
@@ -129,7 +141,14 @@ class RunLedger:
             "updated_at": _utc_now(),
             "turns": existing.get("turns", []),
         }
-        _atomic_write_json(self.session_path, payload)
+        if not _atomic_write_json(self.session_path, payload):
+            self._set_degraded()
+
+    def _set_degraded(self) -> None:
+        if not self._degraded:
+            self._degraded = True
+            print("\n[!] WARNING: DEGRADED PERSISTENCE. Storage failed (e.g. Disk Full).", flush=True)
+            print("[!] Noryx will continue in-memory, but recovery is no longer available.", flush=True)
 
     def begin(
         self,
@@ -384,6 +403,9 @@ class RunLedger:
         self._checkpoint_counter += 1
         safe_label = "".join(char if char.isalnum() or char in "-_" else "-" for char in label)
         path = turn_dir / "checkpoints" / f"{self._checkpoint_counter:04d}-{safe_label[:48]}.json"
+        if getattr(self, "_degraded", False):
+            return path
+            
         record = {
             "schema_version": RUN_SCHEMA_VERSION,
             "session_id": self.session_id,
@@ -396,7 +418,8 @@ class RunLedger:
             "plan": plan.to_dict() if hasattr(plan, "to_dict") else plan,
             "metadata": metadata or {},
         }
-        _atomic_write_json(path, record)
+        if not _atomic_write_json(path, record):
+            self._set_degraded()
         self._update_state(checkpoint_count=self._checkpoint_counter)
         return path
 
@@ -561,13 +584,17 @@ class RunLedger:
         return self.turn_dir
 
     def _update_state(self, **updates: Any) -> None:
+        if getattr(self, "_degraded", False):
+            return
+            
         turn_dir = self._require_turn()
         state_path = turn_dir / "state.json"
         with exclusive_file_lock(state_path):
             state = self._read_json(state_path) or {}
             state.update(updates)
             state["updated_at"] = _utc_now()
-            _atomic_write_json(state_path, state)
+            if not _atomic_write_json(state_path, state):
+                self._set_degraded()
 
     def _append_jsonl(
         self,
@@ -576,6 +603,9 @@ class RunLedger:
         *,
         prefix: str,
     ) -> str:
+        if getattr(self, "_degraded", False):
+            return f"{prefix}-DEGRADED"
+            
         turn_dir = self._require_turn()
         path = turn_dir / filename
         with exclusive_file_lock(path):
@@ -596,12 +626,17 @@ class RunLedger:
             encoded = (json.dumps(record, ensure_ascii=False, default=_json_default) + "\n").encode(
                 "utf-8"
             )
-            descriptor = os.open(path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
             try:
-                os.write(descriptor, encoded)
-                os.fsync(descriptor)
-            finally:
-                os.close(descriptor)
+                descriptor = os.open(path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
+                try:
+                    os.write(descriptor, encoded)
+                    os.fsync(descriptor)
+                finally:
+                    os.close(descriptor)
+            except OSError as e:
+                logger.warning("Failed to append jsonl to %s: %s", path, e)
+                self._set_degraded()
+                return f"{prefix}-DEGRADED"
         return record_id
 
     def read_jsonl(self, filename: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:

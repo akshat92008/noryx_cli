@@ -10,12 +10,18 @@ Architecture:
 """
 
 import json
+import logging
+import os
 import re
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 from nexus.paths import nexus_home
+
+logger = logging.getLogger(__name__)
 
 # ── Plan Types ───────────────────────────────────────────────────────────────
 
@@ -442,9 +448,13 @@ def estimate_difficulty(user_input: str, intent: IntentType) -> Difficulty:
 
     complexity_score = sum(len(re.findall(p, text, re.IGNORECASE)) for p in complexity_signals)
 
+    # Fix #7: Word count alone cannot promote difficulty above MODERATE.
+    # Only semantic complexity signals (complexity_score) can reach COMPLEX or MASSIVE.
+    # This prevents a verbose-but-simple 60-word request from being classified COMPLEX.
     if complexity_score >= 5 or word_count > 100:
         return Difficulty.MASSIVE
-    elif complexity_score >= 3 or word_count > 50:
+    elif complexity_score >= 3:
+        # Only semantic signals push to COMPLEX; verbose-but-simple tasks stay MODERATE.
         return Difficulty.COMPLEX
     elif complexity_score >= 1 or word_count > 20:
         return Difficulty.MODERATE
@@ -466,6 +476,14 @@ def should_plan(
     because the request is concise.
     """
     if intent in (IntentType.CHAT, IntentType.EXPLAIN, IntentType.SEARCH):
+        return PlanType.DIRECT
+
+    # Fix #19: Single-file fast-path DIRECT
+    # If the user explicitly asks to create/edit a single file and the difficulty is TRIVIAL/SIMPLE,
+    # it bypasses planning entirely, even if the word "multi-file" happens to be in the prompt.
+    single_file_intent = bool(re.search(r"\b(create|write|make|update|edit) (a|one|a single) (script|file|program)\b", user_input, re.IGNORECASE))
+    explicit_file = bool(re.search(r"\b\w+\.(py|js|ts|jsx|tsx|html|css|txt|md|json|sh)\b", user_input, re.IGNORECASE))
+    if difficulty in (Difficulty.TRIVIAL, Difficulty.SIMPLE) and (single_file_intent or explicit_file):
         return PlanType.DIRECT
 
     risky_signal = re.search(
@@ -855,10 +873,13 @@ class PlanningEngine:
                     max(300, sum(step.max_tool_calls + 1 for step in steps))
                     if difficulty == Difficulty.MASSIVE
                     else {
-                        Difficulty.SIMPLE: 15,
-                        Difficulty.MODERATE: 35,
-                        Difficulty.COMPLEX: 75,
-                    }.get(difficulty, 15)
+                        # Fix #8: Reduced from (SIMPLE=15, MODERATE=35, COMPLEX=75) to
+                        # realistic per-difficulty ceilings.  Smaller tasks that get
+                        # mis-classified no longer burn 75 tool-call credits.
+                        Difficulty.SIMPLE: 10,
+                        Difficulty.MODERATE: 20,
+                        Difficulty.COMPLEX: 30,
+                    }.get(difficulty, 10)
                 ),
                 "max_hosted_calls": None,
                 "max_prompt_tokens": None,
@@ -1548,6 +1569,8 @@ class PlanningEngine:
                             ),
                         }
                     )
+                    self.current_plan.failure_replans = self.current_plan.failure_replans[-2:]
+
                 elif self.current_plan.is_complete:
                     self.current_plan.status = TaskStatus.COMPLETED
                     self.current_plan.current_step = None
@@ -1585,6 +1608,8 @@ class PlanningEngine:
                 ),
             }
         )
+        self.current_plan.failure_replans = self.current_plan.failure_replans[-2:]
+
         self._save_plan(self.current_plan)
         return True
 
@@ -1747,9 +1772,12 @@ Remaining Steps:
         """Persist plan to disk using an atomic write."""
         filepath = PLANS_DIR / f"{plan.id}.json"
         temp_path = filepath.with_suffix(".tmp")
-        with open(temp_path, "w") as f:
-            json.dump(plan.to_dict(), f, indent=2)
-        temp_path.replace(filepath)
+        try:
+            with open(temp_path, "w") as f:
+                json.dump(plan.to_dict(), f, indent=2)
+            temp_path.replace(filepath)
+        except OSError as e:
+            logger.warning("Failed to save plan %s: %s", filepath, e)
 
     def load_plan(self, plan_id: str) -> ExecutionPlan | None:
         """Load a plan from disk."""

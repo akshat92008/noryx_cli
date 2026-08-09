@@ -52,6 +52,7 @@ from nexus.runtime.kernel import (
     classify_failure,
 )
 from nexus.runtime.session import ExecutionSession
+from nexus.env import noryx_env
 from nexus.safety import SafetyLayer, SafetyLevel
 from nexus.sandbox import SandboxRunner
 
@@ -304,7 +305,7 @@ class NvidiaCeilingNode:
         prompt = request
         if planner_context:
             prompt = f"{planner_context}\n\nUser request:\n{request}"
-        timeout = int(os.environ.get("NEXUS_CEILING_CALL_TIMEOUT", "60"))
+        timeout = int(noryx_env("CEILING_CALL_TIMEOUT", "60"))
         try:
             response = _run_ceiling_call(
                 lambda: self.client.chat.completions.create(
@@ -354,7 +355,7 @@ class NvidiaCeilingNode:
             f"Nova guardrail failure:\n{failure_reason}\n\n"
             f"Workspace context:\n{context or '(none)'}"
         )
-        timeout = int(os.environ.get("NEXUS_CEILING_CALL_TIMEOUT", "60"))
+        timeout = int(noryx_env("CEILING_CALL_TIMEOUT", "60"))
         try:
             response = _run_ceiling_call(
                 lambda: self.client.chat.completions.create(
@@ -375,7 +376,7 @@ class NvidiaCeilingNode:
 
     def review(self, request: str, context: str) -> tuple[bool, str, list[str]]:
         """Run an independent read-only reviewer call over validated candidate changes."""
-        timeout = int(os.environ.get("NEXUS_CEILING_CALL_TIMEOUT", "60"))
+        timeout = int(noryx_env("CEILING_CALL_TIMEOUT", "60"))
         system = (
             "You are the independent Noryx code reviewer. Review only the supplied "
             "request and validated candidate excerpts. Return one JSON object with "

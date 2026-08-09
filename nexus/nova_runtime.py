@@ -721,10 +721,11 @@ class OllamaClient:
     """Minimal dependency-free Ollama client for Nova V11."""
 
     def __init__(self, base_url: str | None = None, timeout: int | None = None):
+        from nexus.env import noryx_env
         resolved_url = (
             base_url
-            or os.environ.get("NEXUS_OLLAMA_URL")
-            or os.environ.get("OLLAMA_HOST")
+            or noryx_env("OLLAMA_URL")
+            or noryx_env("OLLAMA_HOST")
             or "http://127.0.0.1:11434"
         )
         if not resolved_url.startswith(("http://", "https://")):
@@ -739,7 +740,7 @@ class OllamaClient:
             )
 
         self.base_url = resolved_url.rstrip("/")
-        self.timeout = timeout or int(os.environ.get("NEXUS_OLLAMA_TIMEOUT", "180"))
+        self.timeout = timeout or int(noryx_env("OLLAMA_TIMEOUT", "180"))
 
     def nova_generate(
         self,

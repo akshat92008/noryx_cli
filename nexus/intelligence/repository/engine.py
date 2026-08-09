@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 import subprocess
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -762,6 +765,8 @@ class RepositoryIntelligence:
                 json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
             )
             os.replace(tmp, self.cache_path)
+        except OSError as e:
+            logger.warning("Failed to save intelligence cache %s: %s", self.cache_path, e)
         finally:
             tmp.unlink(missing_ok=True)
 

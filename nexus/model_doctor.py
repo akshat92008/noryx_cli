@@ -155,8 +155,9 @@ def _prior_for(model_name: str) -> CapabilityProfile:
 
 class ModelDoctor:
     def __init__(self, store_path: str | Path | None = None) -> None:
+        from nexus.env import noryx_env
         default = (
-            Path(os.environ.get("NEXUS_HOME", Path.home() / ".nexusai")) / "model-profiles.json"
+            Path(noryx_env("HOME", str(Path.home() / ".nexusai"))) / "model-profiles.json"
         )
         self.store_path = Path(store_path or default).expanduser()
         self._profiles: dict[str, CapabilityProfile] = {}

@@ -62,15 +62,18 @@ class MockMutatingProvider(Provider):
         return len(text)
 
     def chat(self, model_id, messages, tools=None, stream=False, max_tokens=None, temperature=None, **kwargs):
-        tc = [
-            MagicMock(
-                id="call_123",
-                function=MagicMock(
-                    name="write_file",
-                    arguments='{"file_path": "new_app.py", "content": "print(1)"}'
-                )
-            )
-        ]
+        class DummyFunction:
+            def __init__(self):
+                self.name = "write_file"
+                self.arguments = '{"file_path": "new_app.py", "content": "print(1)"}'
+
+        class DummyToolCall:
+            def __init__(self):
+                self.id = "call_123"
+                self.function = DummyFunction()
+                self.index = 0
+
+        tc = [DummyToolCall()]
         
         if stream:
             def _stream():
@@ -172,5 +175,5 @@ def test_ambiguous_mutation_fails_closed(tmp_path):
     
     # The provider tries to run write_file
     # The tool execution should fail with the exact block message
-    tool_results = [event for event in events if event.get("type") == "tool_result"]
+    tool_results = [event for event in events if event.get("type") == "tool_call"]
     assert any("BLOCKED: repository intelligence could not establish a safe mutation scope" in str(r) for r in tool_results)

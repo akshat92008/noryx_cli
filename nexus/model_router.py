@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+from nexus.env import noryx_env
 from nexus.model_doctor import CapabilityBand, CapabilityDimension, CapabilityProfile, model_doctor
 from nexus.models import ModelDescriptor, ModelTier, PrivacyClass, model_registry
 
@@ -173,7 +174,7 @@ class ModelRouter:
             item
             for item in model_registry.list_all()
             if item.enabled
-            and (item.backend != "custom" or os.environ.get("NEXUS_MODEL_ID", "").strip())
+            and (item.backend != "custom" or noryx_env("MODEL_ID", "").strip())
         ]
         reasons: list[str] = []
         policy_constraints: list[str] = []

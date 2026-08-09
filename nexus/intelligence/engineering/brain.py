@@ -371,6 +371,15 @@ class EngineeringBrain:
                 ]
             )
         )
+        self.contract.plan_critic = self._critic_summary(
+            task_type=refined_profile.legacy_task_type,
+            decisive_files=self.contract.decisive_files,
+            related_tests=self.contract.related_tests,
+            callers=self.contract.callers,
+            non_goals=self.contract.non_goals,
+            risk_level=refined_profile.risk_level,
+            is_empty_repository=(len(self.repository.files) == 0),
+        )
 
         # Runtime paths are eligible for scope expansion only when they were
         # extracted from actual verification/compiler output and are present in

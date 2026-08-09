@@ -93,14 +93,18 @@ def probe_ollama(model: str = "nova_codex", *, use_cache: bool = True) -> Backen
 
 
 def configured_hosted_credentials() -> list[str]:
+    from nexus.api import _load_env_file
+    _load_env_file()
     names = [
         name
-        for name in ("NVIDIA_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY")
-        if os.environ.get(name)
+        for name in ("NVIDIA_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY", "OMNIROUTE_API_KEY")
+        if os.environ.get(name) or noryx_env(name)
     ]
     if noryx_env("OPENAI_API_KEY"):
         names.insert(0, "NORYX_OPENAI_API_KEY")
-    return names
+    if noryx_env("OMNIROUTE_API_KEY"):
+        names.insert(0, "NORYX_OMNIROUTE_API_KEY")
+    return list(dict.fromkeys(names))
 
 
 def probe_hosted() -> BackendProbe:
@@ -131,7 +135,7 @@ def probe_hosted() -> BackendProbe:
             code="credentials_missing",
             detail="No hosted-provider credential is configured.",
             remediation=(
-                "Set NVIDIA_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY.",
+                "Set NVIDIA_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY, or NORYX_OMNIROUTE_API_KEY.",
                 "For a custom OpenAI-compatible endpoint, set NORYX_OPENAI_BASE_URL and NORYX_OPENAI_API_KEY.",
             ),
         )

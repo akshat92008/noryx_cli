@@ -195,7 +195,7 @@ def test_cli_single_prompt():
 
 
 def test_cli_missing_credentials(capsys):
-    with patch.dict(os.environ, {}, clear=True):
+    with patch.dict(os.environ, {"HOME": "/tmp/fake_home"}, clear=True):
         with patch.object(sys, "argv", ["nexus"]):
             with pytest.raises(SystemExit) as excinfo:
                 main()
@@ -357,7 +357,7 @@ def test_run_interactive_loop():
         agent.mode_policy.label = "autonomous"
         agent.memory.summary = lambda: "memory"
 
-        with patch("rich.console.Console.input", side_effect=["/quit"]):
+        with patch("nexus.ui.get_prompt", side_effect=["/quit"]):
             with pytest.raises(SystemExit):
                 run_interactive(agent)
 

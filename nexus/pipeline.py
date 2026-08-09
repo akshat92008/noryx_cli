@@ -235,6 +235,32 @@ class ExecutionPipeline:
         events = exec_result["events"]
         result.model_turns = exec_result.get("model_turns", 0)
 
+        is_awaiting_approval = any(
+            isinstance(e, dict) and e.get("type") in ("run_awaiting_approval", "run_awaiting_confirmation")
+            for e in events
+        )
+        if is_awaiting_approval:
+            is_confirmation = any(
+                isinstance(e, dict) and e.get("type") == "run_awaiting_confirmation"
+                for e in events
+            )
+            status_override = (
+                RunStatus.AWAITING_CONFIRMATION
+                if is_confirmation
+                else RunStatus.AWAITING_APPROVAL
+            )
+            result.response = response
+            result.events = events
+            result.total_duration_ms = int((time.monotonic() - pipeline_start) * 1000)
+            report = self._agent._run_finalizer.finish(
+                result.response,
+                result.events,
+                status_override=status_override,
+            )
+            result.status = report.get("status", RunStatus.AWAITING_APPROVAL.value)
+            result.outcome = report.get("outcome", "AWAITING_APPROVAL")
+            return result
+
         # ── Stage 6: Verification ─────────────────────────────────────────────
         ver_result = self._stage_verification()
         stage_results.append(ver_result)
@@ -713,6 +739,11 @@ class ExecutionPipeline:
                 agent._enforce_plan_tool_contract = False  # noqa: SLF001
             responses.append(response)
             all_events.extend(events)
+            
+            if "❌ Run failed:" in (response or "") and current.status == TaskStatus.IN_PROGRESS:
+                agent.planner.advance_step(current.id, TaskStatus.FAILED, response[:2000])
+                turns_used += 1
+
             turns_used += sum(
                 1
                 for event in events
@@ -720,6 +751,13 @@ class ExecutionPipeline:
             )
             agent.run_ledger.record_tasks(plan.steps)
             agent.run_ledger.record_plan(plan)
+
+            is_awaiting_approval = any(
+                isinstance(e, dict) and e.get("type") in ("run_awaiting_approval", "run_awaiting_confirmation")
+                for e in events
+            )
+            if is_awaiting_approval:
+                break
             if current.status == TaskStatus.COMPLETED:
                 retry_contexts.pop(current.id, None)
                 agent.run_ledger.checkpoint(

@@ -22,7 +22,7 @@ from typing import Any
 
 from nexus import __version__, ui
 from nexus.agent import Agent
-from nexus.doctor import run_doctor
+from nexus.doctor import ping_live_provider, run_doctor
 from nexus.env import noryx_env
 from nexus.memory import ConversationMemory
 from nexus.models import DEFAULT_MODEL, resolve_model
@@ -54,7 +54,8 @@ def _prepare_fix_command() -> None:
     parser.add_argument("--proof", action="store_true")
     parser.add_argument("--proof-output", default="")
     parser.add_argument("--no-workspace", action="store_true")
-    parser.add_argument("--max-turns", type=int, default=80)
+    # Fix #9: Lower from 80 to 30; difficulty-adaptive limits enforce tighter budgets per-task.
+    parser.add_argument("--max-turns", type=int, default=30)
     args, extra = parser.parse_known_args(sys.argv[2:])
 
     from nexus.verified_repair import VerifiedRepairRequest, prepare_verified_repair
@@ -152,6 +153,12 @@ Environment:
         "--doctor",
         action="store_true",
         help="Run installation, provider, workspace, and sandbox diagnostics",
+    )
+    parser.add_argument(
+        "--ping",
+        action="store_true",
+        # Fix #13: --ping adds a live completion check to --doctor.
+        help="With --doctor: also make a real completion request to verify the hosted provider responds.",
     )
 
     parser.add_argument(
@@ -261,7 +268,9 @@ Environment:
         choices=("text", "json", "jsonl", "stream-json"),
         default="text",
     )
-    parser.add_argument("--max-turns", type=int, default=50)
+    # Fix #9: Lower from 50 to 20; per-difficulty adaptive limits (4/8/15/25) are the real
+    # guard rails.  Users can still pass --max-turns N to override.
+    parser.add_argument("--max-turns", type=int, default=20)
     parser.add_argument(
         "--permission-mode", choices=("default", "acceptEdits", "plan"), default="default"
     )
@@ -2264,18 +2273,38 @@ def handle_slash_command(cmd: str, agent: Agent) -> bool:
     elif command == "/confirm":
         result, success = agent.confirm_pending_operation(arg)
         ui.print_tool_result(result, success)
+        if success:
+            res = agent.resume_after_approval(emit_ui=True)
+            res_text = res[0] if isinstance(res, (tuple, list)) and len(res) >= 1 else (res if isinstance(res, str) else "")
+            if res_text:
+                ui.console.print(res_text)
 
     elif command == "/cancel":
         result, success = agent.cancel_pending_operation(arg)
         ui.print_tool_result(result, success)
+        if success:
+            res = agent.resume_after_approval(emit_ui=True)
+            res_text = res[0] if isinstance(res, (tuple, list)) and len(res) >= 1 else (res if isinstance(res, str) else "")
+            if res_text:
+                ui.console.print(res_text)
 
     elif command == "/apply":
         result, success = agent.apply_pending_edit(arg)
         ui.print_tool_result(result, success)
+        if success:
+            res = agent.resume_after_approval(emit_ui=True)
+            res_text = res[0] if isinstance(res, (tuple, list)) and len(res) >= 1 else (res if isinstance(res, str) else "")
+            if res_text:
+                ui.console.print(res_text)
 
     elif command == "/reject":
         result, success = agent.reject_pending_edit(arg)
         ui.print_tool_result(result, success)
+        if success:
+            res = agent.resume_after_approval(emit_ui=True)
+            res_text = res[0] if isinstance(res, (tuple, list)) and len(res) >= 1 else (res if isinstance(res, str) else "")
+            if res_text:
+                ui.console.print(res_text)
 
     elif command == "/pending":
         ui.console.print(agent.pending_edits_summary())
@@ -3001,13 +3030,24 @@ def main():
     args = parse_args()
 
     if args.doctor:
+        ping = getattr(args, "ping", False)
         if args.output_format == "json":
             from nexus.doctor import doctor_report
 
             success, payload = doctor_report(args.working_dir, mode=args.mode)
+            if ping:
+                live_check = ping_live_provider()
+                payload["checks"].append(live_check.to_dict())  # type: ignore[union-attr]
+                if live_check.status == "fail":
+                    payload["ready"] = False
             print(json.dumps(payload, indent=2, sort_keys=True))
         else:
             success, report = run_doctor(args.working_dir, mode=args.mode)
+            if ping:
+                live_check = ping_live_provider()
+                report = report + "\n" + live_check.render()
+                if live_check.status == "fail":
+                    success = False
             print(report)
         raise SystemExit(0 if success else 2)
 

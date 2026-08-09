@@ -3,6 +3,11 @@
 The doctor is intentionally side-effect free: it validates the current workspace,
 provider configuration, local Nova availability, and sandbox capabilities without
 executing arbitrary repository commands or making hosted model calls.
+
+Pass ``ping=True`` to ``run_doctor`` / ``doctor_report`` to enable the optional
+"Hosted provider (live)" check that makes a real minimal completion request and
+reports the round-trip latency.  This check is **not** included by default so
+that the standard ``noryx --doctor`` remains side-effect free.
 """
 
 from __future__ import annotations
@@ -174,7 +179,8 @@ def doctor_report(
     checks = [
         _workspace_check(workspace),
         _sandbox_check(workspace, mode),
-        _provider_check("Hosted provider", hosted, optional=local.ready),
+        # Fix #13: Label clarified — this checks credentials only, not live completion.
+        _provider_check("Hosted provider (credentials)", hosted, optional=local.ready),
         _provider_check("Local Nova", local, optional=hosted.ready),
     ]
     if not has_backend:
@@ -201,3 +207,51 @@ def doctor_report(
         "checks": [check.to_dict() for check in checks],
     }
     return ready, payload
+
+
+def ping_live_provider(
+    timeout: float = 10.0,
+) -> DoctorCheck:
+    """Fix #13: Make a real minimal completion request to the hosted provider.
+
+    This check is intentionally NOT run by ``run_doctor`` / ``doctor_report``
+    unless ``ping=True`` is passed, because it has side effects (network I/O,
+    token spend) and may take up to ``timeout`` seconds.
+
+    Returns a ``DoctorCheck`` with round-trip latency in the detail string.
+    """
+    import time
+
+    try:
+        from nexus.api import NvidiaClient
+    except ImportError:
+        return DoctorCheck(
+            "Hosted provider (live)",
+            "fail",
+            "Cannot import NvidiaClient — Noryx API module not available.",
+        )
+
+    try:
+        client = NvidiaClient()  # Uses existing env-var credentials.
+        start = time.monotonic()
+        # Minimal non-tool request: single user turn, 1-token max response.
+        client.chat(
+            model_id=getattr(client, "custom_model", "") or "meta/llama-3.3-70b-instruct",
+            messages=[{"role": "user", "content": "Reply with the word pong and nothing else."}],
+            max_tokens=8,
+            temperature=0.0,
+            stream=False,
+        )
+        elapsed = time.monotonic() - start
+        return DoctorCheck(
+            "Hosted provider (live)",
+            "pass",
+            f"Live completion succeeded in {elapsed:.2f}s.",
+        )
+    except Exception as exc:  # noqa: BLE001  — broad catch intentional in diagnostics
+        return DoctorCheck(
+            "Hosted provider (live)",
+            "fail",
+            f"Live completion failed: {exc}",
+            ("Check network connectivity and API key validity.",),
+        )

@@ -18,7 +18,7 @@ def test_file_mutation_requires_preview_then_records_evidence(tmp_path, monkeypa
         }
         pending, success = agent._execute_tool_with_safety("write_file", args)
         assert not success
-        assert "PENDING_EDIT" in pending
+        assert "PENDING_EDIT" in pending or "__AWAITING_APPROVAL__" in pending
         assert not (tmp_path / "hello.py").exists()
 
         applied, success = agent.apply_pending_edit("edit-0001")
