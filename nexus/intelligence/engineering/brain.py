@@ -234,6 +234,7 @@ class EngineeringBrain:
             callers=callers,
             non_goals=non_goals,
             risk_level=risk,
+            is_empty_repository=(len(self.repository.files) == 0),
         )
         allowed_decisive = list(self.scope_guard.contract.allowed_files)
         allowed_tests = [
@@ -444,6 +445,7 @@ class EngineeringBrain:
         callers: dict[str, list[str]],
         non_goals: list[str],
         risk_level: str,
+        is_empty_repository: bool = False,
     ) -> dict[str, Any]:
         blocking: list[str] = []
         warnings: list[str] = []
@@ -455,7 +457,7 @@ class EngineeringBrain:
             "run relevant regression verification",
             "review the final diff against the objective and non-goals",
         ]
-        if not decisive_files:
+        if not decisive_files and not is_empty_repository:
             blocking.append(
                 "No decisive repository files were established; mutation must wait for context expansion."
             )
@@ -602,6 +604,11 @@ class EngineeringBrain:
     ) -> ScopeDecision:
         if self.scope_guard is None:
             return ScopeDecision(True, "No engineering scope contract is active.")
+        if self.contract and self.contract.plan_critic.get("blocking_issues"):
+            return ScopeDecision(
+                False,
+                "BLOCKED: repository intelligence could not establish a safe mutation scope."
+            )
         conflict = self._write_precondition_failure(paths)
         if conflict:
             return ScopeDecision(False, conflict)

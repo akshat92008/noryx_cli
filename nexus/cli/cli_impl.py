@@ -283,6 +283,7 @@ Environment:
     )
     parser.add_argument(
         "--mode",
+        default="review",
         help=(
             "Operational policy preset (default: review). "
             "Modes and isolation requirements: "
@@ -2532,7 +2533,9 @@ def run_interactive(agent: Agent):
                 continue
 
             # Run the agent
-            agent.run(user_input)
+            response = agent.run(user_input)
+            if response and response.strip():
+                ui.console.print(f"\n{response}\n")
 
         except KeyboardInterrupt:
             ui.console.print(f"\n[{ui.DIM}]Ctrl+C — type /exit to quit[/]")

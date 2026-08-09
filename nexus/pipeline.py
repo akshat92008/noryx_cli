@@ -395,21 +395,22 @@ class ExecutionPipeline:
                         summary="Repository context and initial engineering contract established.",
                     )
                 if brain_contract.plan_critic.get("blocking_issues") and strict_mode:
-                    analysis["engineering_hard_block"] = True
-                    return (
-                        analysis,
-                        None,
-                        StageResult(
-                            stage=PipelineStage.PLANNING,
-                            success=False,
-                            duration_ms=int((time.monotonic() - t) * 1000),
-                            metadata={
-                                "hard_block": True,
-                                "issues": brain_contract.plan_critic.get("blocking_issues", []),
-                            },
-                            error="; ".join(brain_contract.plan_critic.get("blocking_issues", [])),
-                        ),
-                    )
+                    if getattr(analysis.get("intent"), "value", analysis.get("intent")) != "unknown":
+                        analysis["engineering_hard_block"] = True
+                        return (
+                            analysis,
+                            None,
+                            StageResult(
+                                stage=PipelineStage.PLANNING,
+                                success=False,
+                                duration_ms=int((time.monotonic() - t) * 1000),
+                                metadata={
+                                    "hard_block": True,
+                                    "issues": brain_contract.plan_critic.get("blocking_issues", []),
+                                },
+                                error="; ".join(brain_contract.plan_critic.get("blocking_issues", [])),
+                            ),
+                        )
             if analysis.get("plan_type") == "planned":
                 repo_summary = (
                     self._agent.repo_graph.summary()

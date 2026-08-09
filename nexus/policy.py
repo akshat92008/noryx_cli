@@ -27,9 +27,9 @@ class ModePolicy:
     require_distinct_reviewer: bool = False
 
 
-def get_mode_policy(mode: str) -> ModePolicy:
+def get_mode_policy(mode: str | None = None) -> ModePolicy:
     """Return the ModePolicy preset for a given mode string."""
-    if mode == "review":
+    if not mode or mode in ("review", "default"):
         return ModePolicy(
             may_edit=True,
             may_apply=False,

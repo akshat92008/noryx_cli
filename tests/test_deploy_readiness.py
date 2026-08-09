@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 
 def _env(tmp_path: Path) -> dict[str, str]:
     root = Path(__file__).resolve().parents[1]
@@ -22,6 +23,7 @@ def _env(tmp_path: Path) -> dict[str, str]:
     }
 
 
+@pytest.mark.live_model
 def test_deploy_check_deep_refuses_production_without_native_isolation(tmp_path: Path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()

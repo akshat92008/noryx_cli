@@ -480,8 +480,15 @@ def test_run_context_is_isolated_between_concurrent_agent_threads(tmp_path):
 def test_dynamic_capability_registry_is_agent_scoped(tmp_path):
     from nexus.capabilities import ToolCapability
 
-    first = Agent(api_key="test", working_dir=str(tmp_path / "first"))
-    second = Agent(api_key="test", working_dir=str(tmp_path / "second"))
+    # RepositoryIntelligence (initialised inside Agent.__init__) requires the
+    # working directory to exist before construction.
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+    first_dir.mkdir()
+    second_dir.mkdir()
+
+    first = Agent(api_key="test", working_dir=str(first_dir))
+    second = Agent(api_key="test", working_dir=str(second_dir))
     first._register_tool_capability("session_only", frozenset({ToolCapability.PURE}))
 
     assert "session_only" in first._tool_capabilities

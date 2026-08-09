@@ -1,6 +1,80 @@
 # Changelog
 
+## [3.8.5-rc2] - 2026-08-08
+
+### Fixed
+- Fixed mutation scope blocking read-only queries in empty repositories.
+- Permitted greenfield environment scoping for new project builds.
+- Refined UX (changed /status to /run-status, updated nexusai branding to noryx).
+
+## [3.8.5] - 2026-08-08
+
+### Security hardening — trust authority isolation (P0/P1)
+
+**Trust authority externalization (P0)**
+
+- Moved the trust record from `<repo>/.noryx/trusted-config.json` (inside the
+  model-writable repository) to `~/.noryx/trust/<repo-id>.json` (outside any
+  repository).  Repository identity is the SHA-256 of the canonical resolved
+  path.
+- Added `TrustAuthority` (read/write, user-approval paths only) and `TrustReader`
+  (read-only, safe for agent tools, plugins, MCP).  `TrustStore` is deprecated
+  and emits a `DeprecationWarning`; it will be removed in 3.9.
+- Validated that `NORYX_HOME` / `NEXUS_HOME` inside a repository raises
+  `TrustStoreError` at construction time.
+- Fail-closed on schema-version mismatch, corrupt JSON, missing files,
+  and content-hash drift.  Approvals are content-addressed (SHA-256); any
+  byte-level change invalidates them.
+- Migrated `agent/core.py` and `platform/mcp_gateway.py` from deprecated
+  `TrustStore` to `TrustReader`.
+
+**Sandbox OS-level trust isolation (P1)**
+
+- macOS `sandbox-exec`: added explicit `(deny file* ...)` and
+  `(deny file-read-metadata ...)` rules for `~/.noryx/trust/` before all
+  `allow` rules.  First-match SBPL semantics guarantee the denial takes
+  priority over the global `file-read-metadata` allow.
+- Bubblewrap (Linux): trust dir is never mounted; added defense-in-depth
+  env-var stripping.
+- RESTRICTED fallback: trust dir added to `_command_path_violation()`
+  always-forbidden set.
+- All backends: `NORYX_HOME`, `NEXUS_HOME`, `NORYX_TRUST_DIR`, and
+  `NEXUS_TRUST_DIR` are now stripped from the subprocess environment;
+  model-controlled processes cannot discover the trust store path from
+  their environment.
+- `SandboxRunner.__init__()` accepts a `trust_dir` override for testing.
+
+**Trust scanner fix (P1)**
+
+- Replaced the blanket `.noryx` ignore in workspace journal and trust scanner
+  with explicit runtime-subdir classification (`cache`, `logs`, `tmp`).
+  `.noryx/skills/`, `.noryx/policies.*`, etc. now appear correctly in
+  workspace diffs and trust scans.
+
+**Adversarial regression tests**
+
+- Added 28 adversarial tests (`tests/security_adversarial/`) covering:
+  trust-store externalization, read/write split, schema mismatch, digest
+  replacement, TOCTOU detection, path non-transfer, sandbox shell read/write/
+  list/delete, Python subprocess read/write, directory listing, symlink
+  traversal, relative path traversal, trust state integrity after attack,
+  `NORYX_HOME` env stripping, and host-side `TrustAuthority` functional
+  validation.
+
+**Qualification fixes**
+
+- Fixed `qualification_environment.py` to not call `platform.platform()`
+  (which invokes `platform.architecture()`, broken on Python 3.13 with
+  `str.decode` AttributeError).  Platform string is now collected safely with
+  `sys.platform` + `platform.machine()`.
+- Fixed `test_dynamic_capability_registry_is_agent_scoped`: test fixture now
+  creates the required working directories before constructing `Agent`.
+- Marked live-model-dependent benchmark tests with `pytest.mark.live_model`
+  and documented them as environment-dependent integration tests.
+- Package version bumped to 3.8.5.
+
 ## [3.8.4] - 2026-08-08
+
 
 ### Noryx public-launch hardening
 

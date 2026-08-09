@@ -19,8 +19,15 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # Hosted inference can legitimately take more than a few seconds before the
 # first token. Keep the defaults conservative while allowing operators to tune
 # them for their environment.
-DEFAULT_NVIDIA_TIMEOUT = float(noryx_env("NVIDIA_TIMEOUT", "60.0"))
+DEFAULT_NVIDIA_TIMEOUT = float(noryx_env("NVIDIA_TIMEOUT", "120.0"))
 DEFAULT_GROQ_TIMEOUT = float(noryx_env("GROQ_TIMEOUT", "60.0"))
+
+# Automatic replacements for NVIDIA models that reached End-Of-Life (410 Gone)
+NVIDIA_MODEL_REPLACEMENTS = {
+    "deepseek-ai/deepseek-v4-flash": "meta/llama-3.3-70b-instruct",
+    "deepseek-ai/deepseek-v4-pro": "z-ai/glm-5.2",
+    "qwen/qwen3.5-397b-a17b": "meta/llama-3.3-70b-instruct",
+}
 
 # Groq model mappings for ultimate fallback (must support tool calling if used)
 GROQ_MODEL_MAP = {
@@ -120,6 +127,7 @@ def _load_env_file():
     possible_paths = [
         os.path.join(cwd, ".env"),
         os.path.join(checkout, ".env"),
+        os.path.expanduser("~/.noryx/.env"),
         os.path.expanduser("~/.config/nexus/.env"),
         os.path.expanduser("~/.nexusai/.env"),
     ]
@@ -318,10 +326,13 @@ class NvidiaClient:
             cached = self._client_cache.get(key)
             if cached is not None:
                 return cached
+            import httpx
+
+            client_timeout = httpx.Timeout(max(300.0, float(timeout)), connect=30.0)
             client = OpenAI(
                 base_url=base_url,
                 api_key=api_key,
-                timeout=timeout,
+                timeout=client_timeout,
                 max_retries=2,
             )
             self._client_cache[key] = client
@@ -496,6 +507,9 @@ class NvidiaClient:
         if top_p is not None:
             kwargs["top_p"] = float(top_p)
 
+        if model_id in NVIDIA_MODEL_REPLACEMENTS:
+            model_id = NVIDIA_MODEL_REPLACEMENTS[model_id]
+
         errors = []
         connection_timed_out = False
 
@@ -565,11 +579,11 @@ class NvidiaClient:
                         break  # Fast exit on host timeout
                     self.switch_to_fallback()
 
-        # ── Step 2: Try NVIDIA fallback models (DeepSeek Flash & Llama 3.3) ──
+        # ── Step 2: Try NVIDIA fallback models (Llama 3.3 70B & GLM 5.2) ──
         if not connection_timed_out:
             fallback_nvidia_models = [
-                "deepseek-ai/deepseek-v4-flash",
                 "meta/llama-3.3-70b-instruct",
+                "z-ai/glm-5.2",
             ]
             now = time.time()
             for fb_model in fallback_nvidia_models:

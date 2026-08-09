@@ -51,10 +51,14 @@ class WorkspaceMutation:
 class ContentAddressedWorkspaceJournal:
     """Capture and reconcile workspace state with immutable preimages."""
 
+    # Parts of a path (directory names) whose presence means the entire path
+    # is runtime noise and should be excluded from workspace snapshots.
+    # IMPORTANT: ".noryx" is NOT listed here because that would silently exclude
+    # security-sensitive control files such as .noryx/skills/*.md.  Instead,
+    # runtime sub-directories of .noryx are listed individually below.
     DEFAULT_IGNORED_PARTS = frozenset(
         {
             ".git",
-            ".noryx",
             ".nexusai",
             "node_modules",
             "venv",
@@ -65,6 +69,14 @@ class ContentAddressedWorkspaceJournal:
             ".ruff_cache",
         }
     )
+
+    # Runtime sub-directories inside .noryx / .nexus control dirs.
+    # These are excluded even though the parent .noryx / .nexus dirs are not.
+    IGNORED_CONTROL_SUBDIRS: frozenset[str] = frozenset({"cache", "logs", "tmp"})
+
+    # Control dir names whose monitored sub-paths should appear in diffs.
+    # Used by _is_control_dir_runtime() to classify paths.
+    CONTROL_DIR_NAMES: frozenset[str] = frozenset({".noryx", ".nexus"})
 
     def __init__(
         self,
@@ -128,12 +140,33 @@ class ContentAddressedWorkspaceJournal:
             for excluded in self.excluded_roots
         )
 
+    def _is_control_dir_runtime(self, path: Path) -> bool:
+        """Return True if *path* is inside a runtime sub-directory of a control dir.
+
+        Paths such as ``.noryx/cache/...`` or ``.noryx/logs/...`` are runtime
+        noise and should be excluded.  Paths such as ``.noryx/skills/rule.md``
+        are project-configuration and must be tracked.
+        """
+        try:
+            relative = path.relative_to(self.root)
+        except ValueError:
+            return False
+        parts = relative.parts
+        # Need at least: <control-dir>/<subdir>/...
+        if len(parts) < 2:
+            return False
+        return parts[0] in self.CONTROL_DIR_NAMES and parts[1] in self.IGNORED_CONTROL_SUBDIRS
+
     def _is_ignored(self, path: Path) -> bool:
         try:
             relative = path.relative_to(self.root)
         except ValueError:
             return True
-        return self._is_excluded(path) or any(part in self.ignored_parts for part in relative.parts)
+        # Check broad noise parts (does not include .noryx itself)
+        if self._is_excluded(path) or any(part in self.ignored_parts for part in relative.parts):
+            return True
+        # Check for runtime sub-paths inside .noryx / .nexus
+        return self._is_control_dir_runtime(path)
 
     def _store_preimage(self, source: Path, digest: str) -> str:
         destination = self.preimage_dir / digest[:2] / digest

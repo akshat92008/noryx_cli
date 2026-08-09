@@ -202,6 +202,17 @@ def test_task_memory_rejects_stale_writer(tmp_path: Path):
         store.save(stale)
 
 
+def test_task_memory_recreate_adopts_existing_sequence(tmp_path: Path):
+    root = _repo(tmp_path)
+    store = EngineeringMemoryStore(root)
+    m1 = store.create("task-multi-turn", "First prompt")
+    m1.status = "VERIFYING"
+    store.save(m1)
+    # Re-creating task memory for the same task_id (e.g. multi-turn prompt) must adopt sequence
+    m2 = store.create("task-multi-turn", "Second prompt")
+    assert m2.sequence > m1.sequence
+
+
 def test_long_horizon_refuses_tampered_checkpoint(tmp_path: Path):
     root = _repo(tmp_path)
     controller = LongHorizonController(root, "task-tamper", "Fix total")

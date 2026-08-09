@@ -26,6 +26,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from nexus.project_files import PROJECT_RULE_FILENAMES
+
 
 @dataclass
 class ProjectRules:
@@ -94,17 +96,10 @@ class ProjectMemory:
         safety_config = pm.get_safety_config()
     """
 
-    RULE_FILENAMES = [
-        "NORYX.md",
-        "noryx.md",
-        ".noryx.md",
-        "NEXUS.md",
-        "nexus.md",
-        ".noryx.md",
-        "AGENTS.md",
-        "AGENT.md",
-        "CLAUDE.md",
-    ]
+    # Canonical list imported from nexus.project_files so that ProjectMemory
+    # and TrustStore can never diverge.  The old hardcoded list had a bug:
+    # it listed ".noryx.md" twice instead of ".nexus.md" for the sixth entry.
+    RULE_FILENAMES: tuple[str, ...] = PROJECT_RULE_FILENAMES
 
     def __init__(self, working_dir: str):
         self.working_dir = working_dir

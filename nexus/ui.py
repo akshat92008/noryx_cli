@@ -72,7 +72,7 @@ def print_banner():
         # Final state
         final_output = (
             frames[0] + f"\n[bold white]{welcome_text}[/]\n\n"
-            f"[dim]Run /help for commands. /status for setup info.[/]\n"
+            f"[dim]Run /help for commands. /run-status for setup info.[/]\n"
         )
         live.update(Align.center(Text.from_markup(final_output)))
     console.print()
@@ -508,7 +508,7 @@ def get_prompt(model_name: str) -> str:
         console.print()
         pwd = os.path.basename(os.getcwd()) or "workspace"
         console.print(
-            f" [bold {CYAN}]nexusai[/] [dim]•[/] [bold {PURPLE}]{model_name}[/] [dim]•[/] [bold {GREEN}]{pwd}[/]"
+            f" [bold {CYAN}]noryx[/] [dim]•[/] [bold {PURPLE}]{model_name}[/] [dim]•[/] [bold {GREEN}]{pwd}[/]"
         )
 
         # Use HTML formatting in prompt_toolkit for consistent cyan color
@@ -520,7 +520,7 @@ def get_prompt(model_name: str) -> str:
             console.print()
             pwd = os.path.basename(os.getcwd()) or "workspace"
             console.print(
-                f" [bold {CYAN}]nexusai[/] [dim]•[/] [bold {PURPLE}]{model_name}[/] [dim]•[/] [bold {GREEN}]{pwd}[/]"
+                f" [bold {CYAN}]noryx[/] [dim]•[/] [bold {PURPLE}]{model_name}[/] [dim]•[/] [bold {GREEN}]{pwd}[/]"
             )
             return console.input(f" [bold {CYAN}]❯ [/]")
         except (EOFError, KeyboardInterrupt):

@@ -68,7 +68,7 @@ from nexus.tools import (
     tool_get_project_structure,
     tool_git_status,
 )
-from nexus.trust import TrustStore
+from nexus.trust import TrustReader
 from nexus.user_memory import UserMemory
 from nexus.verification import CheckStatus, CheckType, VerificationEngine
 from nexus.verification_evidence import (
@@ -425,7 +425,10 @@ class Agent:
         # cannot overwrite each other's dynamic plugin/MCP/extension contracts.
         self._tool_capabilities: dict[str, ToolCapabilityDeclaration] = dict(TOOL_CAPABILITIES)
         self._external_tool_path_arguments: dict[str, tuple[str, ...]] = {}
-        self.trust = TrustStore(self.working_dir)
+        # TrustReader: read-only inspection of externalized trust state.
+        # The Agent must NEVER hold a TrustAuthority; approval is a user-facing
+        # operation that happens exclusively in the CLI approval code path.
+        self.trust = TrustReader(self.working_dir)
         self.policy = PolicyLoader(self.working_dir, is_trusted=self.trust.is_approved).load()
         self.extensions = ExtensionRegistry()
         self.extensions.discover()
@@ -959,7 +962,7 @@ class Agent:
                     ),
                 )
                 self._active_analysis["engineering_contract"] = self._engineering_contract.to_dict()
-            except (OSError, TypeError, ValueError) as exc:
+            except (OSError, TypeError, ValueError, RuntimeError) as exc:
                 logger.warning("Engineering Brain preparation degraded: %s", exc)
                 self._active_analysis["engineering_brain_warning"] = str(exc)
         self._run_history_start = len(self.history.changes)

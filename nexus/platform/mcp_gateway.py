@@ -11,7 +11,7 @@ from typing import Any
 from nexus.mcp.client import MCPClient, MCPConnection, MCPServerConfig
 from nexus.platform.audit import AuditAction, AuditLogger
 from nexus.platform.mcp_permissions import MCPPermissionLayer
-from nexus.trust import TrustStore
+from nexus.trust import TrustReader
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,10 @@ class MCPGateway:
         self._client: MCPClient | None = None
         self._permissions = MCPPermissionLayer(self.state_dir)
         self._audit = AuditLogger(self.state_dir.parent / "extensions")
-        self._trust = TrustStore(str(self.working_dir))
+        # TrustReader: read-only inspection of externalized trust state.
+        # MCPGateway gates server operations on trust but never issues approvals;
+        # those are user-facing operations in the CLI approval path.
+        self._trust = TrustReader(str(self.working_dir))
         self._load_registry()
         self._load_project_config()
 

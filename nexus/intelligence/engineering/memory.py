@@ -213,6 +213,16 @@ class EngineeringMemoryStore:
         decisive_files: list[str] | None = None,
         related_tests: list[str] | None = None,
     ) -> EngineeringTaskMemory:
+        path = self.path_for(task_id)
+        existing_sequence = 0
+        if path.is_file():
+            try:
+                current_data = json.loads(path.read_text(encoding="utf-8"))
+                current = EngineeringTaskMemory.from_dict(current_data, self.authenticator)
+                existing_sequence = current.sequence
+            except Exception:
+                existing_sequence = 0
+
         memory = EngineeringTaskMemory(
             task_id=task_id,
             objective=objective.strip(),
@@ -224,6 +234,7 @@ class EngineeringMemoryStore:
             non_goals=list(non_goals or []),
             decisive_files=list(decisive_files or []),
             related_tests=list(related_tests or []),
+            sequence=existing_sequence,
         )
         self.save(memory)
         return memory

@@ -206,11 +206,33 @@ class SandboxRunner:
         "SESSION",
         "PRIVATE",
     )
+    # Environment variables that disclose the location of the trust authority.
+    # These must NEVER be forwarded to model-controlled subprocesses regardless
+    # of their NORYX_* prefix — doing so would allow a subprocess to discover
+    # the trust store path and target it with out-of-band attacks.
+    TRUST_SENSITIVE_ENV_KEYS: frozenset[str] = frozenset(
+        {
+            "NORYX_HOME",
+            "NEXUS_HOME",
+            "NORYX_TRUST_DIR",
+            "NEXUS_TRUST_DIR",
+        }
+    )
 
-    def __init__(self, workspace: str | Path):
+    def __init__(self, workspace: str | Path, *, trust_dir: str | Path | None = None):
         self.workspace = Path(workspace).expanduser().resolve()
         if not self.workspace.is_dir():
             raise ValueError(f"Sandbox workspace does not exist: {self.workspace}")
+        if trust_dir is not None:
+            self.trust_dir: Path = Path(trust_dir).expanduser().resolve()
+        else:
+            # Derive from the same trust_store_dir() that TrustAuthority uses so
+            # the sandbox deny rules always match where approvals are actually stored.
+            try:
+                from nexus.trust import trust_store_dir as _tsd
+                self.trust_dir = _tsd()
+            except Exception:  # pragma: no cover — import failure should never block sandbox
+                self.trust_dir = Path.home() / ".noryx" / "trust"
 
     def backend(self) -> SandboxBackend:
         if self._backend_cache is not None:
@@ -556,6 +578,11 @@ class SandboxRunner:
         import sys
 
         workspace = str(self.workspace.resolve()).replace('"', '\\"')
+        # The trust authority directory must be denied access before any
+        # allow rules.  macOS SBPL evaluates rules in order — first match wins —
+        # so placing the deny here ensures it takes priority over both the
+        # global file-read-metadata allow and the workspace file-read* allow.
+        trust_dir = str(self.trust_dir.resolve()).replace('"', '\\"')
         read_roots = [
             workspace,
             "/System",
@@ -579,6 +606,13 @@ class SandboxRunner:
             "(deny default)",
             "(allow process*)",
             "(allow sysctl-read)",
+            # --- TRUST AUTHORITY ISOLATION -----------------------------------
+            # Explicit denials for the trust directory.  These MUST appear
+            # before any (allow file*) rules; first-match semantics in SBPL
+            # guarantee these denials take priority.
+            f'(deny file* (subpath "{trust_dir}"))',
+            f'(deny file-read-metadata (subpath "{trust_dir}"))',
+            # -----------------------------------------------------------------
             # Keep Mach IPC fail-closed.  Developer runtimes need a small set
             # of OS services; arbitrary global-name lookup would expose the
             # candidate to unrelated XPC/keychain/daemon surfaces.
@@ -590,6 +624,8 @@ class SandboxRunner:
             '  (global-name "com.apple.opendirectoryd.libinfo")',
             '  (global-name "com.apple.SystemConfiguration.configd"))',
             "(allow ipc-posix-shm)",
+            # file-read-metadata allow comes AFTER the trust deny so the trust
+            # directory is covered by the explicit denial above.
             "(allow file-read-metadata)",
             f"(allow file-read* {read_rules} "
             '(literal "/") '
@@ -675,6 +711,13 @@ class SandboxRunner:
                 return False
             path = Path(candidate).expanduser()
             resolved = path.resolve() if path.is_absolute() else (cwd / path).resolve(strict=False)
+            # --- TRUST AUTHORITY: always forbidden ----------------------------
+            # The trust store must be unreachable from model-generated commands
+            # regardless of backend.  This is defense-in-depth for the restricted
+            # fallback and a second layer for the native sandbox backends.
+            if _is_relative_to(resolved, self.trust_dir):
+                return False
+            # ------------------------------------------------------------------
             try:
                 resolved.relative_to(self.workspace)
                 return True
@@ -763,7 +806,14 @@ class SandboxRunner:
             key: value
             for key, value in os.environ.items()
             if key in self.SAFE_ENV_KEYS
-            or (key.startswith(("NORYX_", "NEXUS_")) and not self._is_sensitive_env_key(key))
+            or (
+                key.startswith(("NORYX_", "NEXUS_"))
+                and not self._is_sensitive_env_key(key)
+                # Never forward trust-authority location to model subprocesses.
+                # Knowing NORYX_HOME lets a subprocess target the trust store
+                # with out-of-band file operations even without in-process access.
+                and key not in self.TRUST_SENSITIVE_ENV_KEYS
+            )
         }
         allowed = {str(key).upper() for key in allowed_sensitive_keys}
         for key, value in additions.items():
