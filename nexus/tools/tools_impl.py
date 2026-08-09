@@ -1433,9 +1433,10 @@ def tool_edit_file(path: str, old_text: str, new_text: str) -> str:
         if p.stat().st_size > 2 * 1024 * 1024:
             return f"❌ File too large ({p.stat().st_size} bytes). Max edit size is 2MB."
 
-        import hashlib
         with open(p, "rb") as f:
             raw_bytes = f.read()
+            if b"\x00" in raw_bytes:
+                return f"❌ Cannot edit binary file: {p.name}"
             expected_hash = hashlib.sha256(raw_bytes).hexdigest()
             content = raw_bytes.decode("utf-8", errors="replace")
 
@@ -1510,6 +1511,8 @@ def tool_patch_file(path: str, start_line: int, end_line: int, new_content: str)
         import hashlib
         with open(p, "rb") as f:
             raw_bytes = f.read()
+            if b"\x00" in raw_bytes:
+                return f"❌ Cannot patch binary file: {p.name}"
             expected_hash = hashlib.sha256(raw_bytes).hexdigest()
             lines = raw_bytes.decode("utf-8", errors="replace").splitlines(keepends=True)
 
@@ -1591,10 +1594,14 @@ def tool_multi_edit(edits: list[dict]) -> str:
             return f"❌ Multi-edit aborted: edit #{index} path error — {exc}. No files changed."
         if not target.is_file():
             return f"❌ Multi-edit aborted: edit #{index} file not found: {path}. No files changed."
+        if target.stat().st_size > 2 * 1024 * 1024:
+            return f"❌ Multi-edit aborted: file {target.name} too large ({target.stat().st_size} bytes). Max edit size is 2MB."
 
         if target not in originals:
             try:
                 raw_bytes = target.read_bytes()
+                if b"\x00" in raw_bytes:
+                    return f"❌ Multi-edit aborted: cannot edit binary file {target.name}. No files changed."
                 originals[target] = raw_bytes.decode("utf-8")
                 originals_hash[target] = hashlib.sha256(raw_bytes).hexdigest()
                 edit_counts[target] = 0

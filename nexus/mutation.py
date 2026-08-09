@@ -31,7 +31,6 @@ is applied here via ``_FileLockRegistry``.
 from __future__ import annotations
 
 import difflib
-import fcntl
 import hashlib
 import logging
 import os
@@ -41,6 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nexus.events import EventBus, EventType
+from nexus.locking import lock_file_descriptor, unlock_file_descriptor
 
 logger = logging.getLogger(__name__)
 
@@ -143,10 +143,11 @@ class MutationController:
             # O_CREAT | O_WRONLY so we don't truncate; we just want the fd.
             try:
                 lock_fd = os.open(str(target), os.O_CREAT | os.O_WRONLY, 0o666)
-                fcntl.flock(lock_fd, fcntl.LOCK_EX)
+                if not lock_file_descriptor(lock_fd, exclusive=True):
+                    # Could not acquire OS lock, continue with threading lock only
+                    pass
             except (OSError, AttributeError):
-                # fcntl unavailable (Windows) or file can't be opened yet —
-                # continue with threading lock only.
+                # File can't be opened yet — continue with threading lock only.
                 if lock_fd is not None:
                     try:
                         os.close(lock_fd)
@@ -246,7 +247,7 @@ class MutationController:
         finally:
             if lock_fd is not None:
                 try:
-                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    unlock_file_descriptor(lock_fd)
                     os.close(lock_fd)
                 except OSError:
                     pass

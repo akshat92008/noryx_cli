@@ -70,6 +70,8 @@ def test_repository_integrity_check(tmp_path):
     
     with tool_context(tmp_path):
         history = get_history()
+        db_path = history._changes_file()
+        db_path.unlink(missing_ok=True)
         history.changes = []
         for i in range(1, 100):
             res = tool_write_file(str(target), f"write_{i}")
