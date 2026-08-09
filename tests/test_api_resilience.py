@@ -56,9 +56,11 @@ def test_client_timeout():
 def test_groq_only_configuration_is_supported(monkeypatch):
     """A Groq key is sufficient to start the hosted client."""
     for name in list(os.environ):
-        if name.startswith(("NVIDIA_API_KEY", "NVIDIA_FALLBACK_API_KEY")):
+        if any(k in name for k in ("NVIDIA", "OMNIROUTE", "OPENAI")):
             monkeypatch.delenv(name, raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("NORYX_OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("NEXUS_OPENROUTER_API_KEY", raising=False)
     monkeypatch.setenv("GROQ_API_KEY", "gsk-only")
     monkeypatch.setattr("nexus.api._load_env_file", lambda: None)
 
@@ -72,14 +74,7 @@ def test_groq_only_configuration_is_supported(monkeypatch):
 def test_openrouter_only_configuration_is_supported(monkeypatch):
     """An OpenRouter key is sufficient to start the hosted client."""
     for name in list(os.environ):
-        if name.startswith(
-            (
-                "NVIDIA_API_KEY",
-                "NVIDIA_FALLBACK_API_KEY",
-                "GROQ_API_KEY",
-                "GROQ_FALLBACK_API_KEY",
-            )
-        ):
+        if any(k in name for k in ("NVIDIA", "GROQ", "OMNIROUTE", "OPENAI")):
             monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-only")
     monkeypatch.setattr("nexus.api._load_env_file", lambda: None)
@@ -269,6 +264,9 @@ def test_hosted_client_owns_and_closes_cached_transports(monkeypatch):
             self.closed += 1
 
     monkeypatch.setattr("nexus.api.OpenAI", FakeTransport)
+    for name in list(os.environ):
+        if any(k in name for k in ("OMNIROUTE", "OPENAI")):
+            monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-lifecycle")
     monkeypatch.setenv("GROQ_API_KEY", "gsk-lifecycle")
     monkeypatch.setattr("nexus.api._load_env_file", lambda: None)

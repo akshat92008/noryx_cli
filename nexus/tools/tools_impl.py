@@ -1570,37 +1570,34 @@ def tool_multi_edit(edits: list[dict]) -> str:
 
     history = get_history()
     originals: dict[Path, str] = {}
+    originals_hash: dict[Path, str] = {}
     final_bodies: dict[Path, str] = {}
     edit_counts: dict[Path, int] = {}
 
-    # Build the complete transaction in memory. Multiple edits to one file are
-    # applied sequentially against the result of the previous edit.
+    import hashlib
+    import uuid
+    import os
+
+    # Build the complete transaction in memory.
     for index, edit in enumerate(edits, start=1):
         path = edit.get("path", "")
         old_text = edit.get("old_text", "")
         new_text = edit.get("new_text", "")
         if not isinstance(path, str) or not path:
             return f"❌ Multi-edit aborted: edit #{index} is missing 'path'. No files changed."
-        if not isinstance(old_text, str) or not isinstance(new_text, str):
-            return (
-                f"❌ Multi-edit aborted: edit #{index} old_text/new_text must be strings. "
-                "No files changed."
-            )
         try:
             target = _resolve_path(path)
         except (OSError, ValueError) as exc:
             return f"❌ Multi-edit aborted: edit #{index} path error — {exc}. No files changed."
         if not target.is_file():
             return f"❌ Multi-edit aborted: edit #{index} file not found: {path}. No files changed."
-        if target.stat().st_size > 2 * 1024 * 1024:
-            return f"❌ Multi-edit aborted: file {target.name} too large ({target.stat().st_size} bytes). Max edit size is 2MB."
 
         if target not in originals:
             try:
                 raw_bytes = target.read_bytes()
                 originals[target] = raw_bytes.decode("utf-8")
-                import hashlib
-                edit_counts[target] = 0 # Ensure key exists
+                originals_hash[target] = hashlib.sha256(raw_bytes).hexdigest()
+                edit_counts[target] = 0
             except (OSError, UnicodeError) as exc:
                 return f"❌ Multi-edit aborted: cannot read {path}: {exc}. No files changed."
             final_bodies[target] = originals[target]
@@ -1608,41 +1605,33 @@ def tool_multi_edit(edits: list[dict]) -> str:
         current = final_bodies[target]
         occurrences = current.count(old_text)
         if occurrences == 0:
-            preview = old_text.splitlines()[0][:80] if old_text else "<empty>"
-            return (
-                f"❌ Multi-edit aborted: edit #{index} old_text not found in {target.name} "
-                f"(starts with {preview!r}). No files changed."
-            )
+            return f"❌ Multi-edit aborted: edit #{index} old_text not found in {target.name}. No files changed."
         if occurrences > 1:
-            return (
-                f"❌ Multi-edit aborted: edit #{index} matched {occurrences} locations in "
-                f"{target.name}; provide more surrounding context. No files changed."
-            )
+            return f"❌ Multi-edit aborted: edit #{index} matched {occurrences} locations in {target.name}. No files changed."
+        
         final_bodies[target] = current.replace(old_text, new_text, 1)
         edit_counts[target] = edit_counts.get(target, 0) + 1
 
     snapshots: dict[Path, str | None] = {}
     temp_paths: dict[Path, Path] = {}
     committed: list[Path] = []
+    
     try:
+        # Prepare temp files
         for target, body in final_bodies.items():
             snapshots[target] = history.snapshot_before_write(str(target))
             temp = target.with_name(f".{target.name}.noryx-{uuid.uuid4().hex}.tmp")
-            with temp.open("w", encoding="utf-8", newline="") as handle:
-                handle.write(body)
-                handle.flush()
-                os.fsync(handle.fileno())
+            temp.write_text(body, encoding="utf-8")
             try:
                 os.chmod(temp, target.stat().st_mode)
             except OSError:
                 pass
             temp_paths[target] = temp
 
-        import hashlib
+        # Commit phase with TOCTOU check
         for target, temp in temp_paths.items():
-            # Check for stale read right before commit
             current_raw = target.read_bytes() if target.exists() else b""
-            if hashlib.sha256(current_raw).hexdigest() != hashlib.sha256(originals[target].encode("utf-8")).hexdigest():
+            if hashlib.sha256(current_raw).hexdigest() != originals_hash[target]:
                 raise OSError(f"Stale read detected: {target.name} was modified externally during transaction.")
             os.replace(temp, target)
             committed.append(target)
@@ -1651,14 +1640,18 @@ def tool_multi_edit(edits: list[dict]) -> str:
         rollback_errors: list[str] = []
         for target in reversed(committed):
             try:
-                restore = target.with_name(f".{target.name}.noryx-rollback-{uuid.uuid4().hex}.tmp")
-                with restore.open("w", encoding="utf-8", newline="") as handle:
-                    handle.write(originals[target])
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(restore, target)
+                # Verify we aren't overwriting someone else's mid-transaction change during rollback
+                current_raw = target.read_bytes() if target.exists() else b""
+                current_hash = hashlib.sha256(current_raw).hexdigest()
+                
+                # Only restore if it still looks like what we wrote
+                if current_hash == hashlib.sha256(final_bodies[target].encode("utf-8")).hexdigest():
+                    target.write_text(originals[target], encoding="utf-8")
+                else:
+                    rollback_errors.append(f"{target.name}: content changed since commit, skipping rollback")
             except OSError as rollback_exc:
-                rollback_errors.append(f"{target}: {rollback_exc}")
+                rollback_errors.append(f"{target.name}: {rollback_exc}")
+        
         detail = f" Rollback errors: {'; '.join(rollback_errors)}" if rollback_errors else ""
         return f"❌ Multi-edit transaction failed: {exc}.{detail}"
     finally:

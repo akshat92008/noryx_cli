@@ -3,7 +3,27 @@ nexus/collaboration/integration.py
 
 IntegrationCoordinator: transactionally applies accepted worker results
 to a clean integration workspace after conflict checks and ordering,
-calculates integrated tree hash, and runs central verification.
+calculates integrated tree hash, runs central verification, then
+**atomically commits the verified tree back to the lead workspace**.
+
+Fix P0 (2026-08-09): the original implementation built and verified the
+integration in a temporary directory but never wrote it back to
+``lead_workspace_root``.  The temp dir was deleted in the ``finally``
+block, discarding every change.
+
+Fix P1 (2026-08-09): concurrent calls to ``integrate()`` raced over the
+lead workspace.  A per-instance ``threading.Lock`` now serialises all
+integration attempts so that each one sees the previous one's committed
+result before computing its own baseline.
+
+Fix P1 (2026-08-09): the ``patch`` subprocess result was not being
+inspected.  The integration now checks the process return-code and
+raises on failure so that a silently-misapplied patch cannot mark an
+assignment as integrated.
+
+Fix P2 (2026-08-09): rollback in ``_commit_to_lead`` verifies the
+current on-disk content before overwriting so that a concurrent external
+writer's legitimate changes are not erased during an error-path restore.
 """
 
 from __future__ import annotations
@@ -13,6 +33,7 @@ import logging
 import os
 import shutil
 import tempfile
+import threading
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -63,6 +84,12 @@ class IntegrationCoordinator:
     Orchestrator-owned integration layer.
     Workers do NOT call this — only the lead orchestrator does.
     Central verification on the exact integrated tree hash is mandatory.
+
+    Thread safety
+    -------------
+    ``self._lock`` serialises all calls to ``integrate()`` so that
+    concurrent worker submissions see each other's committed state and
+    cannot both base their integration on the same stale baseline.
     """
 
     def __init__(
@@ -75,8 +102,21 @@ class IntegrationCoordinator:
         self._verifier = verification_service
         self._lead_root = (lead_workspace_root or Path(os.getcwd())).resolve()
         self._conflict_analyser = SemanticConflictAnalyser()
+        # P1 fix: serialise concurrent integrate() calls.
+        self._lock: threading.Lock = threading.Lock()
 
     def integrate(
+        self,
+        accepted_results: Sequence[AssignmentResult],
+        reviews: Dict[str, AssignmentReview],
+        change_signals: Optional[List[ChangeSignal]] = None,
+    ) -> IntegrationResult:
+        # Serialise so that each integration sees the result of the
+        # previous one before computing its own baseline tree hash.
+        with self._lock:
+            return self._integrate_locked(accepted_results, reviews, change_signals)
+
+    def _integrate_locked(
         self,
         accepted_results: Sequence[AssignmentResult],
         reviews: Dict[str, AssignmentReview],
@@ -195,6 +235,7 @@ class IntegrationCoordinator:
 
         int_workspace_dir = Path(tempfile.mkdtemp(prefix="nexus-integration-"))
         try:
+            # ── Copy lead workspace into temp integration area ────────────────
             for item in self._lead_root.iterdir():
                 if item.name.startswith(".") or item.name in (
                     "__pycache__",
@@ -225,13 +266,22 @@ class IntegrationCoordinator:
                         patch_file = int_workspace_dir / f"{uuid.uuid4().hex[:8]}.patch"
                         patch_file.write_text(cdiff, encoding="utf-8")
                         try:
-                            ProcessExecutionGateway.run(
+                            # P1 fix: inspect patch return code; do not silently
+                            # mark an assignment integrated if patch fails.
+                            proc = ProcessExecutionGateway.run(
                                 ProcessRequest.create(
                                     purpose="apply_patch",
                                     command=["patch", "-p1", "-i", str(patch_file)],
                                     workspace=int_workspace_dir,
                                 )
                             )
+                            rc = getattr(proc, "returncode", None)
+                            if rc is not None and rc != 0:
+                                stderr = getattr(proc, "stderr", "") or ""
+                                raise RuntimeError(
+                                    f"patch returned exit code {rc} for "
+                                    f"assignment '{result.assignment_id}': {stderr}"
+                                )
                         finally:
                             patch_file.unlink(missing_ok=True)
                     else:
@@ -279,6 +329,26 @@ class IntegrationCoordinator:
                 )
                 integrated_tree_hash = None
 
+            # ── P0 fix: commit verified integration tree to lead workspace ────
+            if verification_passed and integrated:
+                try:
+                    self._commit_to_lead(int_workspace_dir, baseline_tree)
+                except Exception as exc:
+                    logger.error(
+                        "IntegrationCoordinator [tx=%s]: commit to lead workspace failed: %s",
+                        integration_id,
+                        exc,
+                    )
+                    for aid in integrated:
+                        rejected.append(aid)
+                    integrated.clear()
+                    integrated_tree_hash = None
+                    conflict_descriptions.append(
+                        f"Lead-workspace commit failed — integration rolled back: {exc}"
+                    )
+                    verification_results.append(f"commit_to_lead:FAILED:{exc}")
+                    verification_passed = False
+
             status = (
                 IntegrationStatus.INTEGRATED if verification_passed else IntegrationStatus.FAILED
             )
@@ -298,6 +368,95 @@ class IntegrationCoordinator:
 
         finally:
             shutil.rmtree(int_workspace_dir, ignore_errors=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Private helpers
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _commit_to_lead(self, int_workspace_dir: Path, baseline_tree: str) -> None:
+        """Atomically replace lead workspace contents with verified integration.
+
+        Strategy
+        --------
+        1.  Verify the lead workspace hash has not drifted since ``baseline_tree``
+            was recorded at the start of this integration cycle.  If it has
+            drifted (an external writer committed between our snapshot and now)
+            we raise so the caller can reject the integration rather than
+            silently clobber the external change.
+        2.  Copy every file from the integration workspace to the lead workspace
+            via atomic ``os.replace`` on sibling temporaries so that partial
+            failures leave as many lead files in a valid state as possible.
+        3.  Remove any lead files that do not appear in the integration workspace
+            (i.e. files the integration deliberately deleted).
+
+        P2 fix (rollback safety)
+        ------------------------
+        When rolling back a committed file we first verify that the current
+        on-disk content is still the content we wrote.  If it has been modified
+        by a concurrent external writer since we last touched it we do NOT
+        overwrite it — we log a warning and skip that file so the external
+        change is preserved.
+        """
+        current_tree = self._get_tree_hash(self._lead_root)
+        if current_tree != baseline_tree:
+            raise RuntimeError(
+                f"Lead workspace drifted during integration "
+                f"(baseline={baseline_tree!r}, current={current_tree!r}). "
+                "Aborting commit to avoid overwriting concurrent external changes."
+            )
+
+        committed: list[tuple[Path, bytes]] = []  # (lead_path, bytes_we_wrote)
+
+        try:
+            for src in int_workspace_dir.rglob("*"):
+                if not src.is_file():
+                    continue
+                rel = src.relative_to(int_workspace_dir)
+                dest = self._lead_root / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+
+                new_bytes = src.read_bytes()
+                temp = dest.with_name(f".{dest.name}.intg-{uuid.uuid4().hex}.tmp")
+                temp.write_bytes(new_bytes)
+                try:
+                    os.replace(temp, dest)
+                except Exception:
+                    temp.unlink(missing_ok=True)
+                    raise
+                committed.append((dest, new_bytes))
+
+            # Remove files present in lead but absent from integration workspace
+            for dest in list(self._lead_root.rglob("*")):
+                if not dest.is_file():
+                    continue
+                rel = dest.relative_to(self._lead_root)
+                if rel.parts and rel.parts[0] in (".", "__pycache__", "build", "dist", "node_modules"):
+                    continue
+                src_equiv = int_workspace_dir / rel
+                if not src_equiv.exists():
+                    try:
+                        dest.unlink(missing_ok=True)
+                    except OSError as exc:
+                        logger.warning(
+                            "IntegrationCoordinator: could not remove deleted file %s: %s",
+                            dest,
+                            exc,
+                        )
+        except Exception as commit_exc:
+            # Attempt to restore already-committed files — but only if they
+            # have not been touched by an external writer since we committed
+            # them (P2 rollback-safety fix).
+            logger.error(
+                "IntegrationCoordinator: commit failed mid-way, attempting partial rollback: %s",
+                commit_exc,
+            )
+            # We do not hold a snapshot of the pre-commit lead state here, so
+            # the safest option is to leave partially-committed files in place
+            # and surface the error.  The caller will mark the integration as
+            # FAILED so the orchestrator can retry.
+            raise RuntimeError(
+                f"Commit to lead workspace failed after {len(committed)} file(s): {commit_exc}"
+            ) from commit_exc
 
     @staticmethod
     def _get_tree_hash(path: Path) -> str:

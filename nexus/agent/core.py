@@ -2188,6 +2188,31 @@ class Agent:
                 elif event.type == EventType.RUN_FAILED:
                     if live:
                         live.stop()
+                    error_msg = str(event.error)
+                    is_rate_limit = (
+                        "429" in error_msg.lower()
+                        or "rate" in error_msg.lower()
+                        or "resourceexhausted" in error_msg.lower()
+                        or "too many requests" in error_msg.lower()
+                    )
+                    if (
+                        (is_rate_limit or "Noryx AI Provider Failover Error" in error_msg)
+                        and self.enable_nova_fallback
+                        and self.local_intern_enabled
+                    ):
+                        if emit_ui:
+                            ui.print_warning(
+                                "Hosted providers are unavailable — using the explicitly enabled local Nova fallback."
+                            )
+                        if self.messages and self.messages[-1]["role"] == "user":
+                            self.messages.pop()
+                        if getattr(self.planner, "current_plan", None):
+                            step = getattr(self.planner.current_plan, "next_step", None)
+                            if step:
+                                self.planner.advance_step(
+                                    step.id, TaskStatus.COMPLETED, "Completed via local Nova fallback"
+                                )
+                        return self._run_nova_turn(user_input, emit_ui=emit_ui)
                     return f"❌ Run failed: {event.error}", accumulated_events
                 elif event.type == EventType.RUN_COMPLETED:
                     content = event.content

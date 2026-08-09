@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import signal
 import threading
 
 logger = logging.getLogger(__name__)
@@ -147,8 +148,69 @@ class RunLedger:
     def _set_degraded(self) -> None:
         if not self._degraded:
             self._degraded = True
+            # P3 fix: emit a structured WARNING (parseable by log aggregators)
+            # in addition to the stderr line so that silent degradation is
+            # detectable in production log pipelines.
+            logger.warning(
+                "NORYX_DEGRADED_PERSISTENCE: storage write failed; "
+                "session=%s run_dir=%s — recovery unavailable",
+                self.session_id,
+                self.session_dir,
+            )
             print("\n[!] WARNING: DEGRADED PERSISTENCE. Storage failed (e.g. Disk Full).", flush=True)
             print("[!] Noryx will continue in-memory, but recovery is no longer available.", flush=True)
+
+    # ── Cross-process run ownership (P2-b fix) ───────────────────────────────
+
+    def _acquire_run_lock(self, turn_dir: Path) -> None:
+        """Write a PID lock file into *turn_dir*.
+
+        Raises ``RuntimeError`` if another live process already owns this
+        turn directory so two concurrent ``noryx`` instances cannot both
+        commit mutations to the same session turn.
+
+        The lock is advisory only (relies on PID recycling being slow
+        relative to a Noryx run).  It is released by ``_release_run_lock``
+        when the turn ends.
+        """
+        lock_path = turn_dir / ".run.lock"
+        if lock_path.exists():
+            try:
+                existing_pid = int(lock_path.read_text(encoding="utf-8").strip())
+            except (OSError, ValueError):
+                existing_pid = None
+            if existing_pid is not None and existing_pid != os.getpid():
+                # Check whether the owning process is still alive.
+                try:
+                    os.kill(existing_pid, 0)  # signal 0 = existence check
+                    alive = True
+                except (ProcessLookupError, PermissionError):
+                    alive = False
+                if alive:
+                    raise RuntimeError(
+                        f"Run directory {turn_dir} is already owned by PID {existing_pid}. "
+                        "Two concurrent Noryx instances must not share a session turn."
+                    )
+                # Stale lock from a crashed process — remove it.
+                lock_path.unlink(missing_ok=True)
+        lock_path.write_text(str(os.getpid()), encoding="utf-8")
+        self._run_lock_path: Path | None = lock_path
+
+    def _release_run_lock(self) -> None:
+        """Remove the PID lock file if we own it."""
+        lock_path = getattr(self, "_run_lock_path", None)
+        if lock_path is None:
+            return
+        try:
+            if lock_path.exists():
+                content = lock_path.read_text(encoding="utf-8").strip()
+                if content == str(os.getpid()):
+                    lock_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        self._run_lock_path = None
+
+    # ─────────────────────────────────────────────────────────────────────────
 
     def begin(
         self,
@@ -170,6 +232,8 @@ class RunLedger:
             self.turn_id = f"turn-{turn_number:04d}"
             self.turn_dir = self.session_dir / self.turn_id
             self.turn_dir.mkdir(parents=True, exist_ok=False)
+            # P2-b fix: claim exclusive ownership of this turn directory.
+            self._acquire_run_lock(self.turn_dir)
             (self.turn_dir / "checkpoints").mkdir()
             (self.turn_dir / "patches").mkdir()
             (self.turn_dir / "tests").mkdir()
@@ -385,7 +449,9 @@ class RunLedger:
             },
             prefix="event",
         )
-        self._event_counter = max(self._event_counter, int(event_id.rsplit("-", 1)[-1]))
+        last_part = event_id.rsplit("-", 1)[-1]
+        if last_part.isdigit():
+            self._event_counter = max(self._event_counter, int(last_part))
         self._update_state(event_count=self._event_counter)
         return event_id
 
@@ -486,10 +552,14 @@ class RunLedger:
                     break
             session["updated_at"] = report["completed_at"]
             _atomic_write_json(self.session_path, session)
+
+        # P2-b fix: release the cross-process PID lock now that the turn is done.
+        self._release_run_lock()
         return report
 
     def mark_rolled_back(self, detail: str) -> None:
         """Change the active run status after a complete rollback."""
+        self._release_run_lock()
         self.append_event("rollback", status="verified", detail=detail)
         completed_at = _utc_now()
         self._update_state(
@@ -604,6 +674,13 @@ class RunLedger:
         prefix: str,
     ) -> str:
         if getattr(self, "_degraded", False):
+            # P3 fix: log at WARNING so log aggregators can detect silent
+            # degraded-mode record drops without scanning stderr.
+            logger.warning(
+                "NORYX_DEGRADED_PERSISTENCE: dropping %s record for session=%s",
+                prefix,
+                self.session_id,
+            )
             return f"{prefix}-DEGRADED"
             
         turn_dir = self._require_turn()
