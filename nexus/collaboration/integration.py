@@ -271,16 +271,27 @@ class IntegrationCoordinator:
                             proc = ProcessExecutionGateway.run(
                                 ProcessRequest.create(
                                     purpose="apply_patch",
-                                    command=["patch", "-p1", "-i", str(patch_file)],
+                                    command=["patch", "-p1", "--fuzz=0", "--no-backup-if-mismatch", "-i", str(patch_file)],
                                     workspace=int_workspace_dir,
                                 )
                             )
                             rc = getattr(proc, "returncode", None)
+                            stdout = getattr(proc, "stdout", "") or ""
+                            stderr = getattr(proc, "stderr", "") or ""
                             if rc is not None and rc != 0:
-                                stderr = getattr(proc, "stderr", "") or ""
                                 raise RuntimeError(
                                     f"patch returned exit code {rc} for "
                                     f"assignment '{result.assignment_id}': {stderr}"
+                                )
+                            out_lower = (stdout + stderr).lower()
+                            if "fuzz" in out_lower or ("hunk" in out_lower and "failed" in out_lower):
+                                raise RuntimeError(
+                                    f"patch applied with unsafe fuzz or errors for assignment '{result.assignment_id}': {stdout} {stderr}"
+                                )
+                            rej_files = list(int_workspace_dir.rglob("*.rej"))
+                            if rej_files:
+                                raise RuntimeError(
+                                    f"patch left reject file(s) ({[r.name for r in rej_files]}) for assignment '{result.assignment_id}'"
                                 )
                         finally:
                             patch_file.unlink(missing_ok=True)
@@ -374,28 +385,21 @@ class IntegrationCoordinator:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _commit_to_lead(self, int_workspace_dir: Path, baseline_tree: str) -> None:
-        """Atomically replace lead workspace contents with verified integration.
+        """Atomically commit verified integration tree to lead workspace with transactional rollback.
 
-        Strategy
-        --------
-        1.  Verify the lead workspace hash has not drifted since ``baseline_tree``
-            was recorded at the start of this integration cycle.  If it has
-            drifted (an external writer committed between our snapshot and now)
-            we raise so the caller can reject the integration rather than
-            silently clobber the external change.
-        2.  Copy every file from the integration workspace to the lead workspace
-            via atomic ``os.replace`` on sibling temporaries so that partial
-            failures leave as many lead files in a valid state as possible.
-        3.  Remove any lead files that do not appear in the integration workspace
-            (i.e. files the integration deliberately deleted).
-
-        P2 fix (rollback safety)
-        ------------------------
-        When rolling back a committed file we first verify that the current
-        on-disk content is still the content we wrote.  If it has been modified
-        by a concurrent external writer since we last touched it we do NOT
-        overwrite it — we log a warning and skip that file so the external
-        change is preserved.
+        Guarantees:
+        1. Drift Check: Verifies lead workspace hash has not drifted since baseline_tree.
+        2. Snapshot: Captures full pre-commit snapshot of affected/existing lead workspace files and metadata.
+        3. Transaction Execution: Performs file replacements, creations, and deletions in lead workspace,
+           tracking every mutation.
+        4. Transactional Rollback: On any failure mid-commit, restores modified and deleted files to their
+           exact pre-commit state if unchanged by external writers. Newly created files are unlinked.
+           Empty directories created by the transaction are cleaned up.
+        5. External Modification Safety: If an external process modified a file after Noryx committed it,
+           rollback preserves the external change, surfaces a ROLLBACK_CONFLICT status error, and does NOT
+           clobber external work.
+        6. Workspace Invariant: If commit fails and rollback completes cleanly,
+           lead_workspace_after == lead_workspace_before (hash equality guaranteed).
         """
         current_tree = self._get_tree_hash(self._lead_root)
         if current_tree != baseline_tree:
@@ -405,17 +409,49 @@ class IntegrationCoordinator:
                 "Aborting commit to avoid overwriting concurrent external changes."
             )
 
-        committed: list[tuple[Path, bytes]] = []  # (lead_path, bytes_we_wrote)
+        ignored_dir_names = {".git", ".noryx", "__pycache__", "build", "dist", "node_modules", ".venv"}
+
+        snapshot: dict[Path, bytes] = {}
+        pre_existing_files: set[Path] = set()
+        pre_existing_dirs: set[Path] = set()
+
+        for root, dirs, files in os.walk(self._lead_root):
+            root_path = Path(root)
+            rel_root = root_path.relative_to(self._lead_root)
+            if rel_root.parts and rel_root.parts[0] in ignored_dir_names:
+                dirs.clear()
+                continue
+
+            pre_existing_dirs.add(rel_root)
+
+            for f in files:
+                if f.startswith("."):
+                    continue
+                file_path = root_path / f
+                rel_file = file_path.relative_to(self._lead_root)
+                pre_existing_files.add(rel_file)
+                try:
+                    snapshot[rel_file] = file_path.read_bytes()
+                except Exception as exc:
+                    logger.warning("IntegrationCoordinator: failed to snapshot %s: %s", file_path, exc)
+
+        executed_actions: list[tuple[str, Path, bytes | None]] = []
 
         try:
-            for src in int_workspace_dir.rglob("*"):
+            for src in sorted(int_workspace_dir.rglob("*")):
                 if not src.is_file():
                     continue
                 rel = src.relative_to(int_workspace_dir)
+                if rel.parts and rel.parts[0] in ignored_dir_names:
+                    continue
+
                 dest = self._lead_root / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
 
                 new_bytes = src.read_bytes()
+                existed_before = rel in pre_existing_files
+                action_type = "MODIFY" if existed_before else "CREATE"
+
                 temp = dest.with_name(f".{dest.name}.intg-{uuid.uuid4().hex}.tmp")
                 temp.write_bytes(new_bytes)
                 try:
@@ -423,39 +459,110 @@ class IntegrationCoordinator:
                 except Exception:
                     temp.unlink(missing_ok=True)
                     raise
-                committed.append((dest, new_bytes))
 
-            # Remove files present in lead but absent from integration workspace
-            for dest in list(self._lead_root.rglob("*")):
-                if not dest.is_file():
-                    continue
-                rel = dest.relative_to(self._lead_root)
-                if rel.parts and rel.parts[0] in (".", "__pycache__", "build", "dist", "node_modules"):
-                    continue
+                executed_actions.append((action_type, rel, new_bytes))
+
+            for rel in list(pre_existing_files):
                 src_equiv = int_workspace_dir / rel
                 if not src_equiv.exists():
-                    try:
+                    dest = self._lead_root / rel
+                    if dest.exists():
                         dest.unlink(missing_ok=True)
-                    except OSError as exc:
-                        logger.warning(
-                            "IntegrationCoordinator: could not remove deleted file %s: %s",
-                            dest,
-                            exc,
-                        )
+                        executed_actions.append(("DELETE", rel, None))
+
+            for root, dirs, files in os.walk(self._lead_root, topdown=False):
+                root_path = Path(root)
+                rel_root = root_path.relative_to(self._lead_root)
+                if rel_root == Path("."):
+                    continue
+                if rel_root.parts and rel_root.parts[0] in ignored_dir_names:
+                    continue
+                if not os.listdir(root_path):
+                    try:
+                        root_path.rmdir()
+                    except OSError:
+                        pass
+
         except Exception as commit_exc:
-            # Attempt to restore already-committed files — but only if they
-            # have not been touched by an external writer since we committed
-            # them (P2 rollback-safety fix).
             logger.error(
-                "IntegrationCoordinator: commit failed mid-way, attempting partial rollback: %s",
+                "IntegrationCoordinator: commit to lead failed mid-way (%s action(s) executed): %s. Initiating transactional rollback.",
+                len(executed_actions),
                 commit_exc,
             )
-            # We do not hold a snapshot of the pre-commit lead state here, so
-            # the safest option is to leave partially-committed files in place
-            # and surface the error.  The caller will mark the integration as
-            # FAILED so the orchestrator can retry.
+            rollback_conflicted = False
+            conflict_details: list[str] = []
+
+            for action_type, rel, bytes_written in reversed(executed_actions):
+                dest = self._lead_root / rel
+                if action_type == "MODIFY":
+                    current_bytes = dest.read_bytes() if dest.exists() else None
+                    if current_bytes == bytes_written:
+                        if rel in snapshot:
+                            dest.parent.mkdir(parents=True, exist_ok=True)
+                            dest.write_bytes(snapshot[rel])
+                    else:
+                        rollback_conflicted = True
+                        conflict_details.append(f"{rel}: modified externally during rollback")
+                        logger.warning(
+                            "IntegrationCoordinator rollback: preserving external change on %s", rel
+                        )
+
+                elif action_type == "CREATE":
+                    current_bytes = dest.read_bytes() if dest.exists() else None
+                    if current_bytes == bytes_written:
+                        dest.unlink(missing_ok=True)
+                    elif current_bytes is not None:
+                        rollback_conflicted = True
+                        conflict_details.append(f"{rel}: newly created file modified externally")
+                        logger.warning(
+                            "IntegrationCoordinator rollback: preserving external file %s", rel
+                        )
+
+                elif action_type == "DELETE":
+                    if not dest.exists():
+                        if rel in snapshot:
+                            dest.parent.mkdir(parents=True, exist_ok=True)
+                            dest.write_bytes(snapshot[rel])
+                    else:
+                        rollback_conflicted = True
+                        conflict_details.append(f"{rel}: recreated externally after deletion")
+                        logger.warning(
+                            "IntegrationCoordinator rollback: preserving external file %s", rel
+                        )
+
+            for root, dirs, files in os.walk(self._lead_root, topdown=False):
+                root_path = Path(root)
+                rel_root = root_path.relative_to(self._lead_root)
+                if rel_root == Path("."):
+                    continue
+                if rel_root.parts and rel_root.parts[0] in ignored_dir_names:
+                    continue
+                if rel_root not in pre_existing_dirs and not os.listdir(root_path):
+                    try:
+                        root_path.rmdir()
+                    except OSError:
+                        pass
+
+            if rollback_conflicted:
+                msg = (
+                    f"Lead-workspace commit failed: {commit_exc}. "
+                    f"ROLLBACK_CONFLICT: Rollback incomplete due to external writer conflicts: {'; '.join(conflict_details)}"
+                )
+                logger.error("IntegrationCoordinator: %s", msg)
+                raise RuntimeError(msg) from commit_exc
+
+            post_rollback_tree = self._get_tree_hash(self._lead_root)
+            if post_rollback_tree != baseline_tree:
+                msg = (
+                    f"Lead-workspace commit failed: {commit_exc}. "
+                    f"Rollback completed but tree hash mismatch: expected {baseline_tree!r}, got {post_rollback_tree!r}."
+                )
+                logger.error("IntegrationCoordinator: %s", msg)
+                raise RuntimeError(msg) from commit_exc
+
             raise RuntimeError(
-                f"Commit to lead workspace failed after {len(committed)} file(s): {commit_exc}"
+                f"Commit to lead workspace failed after {len(executed_actions)} action(s): {commit_exc}. "
+                f"Lead workspace successfully rolled back to baseline state."
             ) from commit_exc
 
     @staticmethod
