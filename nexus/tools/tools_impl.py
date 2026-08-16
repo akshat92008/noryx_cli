@@ -58,7 +58,12 @@ def get_history():
     if history is None:
         from nexus.history import FileHistory
 
-        return FileHistory()
+        # Standalone/direct tool calls still need one stable history object for
+        # the lifetime of the current context.  Creating a new timestamp-based
+        # history on every call could split one mutation sequence at a second
+        # boundary and lose rollback/undo visibility.
+        history = FileHistory(session_id=f"standalone_{uuid.uuid4().hex}")
+        _tool_history.set(history)
     return history
 
 
@@ -3040,18 +3045,47 @@ def execute_tool(name: str, arguments: dict, policy_engine=None) -> ToolResult:
     """
     arguments = normalize_tool_arguments(name, arguments)
 
-    # PolicyEngine guard (P1-11)
-    if policy_engine is not None:
+    # PolicyEngine guard (P1-11).  Tool names and security actions are not
+    # interchangeable: evaluate only security-relevant tools through an
+    # explicit mapping.  The higher ToolExecutionController remains
+    # authoritative for human approval and command-risk policy.
+    policy_actions = {
+        "read_file": "read_file",
+        "file_info": "read_file",
+        "write_file": "write_file",
+        "edit_file": "write_file",
+        "patch_file": "write_file",
+        "multi_edit": "write_file",
+        "run_command": "execute_command",
+        "run_process": "execute_command",
+        "process_run": "execute_command",
+        "web_fetch": "open_network_connection",
+        "web_search": "open_network_connection",
+        "api_check": "open_network_connection",
+        "browser_check": "open_network_connection",
+    }
+    policy_action = policy_actions.get(name)
+    if policy_engine is not None and policy_action is not None:
         try:
-            decision = policy_engine.evaluate(action=name, target=str(arguments))
-            if not decision.is_allowed():
-                return ToolResult(
-                    status=ToolStatus.BLOCKED,
-                    output=f"❌ Blocked by security policy: {decision.reason}",
-                    error=decision.reason,
-                )
-        except Exception:
-            pass  # Policy engine errors must never block legitimate execution
+            decision = policy_engine.evaluate(action=policy_action, target=str(arguments))
+        except Exception as exc:
+            # A broken authorization boundary must fail closed for every tool
+            # that is actually governed by the policy engine.
+            return ToolResult(
+                status=ToolStatus.BLOCKED,
+                output=f"❌ Blocked: security policy evaluation failed: {exc}",
+                error=f"security policy evaluation failed: {exc}",
+            )
+        if not decision.is_allowed():
+            reasons = getattr(decision, "reasons", None) or [
+                f"policy outcome: {getattr(getattr(decision, 'outcome', None), 'value', 'denied')}"
+            ]
+            reason = "; ".join(str(item) for item in reasons)
+            return ToolResult(
+                status=ToolStatus.BLOCKED,
+                output=f"❌ Blocked by security policy: {reason}",
+                error=reason,
+            )
 
     tool_def = registry.get(name)
     if not tool_def:

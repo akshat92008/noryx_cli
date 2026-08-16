@@ -13,7 +13,9 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Iterable
 
-_PATH = r"(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.(?:py|pyi|js|jsx|mjs|cjs|ts|tsx|go|rs|java|kt|kts|rb|php|cs|cpp|c|h|hpp|json|ya?ml|toml|md|sql|sh|css|html|xml|graphql|prisma)"
+from nexus.path_grammar import PATH_PATTERN, extract_repository_paths
+
+_PATH = PATH_PATTERN
 
 
 class ConstraintKind(str, Enum):
@@ -124,7 +126,8 @@ class ConstraintCompiler:
     _NEGATIVE_PATTERNS = (
         re.compile(
             r"\b(?:without|do\s+not|don't|dont|never|must\s+not|should\s+not|avoid)\s+"
-            r"(?:changing|change|modifying|modify|editing|edit|touching|touch|altering|alter|rewriting|rewrite|updating|update)\s+"
+            r"(?:changing|change|modifying|modify|editing|edit|touching|touch|altering|alter|"
+            r"rewriting|rewrite|updating|update|writing|write|creating|create|deleting|delete)\s+"
             r"(?P<target>[^;\n]+)",
             re.IGNORECASE,
         ),
@@ -172,6 +175,18 @@ class ConstraintCompiler:
         text = objective.strip()
         lowered = text.lower()
 
+        # Global no-write clauses are executable policy, not merely planning
+        # prose.  A wildcard FORBID_FILE_WRITE blocks every workspace path.
+        if re.search(
+            r"\b(?:do\s+not|don't|dont|never|without|avoid)\s+"
+            r"(?:writing|write|creating|create|editing|edit|modifying|modify|changing|change|"
+            r"touching|touch|altering|alter|rewriting|rewrite|updating|update|deleting|delete)\b"
+            r"[^.;\n]*\b(?:any\s+)?files?\b",
+            text,
+            re.IGNORECASE,
+        ):
+            add(ConstraintKind.FORBID_FILE_WRITE, "do not write files", "**")
+
         if re.search(
             r"\b(?:no|without|do\s+not\s+add|don't\s+add|avoid(?:\s+adding)?)\s+(?:new|additional)?\s*dependenc",
             lowered,
@@ -203,13 +218,15 @@ class ConstraintCompiler:
                     match.groupdict().get("target") or match.groupdict().get("value") or ""
                 ).strip()
                 source = match.group(0).strip()
-                paths = re.findall(_PATH, target, flags=re.IGNORECASE)
+                paths = extract_repository_paths(target)
                 if paths:
                     for path in paths:
                         add(ConstraintKind.FORBID_FILE_WRITE, source, path)
                     continue
                 normalized = target.lower().strip(" `\"'")
-                if "schema" in normalized:
+                if normalized in {"file", "files", "any file", "any files", "all files"}:
+                    add(ConstraintKind.FORBID_FILE_WRITE, source, "**")
+                elif "schema" in normalized:
                     add(ConstraintKind.FORBID_SCHEMA_CHANGE, source)
                 elif "dependenc" in normalized:
                     add(ConstraintKind.FORBID_NEW_DEPENDENCY, source)

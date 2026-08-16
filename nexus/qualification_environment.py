@@ -11,7 +11,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 compatibility
+    import tomli as tomllib
 
 try:
     from packaging.requirements import Requirement
@@ -157,12 +160,6 @@ def qualify_environment(root: str | Path) -> EnvironmentQualification:
     return EnvironmentQualification(
         python=platform.python_version(),
         executable=sys.executable,
-        # platform.platform() internally calls platform.architecture() which
-        # invokes the file(1) command and then calls str.decode() on its output.
-        # On Python 3.13+ subprocess output is already str (not bytes) when
-        # text=True, so the decode() call raises AttributeError.  Use a safe
-        # alternative that provides equivalent information without the broken
-        # code path.
         platform=f"{sys.platform}/{platform.machine()}/{platform.python_implementation()}",
         dependencies=tuple(checks),
         pip_check_passed=pip_check_passed,

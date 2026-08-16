@@ -1271,15 +1271,32 @@ class ToolExecutionController:
             except (OSError, TypeError, ValueError):
                 logger.debug("Engineering verification tracking failed")
 
-    def _apply_execution_isolation(self, name: str, args: dict) -> None:
-        """Bind command execution to the agent's explicit isolation capability."""
+    def _apply_execution_isolation(
+        self,
+        name: str,
+        args: dict,
+        *,
+        user_confirmed: bool = False,
+    ) -> None:
+        """Bind command execution to the explicit isolation capability.
+
+        Strong modes require kernel isolation by default.  Trusted-host
+        execution is available only when the Agent was constructed with the
+        explicit ``allow_unisolated_host_process=True`` capability.  If the
+        active mode itself requires OS isolation, the exact operation must also
+        have been explicitly confirmed by the user before that requirement may
+        be overridden.  Modes that already opt out of mandatory isolation do
+        not need a second confirmation gate.
+        """
         if name not in {"run_command", "run_process", "process_run"}:
             return
-        require_isolation = bool(self._agent.mode_policy.require_os_isolation)
+
+        capability = bool(getattr(self._agent, "allow_unisolated_host_process", False))
+        mode_requires_isolation = bool(self._agent.mode_policy.require_os_isolation)
+        trusted_host = capability and (bool(user_confirmed) or not mode_requires_isolation)
+        require_isolation = mode_requires_isolation and not trusted_host
         args["require_os_isolation"] = require_isolation
-        args["allow_unisolated_host_process"] = not require_isolation and bool(
-            getattr(self._agent, "allow_unisolated_host_process", False)
-        )
+        args["allow_unisolated_host_process"] = trusted_host
 
     def _assess_command_policy(
         self, name: str, args: dict, command: str
@@ -1614,7 +1631,7 @@ class ToolExecutionController:
         # A safe-looking command is not a containment boundary. Production
         # presets require kernel-backed isolation; trusted local qualification
         # must opt into host execution as a separate capability.
-        self._apply_execution_isolation(name, args)
+        self._apply_execution_isolation(name, args, user_confirmed=_user_confirmed)
 
         # ── 5. Execute
         before_snapshot, command_transaction_id, journal_error = self._begin_command_transaction(

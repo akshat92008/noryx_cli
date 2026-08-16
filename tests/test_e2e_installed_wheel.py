@@ -39,6 +39,8 @@ def _noryx(*args: str, env: dict | None = None) -> subprocess.CompletedProcess:
         [sys.executable, "-m", "noryx", *args],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=30,
         env=base_env,
     )
@@ -234,6 +236,8 @@ def test_installed_no_credentials_exits_nonzero():
         [sys.executable, "-m", "noryx", "write hello world"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=15,
         env=clean_env,
     )

@@ -17,6 +17,14 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+
+from nexus.path_grammar import extract_repository_paths
+from nexus.semantics import (
+    Action,
+    RequestSemantics,
+    SideEffectPolicy,
+    compile_request_semantics,
+)
 from typing import Any
 
 from nexus.paths import nexus_home
@@ -73,10 +81,44 @@ class TaskType(str, Enum):
     OPERATIONAL = "operational"
 
 
-def get_task_type(intent: IntentType) -> TaskType:
-    if intent in (IntentType.EXPLAIN, IntentType.REVIEW, IntentType.SEARCH, IntentType.CHAT):
+def get_task_type(
+    intent: IntentType,
+    semantics: RequestSemantics | dict | None = None,
+) -> TaskType:
+    """Return the execution boundary for a request.
+
+    ``UNKNOWN`` is deliberately read-only unless deterministic semantics prove
+    that the user requested a side effect.  Ambiguity must never escalate into
+    mutation authority.
+    """
+    compiled = (
+        RequestSemantics.from_dict(semantics)
+        if isinstance(semantics, dict)
+        else semantics
+    )
+    if compiled is not None:
+        if compiled.side_effect_policy in {
+            SideEffectPolicy.READ_ONLY,
+            SideEffectPolicy.NO_FILE_WRITE,
+        }:
+            return TaskType.READ_ONLY
+        if compiled.side_effect_policy in {
+            SideEffectPolicy.REQUIRE_CONFIRMATION,
+            SideEffectPolicy.ALLOW_OPERATION,
+        }:
+            return TaskType.OPERATIONAL
+        if compiled.side_effect_policy == SideEffectPolicy.ALLOW_FILE_WRITE:
+            return TaskType.MUTATION
+
+    if intent in (
+        IntentType.EXPLAIN,
+        IntentType.REVIEW,
+        IntentType.SEARCH,
+        IntentType.CHAT,
+        IntentType.UNKNOWN,
+    ):
         return TaskType.READ_ONLY
-    elif intent in (IntentType.DEPLOY, IntentType.CONFIGURE):
+    if intent in (IntentType.DEPLOY, IntentType.CONFIGURE):
         return TaskType.OPERATIONAL
     return TaskType.MUTATION
 
@@ -368,7 +410,22 @@ _PRIMARY_INTENT_PATTERNS: tuple[tuple[IntentType, str], ...] = (
 
 
 def classify_intent(user_input: str) -> IntentType:
-    """Classify the user's intent based on keyword patterns."""
+    """Classify high-level intent after deterministic semantic parsing."""
+    semantics = compile_request_semantics(user_input)
+    if semantics.action in {Action.RESPOND, Action.CALCULATE, Action.TRANSFORM, Action.MEMORY_READ}:
+        return IntentType.CHAT
+    if semantics.action == Action.READ_FILE:
+        return IntentType.EXPLAIN
+    if semantics.action in {Action.SEARCH_REPO, Action.BROWSER_READ, Action.SCREENSHOT}:
+        return IntentType.SEARCH
+    # Explicit read-only/no-write semantics are authoritative over mutation
+    # keywords appearing inside a negated clause.
+    if semantics.side_effect_policy in {SideEffectPolicy.READ_ONLY, SideEffectPolicy.NO_FILE_WRITE}:
+        if re.search(r"\b(?:explain|describe|what does|how does)\b", user_input, re.I):
+            return IntentType.EXPLAIN
+        if re.search(r"\b(?:find|search|locate|tell me whether|tell me if|inspect|read)\b", user_input, re.I):
+            return IntentType.SEARCH
+
     scores: dict[IntentType, int] = {}
     text = user_input.lower()
 
@@ -722,16 +779,20 @@ class PlanningEngine:
         Returns:
             dict with: intent, difficulty, plan_type, skills_needed
         """
+        semantics = compile_request_semantics(user_input)
         intent = classify_intent(user_input)
         difficulty = estimate_difficulty(user_input, intent)
         plan_type = should_plan(difficulty, intent, user_input)
         skills = detect_skills_needed(user_input)
+        task_type = get_task_type(intent, semantics)
 
         return {
             "intent": intent,
             "difficulty": difficulty,
             "plan_type": plan_type,
             "skills_needed": skills,
+            "semantics": semantics.to_dict(),
+            "task_type": task_type,
         }
 
     def create_canonical_bundle(self, goal: str, repo_summary: dict | None = None) -> dict:
@@ -1487,25 +1548,8 @@ class PlanningEngine:
 
     @staticmethod
     def _extract_permitted_files(goal: str) -> list[str]:
-        """Extract explicit repository paths without treating framework names as files."""
-        candidates = re.findall(
-            r"(?:^|\s|`|'|\")([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\.[A-Za-z0-9]{1,8})"
-            r"(?=$|\s|`|'|\"|[),:;])",
-            goal,
-        )
-        technology_names = {
-            "next.js",
-            "node.js",
-            "react.js",
-            "vue.js",
-            "angular.js",
-            "three.js",
-        }
-        return list(
-            dict.fromkeys(
-                item.lstrip("./") for item in candidates if item.lower() not in technology_names
-            )
-        )
+        """Extract explicit repository paths through the canonical grammar."""
+        return extract_repository_paths(goal)
 
     @staticmethod
     def _step_risk(step: PlanStep, intent: IntentType) -> str:

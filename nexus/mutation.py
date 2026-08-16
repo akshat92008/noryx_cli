@@ -76,9 +76,8 @@ class MutationController:
         self.workspace = Path(workspace).expanduser().resolve()
 
     def _resolve_and_verify(self, path: str | Path) -> Path:
-        target = Path(path).expanduser().resolve()
-        if not target.is_absolute():
-            target = (self.workspace / path).resolve()
+        raw = Path(path).expanduser()
+        target = raw.resolve() if raw.is_absolute() else (self.workspace / raw).resolve()
         try:
             target.relative_to(self.workspace)
         except ValueError as exc:
