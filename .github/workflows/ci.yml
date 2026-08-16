@@ -9,28 +9,17 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            python: "3.10"
-          - os: ubuntu-latest
-            python: "3.13"
-          - os: macos-latest
-            python: "3.12"
-          - os: windows-latest
-            python: "3.12"
-    runs-on: ${{ matrix.os }}
+  full-suite:
+    name: full suite (ubuntu, py3.12)
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: "3.12"
           cache: pip
-      - name: Install
+      - name: Install pinned qualification environment
         run: python -m pip install -c release-constraints.txt -e '.[dev]'
       - name: Verify dependency contract
         run: |
@@ -47,19 +36,68 @@ jobs:
           nexus/path_grammar.py
           nexus/semantics.py
           nexus/qualification_environment.py
+          nexus/intelligence/engineering/integrity.py
           tests/test_locking.py
       - name: Truth-integrity and installed CLI boundaries
         run: >-
-          python -m pytest -q
+          python -m pytest -q -p no:randomly
           tests/test_truth_integrity_p0.py
           tests/test_offline_reliability_benchmark.py
           tests/test_e2e_installed_wheel.py
           tests/test_sandbox_stress.py
-      - name: Full deterministic suite
+      - name: Complete deterministic test suite
+        env:
+          NEXUS_STATE_HMAC_KEY: ci-full-suite
+          NEXUS_DISABLE_NETWORK: "1"
+          NEXUS_OFFLINE: "1"
+        run: python -m pytest -q -p no:randomly
+      - name: Build distributable artifacts
+        run: python -m build
+
+  platform-smoke:
+    name: smoke (${{ matrix.os }}, py${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.10"
+          - os: ubuntu-latest
+            python: "3.13"
+          - os: macos-latest
+            python: "3.12"
+          - os: windows-latest
+            python: "3.12"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install pinned qualification environment
+        run: python -m pip install -c release-constraints.txt -e '.[dev]'
+      - name: Verify dependency contract
+        run: |
+          python -m pip check
+          python -c "from nexus.qualification_environment import qualify_environment; report = qualify_environment('.'); assert report.passed, report.to_dict()"
+      - name: Compile and architecture gate
+        run: |
+          python -m compileall -q nexus tests scripts
+          python -m nexus architecture check
+      - name: Cross-platform launch smoke
         env:
           NEXUS_STATE_HMAC_KEY: ci-${{ matrix.os }}-${{ matrix.python }}
           NEXUS_DISABLE_NETWORK: "1"
           NEXUS_OFFLINE: "1"
-        run: python -m pytest -q
+        run: >-
+          python -m pytest -q -p no:randomly
+          tests/test_truth_integrity_p0.py
+          tests/test_e2e_installed_wheel.py
+          tests/test_sandbox_stress.py
+          tests/test_request_semantics_rc3.py
+          tests/test_locking.py
+          tests/test_mutation_scope_rc1.py
       - name: Build distributable artifacts
         run: python -m build
