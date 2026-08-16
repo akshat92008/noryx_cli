@@ -1,5 +1,5 @@
-# Direct runtime and release-qualification constraints for Noryx CLI 3.8.4.
-# CI still runs `pip check` and validates these against pyproject.toml.
+# Direct runtime and release-qualification constraints for Noryx CLI 3.8.5.
+# CI runs `pip check` and validates these pins against pyproject.toml.
 openai==2.53.0
 rich==15.0.0
 prompt_toolkit==3.0.53
@@ -8,6 +8,7 @@ starlette==0.52.1
 uvicorn==0.52.1
 websockets==16.1.1
 httpx==0.28.1
+tomli==2.4.1; python_version < "3.11"
 
 # Release/dev qualification tooling.
 build==1.5.0
@@ -20,3 +21,4 @@ ruff==0.16.2
 setuptools==83.0.0
 wheel==0.47.0
 packaging==26.3
+psutil==7.2.2
