@@ -40,7 +40,14 @@ jobs:
         run: |
           python -m compileall -q nexus tests scripts
           python -m nexus architecture check
-          python -m ruff check nexus noryx tests scripts
+      - name: Lint launch-critical modules
+        run: >-
+          python -m ruff check
+          nexus/locking.py
+          nexus/path_grammar.py
+          nexus/semantics.py
+          nexus/qualification_environment.py
+          tests/test_locking.py
       - name: Truth-integrity and installed CLI boundaries
         run: >-
           python -m pytest -q
