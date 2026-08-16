@@ -35,15 +35,12 @@ jobs:
       - name: Verify dependency contract
         run: |
           python -m pip check
-          python - <<'PY'
-          from nexus.qualification_environment import qualify_environment
-          report = qualify_environment('.')
-          assert report.passed, report.to_dict()
-          PY
+          python -c "from nexus.qualification_environment import qualify_environment; report = qualify_environment('.'); assert report.passed, report.to_dict()"
       - name: Compile and architecture gate
         run: |
           python -m compileall -q nexus tests scripts
           python -m nexus architecture check
+          python -m ruff check nexus noryx tests scripts
       - name: Truth-integrity and installed CLI boundaries
         run: >-
           python -m pytest -q
@@ -57,3 +54,5 @@ jobs:
           NEXUS_DISABLE_NETWORK: "1"
           NEXUS_OFFLINE: "1"
         run: python -m pytest -q
+      - name: Build distributable artifacts
+        run: python -m build
