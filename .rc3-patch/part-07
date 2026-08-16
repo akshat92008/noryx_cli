@@ -1,0 +1,204 @@
+boundary must fail closed for every tool
++            # that is actually governed by the policy engine.
++            return ToolResult(
++                status=ToolStatus.BLOCKED,
++                output=f"❌ Blocked: security policy evaluation failed: {exc}",
++                error=f"security policy evaluation failed: {exc}",
++            )
++        if not decision.is_allowed():
++            reasons = getattr(decision, "reasons", None) or [
++                f"policy outcome: {getattr(getattr(decision, 'outcome', None), 'value', 'denied')}"
++            ]
++            reason = "; ".join(str(item) for item in reasons)
++            return ToolResult(
++                status=ToolStatus.BLOCKED,
++                output=f"❌ Blocked by security policy: {reason}",
++                error=reason,
++            )
+ 
+     tool_def = registry.get(name)
+     if not tool_def:
+diff --git a/pyproject.toml b/pyproject.toml
+index 0a7740b..0647246 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -12,7 +12,7 @@ license = "MIT"
+ authors = [{name = "Akshat"}]
+ keywords = ["ai", "coding-agent", "cli", "verification", "ollama"]
+ classifiers = [
+-    "Development Status :: 5 - Production/Stable",
++    "Development Status :: 4 - Beta",
+     "Environment :: Console",
+     "Intended Audience :: Developers",
+     "Operating System :: POSIX :: Linux",
+diff --git a/tests/security_adversarial/test_phase3_sandbox_stress.py b/tests/security_adversarial/test_phase3_sandbox_stress.py
+index cc4dc69..56f6841 100644
+--- a/tests/security_adversarial/test_phase3_sandbox_stress.py
++++ b/tests/security_adversarial/test_phase3_sandbox_stress.py
+@@ -3,6 +3,7 @@ import pytest
+ import time
+ import os
+ import signal
++import sys
+ from pathlib import Path
+ from nexus.sandbox import SandboxRunner, CommandSpec
+ 
+@@ -61,7 +62,7 @@ async def test_sandbox_stdout_saturation(tmp_path):
+     
+     def run_dd():
+         spec = CommandSpec.create(
+-            argv=["dd", "if=/dev/zero", "bs=1m", "count=10"], # 10MB of null bytes
++            argv=[sys.executable, "-c", "import sys; sys.stdout.write('x' * 10_000_000)"], # portable 10MB stdout
+             cwd=tmp_path,
+             max_output_bytes=100_000, # Max 100KB allowed
+             allow_unisolated_host_process=True,
+diff --git a/tests/security_adversarial/test_phase5_concurrent_runs.py b/tests/security_adversarial/test_phase5_concurrent_runs.py
+index d9a48d9..83d7b98 100644
+--- a/tests/security_adversarial/test_phase5_concurrent_runs.py
++++ b/tests/security_adversarial/test_phase5_concurrent_runs.py
+@@ -15,47 +15,42 @@ def mock_chat_sync_slow(*args, **kwargs):
+     return mock_resp
+ 
+ def test_prevent_concurrent_runs(tmp_path, monkeypatch):
++    """One Agent instance must reject overlapping turns deterministically."""
++    from types import SimpleNamespace
++    from nexus.pipeline import ExecutionPipeline
++
+     monkeypatch.setenv("NORYX_HOME", str(tmp_path / "noryx_home"))
+-    
++
++    def slow_pipeline_run(self, *_args, **_kwargs):
++        time.sleep(0.5)
++        return SimpleNamespace(response="All done!", events=[])
++
++    monkeypatch.setattr(ExecutionPipeline, "run", slow_pipeline_run)
+     agent = Agent(api_key="test", model_key="dummy", working_dir=str(tmp_path))
+-    agent.client.chat_sync = mock_chat_sync_slow
+-    
++
+     result1 = []
+     result2 = []
+-    
++
+     def run_1():
+         try:
+-            res = agent.run_non_interactive("task 1")
+-            result1.append(res)
+-        except Exception as e:
+-            result1.append(e)
++            result1.append(agent.run_non_interactive("task 1"))
++        except Exception as exc:
++            result1.append(exc)
+ 
+     def run_2():
+         try:
+-            res = agent.run_non_interactive("task 2")
+-            result2.append(res)
+-        except Exception as e:
+-            result2.append(e)
++            result2.append(agent.run_non_interactive("task 2"))
++        except Exception as exc:
++            result2.append(exc)
+ 
+     t1 = threading.Thread(target=run_1)
+     t2 = threading.Thread(target=run_2)
+-    
+     t1.start()
+-    time.sleep(0.1) # Let t1 enter RUNNING state
++    time.sleep(0.1)
+     t2.start()
+-    
+     t1.join()
+     t2.join()
+-    
+-    # One of them should have failed or been rejected, because we cannot run twice concurrently on the same agent instance!
+-    # Or, the state machine should detect "already running".
+-    # We will print the results to see if they both ran successfully, which would be a bug.
+-    
+-    if isinstance(result1[0], Exception):
+-        print(f"Run 1 failed: {result1[0]}")
+-    if isinstance(result2[0], Exception):
+-        print(f"Run 2 failed: {result2[0]}")
+-    
+-    # Assertion depends on what we expect. Let's just run and see.
+-    # We expect one to raise a ValueError "already running" or similar.
+-    assert isinstance(result2[0], Exception) or isinstance(result1[0], Exception)
++
++    rejected = [item for item in (*result1, *result2) if isinstance(item, Exception)]
++    assert len(rejected) == 1
++    assert "already running" in str(rejected[0]).lower()
+diff --git a/mnt/data/noryx_work/noryx_cli-main/tests/test_locking.py b/tests/test_locking.py
+new file mode 100644
+index 0000000..4139b16
+--- /dev/null
++++ b/tests/test_locking.py
+@@ -0,0 +1,28 @@
++import os
++
++from nexus.locking import lock_file_descriptor, unlock_file_descriptor
++from nexus.mutation import MutationController
++
++
++def test_locking_helpers_lock_and_unlock_descriptor(tmp_path):
++    path = tmp_path / "lock-target.txt"
++    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
++    try:
++        assert lock_file_descriptor(fd, exclusive=True, blocking=False) is True
++        unlock_file_descriptor(fd)
++    finally:
++        os.close(fd)
++
++
++def test_relative_mutation_path_is_resolved_against_workspace(tmp_path, monkeypatch):
++    workspace = tmp_path / "workspace"
++    elsewhere = tmp_path / "elsewhere"
++    workspace.mkdir()
++    elsewhere.mkdir()
++    monkeypatch.chdir(elsewhere)
++
++    result = MutationController(workspace).write_file("nested/result.txt", "ok")
++
++    assert result.success is True
++    assert (workspace / "nested" / "result.txt").read_text(encoding="utf-8") == "ok"
++    assert not (elsewhere / "nested" / "result.txt").exists()
+diff --git a/tests/test_mutation_scope_rc1.py b/tests/test_mutation_scope_rc1.py
+index 0b64f9a..46e60b0 100644
+--- a/tests/test_mutation_scope_rc1.py
++++ b/tests/test_mutation_scope_rc1.py
+@@ -108,8 +108,8 @@ def test_empty_repository_greenfield(tmp_path):
+         working_dir=str(tmp_path),
+         model_key="mock_mut/test",
+         mode_policy=get_mode_policy("autonomous"),
++        provider=MockMutatingProvider(),
+     )
+-    agent.client = MockMutatingProvider()
+     
+     # "create" intent maps to BUILD (mutating)
+     prompt = "Create a small Python command-line calculator application in this empty repository."
+@@ -127,8 +127,8 @@ def test_readonly_request_empty_repo(tmp_path):
+         working_dir=str(tmp_path),
+         model_key="mock_ro/test",
+         mode_policy=get_mode_policy("autonomous"),
++        provider=MockReadOnlyProvider(),
+     )
+-    agent.client = MockReadOnlyProvider()
+     
+     prompt = "Reply with exactly: HOSTED_MODEL_OK"
+     content, events = agent.run_non_interactive(prompt)
+@@ -147,8 +147,8 @@ def test_readonly_request_existing_repo(tmp_path):
+         working_dir=str(tmp_path),
+         model_key="mock_ro/test",
+         mode_policy=get_mode_policy("autonomous"),
++        provider=MockReadOnlyProvider(),
+     )
+-    agent.client = MockReadOnlyProvider()
+     
+     prompt = "Reply with exactly: HOSTED_MODEL_OK"
+     content, events = agent.run_non_interactive(prompt)
+@@ -158,22 +158,21 @@ def test_readonly_request_existing_repo(tmp_path):
+     assert "HOSTED_MODEL_OK" in content
+ 
+ 
+-def test_ambiguous_mutation_fails_closed(tmp_path):
+-    """An ambiguous request (UNKNOWN intent) that tries to mutate an existing repo should fail closed at the tool execution level."""
+-    # Existin
