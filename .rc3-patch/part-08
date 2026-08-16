@@ -1,0 +1,159 @@
+g repo
+-    (tmp_path / "existing.py").write_text("print('hello')")
+-    
++def test_exact_literal_bypasses_mutating_provider(tmp_path):
++    """Exact-literal requests use the deterministic read-only fast path."""
++    existing = tmp_path / "existing.py"
++    existing.write_text("print('hello')", encoding="utf-8")
++
+     agent = Agent(
+         working_dir=str(tmp_path),
+         model_key="mock_mut/test",
+         mode_policy=get_mode_policy("autonomous"),
++        provider=MockMutatingProvider(),
+     )
+-    agent.client = MockMutatingProvider()
+-    
+-    prompt = "Reply with exactly: HOSTED_MODEL_OK"  # Maps to UNKNOWN intent
+-    content, events = agent.run_non_interactive(prompt)
+-    
+-    # The provider tries to run write_file
+-    # The tool execution should fail with the exact block message
+-    tool_results = [event for event in events if event.get("type") == "tool_call"]
+-    assert any("BLOCKED: repository intelligence could not establish a safe mutation scope" in str(r) for r in tool_results)
++
++    content, events = agent.run_non_interactive("Reply with exactly: HOSTED_MODEL_OK")
++
++    assert content == "HOSTED_MODEL_OK"
++    assert existing.read_text(encoding="utf-8") == "print('hello')"
++    assert not (tmp_path / "new_app.py").exists()
++    assert not [event for event in events if event.get("type") == "tool_call"]
+diff --git a/mnt/data/noryx_work/noryx_cli-main/tests/test_request_semantics_rc3.py b/tests/test_request_semantics_rc3.py
+new file mode 100644
+index 0000000..5777744
+--- /dev/null
++++ b/tests/test_request_semantics_rc3.py
+@@ -0,0 +1,123 @@
++from types import SimpleNamespace
++
++from nexus.behavioral import BrowserAction, BrowserProbeSpec, BrowserStep, BrowserVerifier, ProbeStatus
++from nexus.planner import IntentType, PlanningEngine, TaskType, classify_intent, get_task_type
++from nexus.semantics import (
++    Action,
++    ResponseMode,
++    SideEffectPolicy,
++    compile_request_semantics,
++    execute_deterministic,
++)
++from nexus.tools import ToolStatus, execute_tool
++
++
++def test_negated_write_is_read_only_explain():
++    prompt = "Do not write any files; just explain what main.py does"
++    semantics = compile_request_semantics(prompt)
++    assert semantics.action == Action.READ_FILE
++    assert semantics.side_effect_policy == SideEffectPolicy.NO_FILE_WRITE
++    assert semantics.targets == ("main.py",)
++    assert classify_intent(prompt) == IntentType.EXPLAIN
++    assert get_task_type(IntentType.EXPLAIN, semantics) == TaskType.READ_ONLY
++
++
++def test_negated_edit_query_is_read_only_search():
++    prompt = "Don't edit anything. Tell me whether app.py imports os."
++    analysis = PlanningEngine().analyze(prompt)
++    assert analysis["task_type"] == TaskType.READ_ONLY
++    assert analysis["intent"] in {IntentType.SEARCH, IntentType.EXPLAIN}
++    assert analysis["semantics"]["side_effect_policy"] == "no_file_write"
++
++
++def test_unknown_defaults_read_only():
++    assert get_task_type(IntentType.UNKNOWN) == TaskType.READ_ONLY
++
++
++def test_exact_literal_is_deterministic():
++    semantics = compile_request_semantics("Reply exactly: 42")
++    assert semantics.action == Action.RESPOND
++    assert semantics.response_mode == ResponseMode.EXACT_LITERAL
++    assert execute_deterministic(semantics, working_dir=".") == "42"
++
++
++def test_calculation_number_only_is_deterministic():
++    semantics = compile_request_semantics("Calculate 17 * 23 and return only the number")
++    assert semantics.action == Action.CALCULATE
++    assert semantics.response_mode == ResponseMode.NUMBER_ONLY
++    assert execute_deterministic(semantics, working_dir=".") == "391"
++
++
++def test_raw_file_value_fast_path(tmp_path):
++    (tmp_path / "VERSION").write_text("3.8.5-rc3\n", encoding="utf-8")
++    semantics = compile_request_semantics("Read VERSION and return only the value")
++    assert semantics.action == Action.READ_FILE
++    assert semantics.response_mode == ResponseMode.RAW_VALUE
++    assert execute_deterministic(semantics, working_dir=tmp_path) == "3.8.5-rc3"
++
++
++def test_policy_engine_failure_blocks_tool(tmp_path):
++    class BrokenPolicy:
++        def evaluate(self, **_kwargs):
++            raise RuntimeError("policy crashed")
++
++    result = execute_tool("read_file", {"path": str(tmp_path / "x.txt")}, policy_engine=BrokenPolicy())
++    assert result.status == ToolStatus.BLOCKED
++    assert "policy evaluation failed" in result.error
++
++
++def test_browser_raw_observations(monkeypatch):
++    # Minimal Playwright-compatible fake to prove typed extraction actions are
++    # persisted as deterministic observations.
++    class Locator:
++        def inner_text(self):
++            return "active"
++
++        def input_value(self):
++            return "42"
++
++        def get_attribute(self, name):
++            return {"data-state": "ready"}.get(name)
++
++    class Page:
++        url = "http://127.0.0.1/"
++
++        def set_default_timeout(self, *_): pass
++        def on(self, *_): pass
++        def goto(self, *_args, **_kwargs): pass
++        def locator(self, _selector): return Locator()
++        def title(self): return "test"
++
++    page = Page()
++    browser = SimpleNamespace(new_page=lambda: page, close=lambda: None)
++    playwright = SimpleNamespace(chromium=SimpleNamespace(launch=lambda headless=True: browser))
++
++    class Context:
++        def __enter__(self): return playwright
++        def __exit__(self, *_): return None
++
++    import sys
++    from types import ModuleType
++    sync_api = ModuleType("playwright.sync_api")
++    sync_api.sync_playwright = lambda: Context()
++    package = ModuleType("playwright")
++    package.sync_api = sync_api
++    monkeypatch.setitem(sys.modules, "playwright", package)
++    monkeypatch.setitem(sys.modules, "playwright.sync_api", sync_api)
++
++    result = BrowserVerifier().verify(
++        BrowserProbeSpec(
++            url="http://127.0.0.1/",
++            steps=(
++                BrowserStep(BrowserAction.GET_TEXT, "#status"),
++                BrowserStep(BrowserAction.GET_VALUE, "#count"),
++                BrowserStep(BrowserAction.GET_ATTRIBUTE, "#state", "data-state"),
++            ),
++        )
++    )
++    assert result.status == ProbeStatus.PASSED
++    assert [item["value"] for item in result.evidence["observations"]] == [
++        "active",
++        "42",
++        "ready",
++    ]
