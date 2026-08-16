@@ -7,4 +7,4 @@ through the 3.x compatibility window so existing plugins and saved sessions do
 not break during upgrade.
 """
 
-__version__ = "3.8.5-rc3"
+__version__ = "3.8.5"
