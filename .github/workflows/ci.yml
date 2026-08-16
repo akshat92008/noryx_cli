@@ -86,9 +86,27 @@ jobs:
         run: python scripts/ci_test_shard.py --index ${{ matrix.index }} --count 4
 
   endurance:
-    name: isolated stress and endurance
+    name: endurance (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ledger-stress
+            file: tests/security_adversarial/test_phase3_ledger_stress.py
+          - name: sandbox-stress
+            file: tests/security_adversarial/test_phase3_sandbox_stress.py
+          - name: repeated-sessions
+            file: tests/security_adversarial/test_phase7_repeated_sessions.py
+          - name: subprocess-endurance
+            file: tests/security_adversarial/test_phase7_subprocess_endurance.py
+          - name: tool-endurance
+            file: tests/security_adversarial/test_phase7_tool_endurance.py
+          - name: sandbox-public
+            file: tests/test_sandbox_stress.py
+          - name: concurrent-stress
+            file: tests/test_stress_concurrent.py
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -97,20 +115,12 @@ jobs:
           cache: pip
       - name: Install pinned qualification environment
         run: python -m pip install -c release-constraints.txt -e '.[dev]'
-      - name: Run resource-intensive qualification tests
+      - name: Run isolated endurance workload
         env:
-          NEXUS_STATE_HMAC_KEY: ci-endurance
+          NEXUS_STATE_HMAC_KEY: ci-endurance-${{ matrix.name }}
           NEXUS_DISABLE_NETWORK: "1"
           NEXUS_OFFLINE: "1"
-        run: >-
-          python -m pytest -q -p no:randomly
-          tests/security_adversarial/test_phase3_ledger_stress.py
-          tests/security_adversarial/test_phase3_sandbox_stress.py
-          tests/security_adversarial/test_phase7_repeated_sessions.py
-          tests/security_adversarial/test_phase7_subprocess_endurance.py
-          tests/security_adversarial/test_phase7_tool_endurance.py
-          tests/test_sandbox_stress.py
-          tests/test_stress_concurrent.py
+        run: python -m pytest -q -p no:randomly ${{ matrix.file }}
 
   platform-smoke:
     name: smoke (${{ matrix.os }}, py${{ matrix.python }})
