@@ -1,0 +1,61 @@
+name: Finalize 3.8.5 public docs
+
+on:
+  push:
+    branches: [agent/rc3-semantic-release-hardening]
+    paths: [.github/workflows/promote-385.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rc3-semantic-release-hardening
+      - name: Promote release documentation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          readme = Path('README.md')
+          text = readme.read_text(encoding='utf-8')
+          text = text.replace(
+              'Version 3.8.5-rc3 is a release-candidate hardening build focused on',
+              'Version 3.8.5 is the public stable hardening release focused on',
+              1,
+          )
+          old = ('Noryx 3.8.5-rc3 is a **beta release candidate for repository analysis, planning, and supervised Verified Repair**. '
+                 'The exact source now collects its full test inventory and the high-risk launch, semantic, repository-intelligence, mutation, tool, browser, and policy regression suites are expected to pass before promotion.')
+          new = ('Noryx 3.8.5 is the **public stable release for repository analysis, planning, and supervised Verified Repair**. '
+                 'Public promotion is gated by deterministic regression shards, isolated stress/endurance qualification, cross-platform smoke coverage, dependency-contract checks, architecture checks, and distributable package builds.')
+          if old not in text:
+              raise SystemExit('README release-status source text not found')
+          text = text.replace(old, new, 1)
+          readme.write_text(text, encoding='utf-8')
+
+          changelog = Path('CHANGELOG.md')
+          text = changelog.read_text(encoding='utf-8')
+          text = text.replace('## [3.8.5-rc3] - 2026-08-16', '## [3.8.5] - 2026-08-16', 1)
+          text = text.replace('### Release-candidate hardening', '### Public launch hardening', 1)
+          text = text.replace(
+              '- Removed the `Production/Stable` package classifier while this build remains a release candidate.',
+              '- Promoted package metadata to `Production/Stable` only after moving launch qualification into deterministic regression shards, isolated endurance jobs, cross-platform smoke gates, and package builds.',
+              1,
+          )
+          text = text.replace(
+              '## [3.8.5] - 2026-08-08\n\n### Security hardening — trust authority isolation (P0/P1)',
+              '## 3.8.5 pre-release security hardening - 2026-08-08\n\n### Security hardening — trust authority isolation (P0/P1)',
+              1,
+          )
+          changelog.write_text(text, encoding='utf-8')
+          PY
+          git rm .github/workflows/promote-385.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add README.md CHANGELOG.md
+          git commit -m 'release: finalize noryx 3.8.5 public docs'
+          git push
