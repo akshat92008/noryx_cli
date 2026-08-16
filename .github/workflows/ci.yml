@@ -59,7 +59,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        include:
+          - shard: 1
+            index: 0
+          - shard: 2
+            index: 1
+          - shard: 3
+            index: 2
+          - shard: 4
+            index: 3
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -75,7 +83,7 @@ jobs:
           NEXUS_STATE_HMAC_KEY: ci-regression-${{ matrix.shard }}
           NEXUS_DISABLE_NETWORK: "1"
           NEXUS_OFFLINE: "1"
-        run: python scripts/ci_test_shard.py --index ${{ matrix.shard - 1 }} --count 4
+        run: python scripts/ci_test_shard.py --index ${{ matrix.index }} --count 4
 
   endurance:
     name: isolated stress and endurance
