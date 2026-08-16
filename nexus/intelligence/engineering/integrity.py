@@ -33,6 +33,21 @@ def _repository_id(repository_root: Path) -> str:
     return hashlib.sha256(str(repository_root.resolve()).encode("utf-8")).hexdigest()[:24]
 
 
+def _user_home() -> Path:
+    """Return the configured user home consistently across supported platforms.
+
+    ``pathlib.Path.home()`` follows ``USERPROFILE`` on Windows and therefore
+    ignores a deliberately overridden ``HOME``.  Noryx respects ``HOME`` when
+    it is explicitly present so isolated CI, containers, and embedders can
+    redirect external signing material without placing it in the repository.
+    The repository-boundary check below still rejects any home that resolves
+    inside the workspace.
+    """
+
+    configured = os.environ.get("HOME", "").strip()
+    return Path(configured).expanduser() if configured else Path.home()
+
+
 def _load_or_create_key(repository_root: Path) -> bytes:
     configured = next(
         (os.environ.get(name, "") for name in _ENV_KEYS if os.environ.get(name, "")),
@@ -49,7 +64,7 @@ def _load_or_create_key(repository_root: Path) -> bytes:
     configured_dir = os.environ.get("NORYX_STATE_KEY_DIR", "").strip()
     candidates = [
         Path(configured_dir).expanduser() if configured_dir else None,
-        Path.home() / ".noryx" / "state-keys",
+        _user_home() / ".noryx" / "state-keys",
         Path.cwd() / ".noryx" / "state-keys",
         Path(tempfile.gettempdir()) / f".noryx-state-keys-{uid}",
     ]
