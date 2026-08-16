@@ -12,7 +12,7 @@ license = "MIT"
 authors = [{name = "Akshat"}]
 keywords = ["ai", "coding-agent", "cli", "verification", "ollama"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
