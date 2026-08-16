@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.8.5-rc3] - 2026-08-16
+
+### Release-candidate hardening
+
+- Restored the missing cross-platform `nexus.locking` implementation so the exact source tree can collect mutation and security tests on POSIX and Windows.
+- Added a structured semantic compiler that separates action, response mode, target/payload spans, and side-effect policy. Ambiguous requests now default to read-only rather than mutation.
+- Added deterministic fast paths for exact-literal replies, arithmetic, simple transforms, and raw local-file reads, bypassing the engineering/model pipeline when no model reasoning is required.
+- Centralized repository path extraction across planning, Engineering Brain, and constraint compilation; global no-write clauses now compile to executable wildcard write prohibitions.
+- Added typed browser observations for `GET_TEXT`, `GET_VALUE`, and `GET_ATTRIBUTE`.
+- Made the lower-level security-policy adapter fail closed for mapped security-relevant tools when policy evaluation raises.
+- Stabilized standalone mutation history with UUID-backed session identity and persistent context reuse.
+- Added constructor-level provider injection for isolated/offline tests and embedded runtimes.
+- Reconciled command-isolation semantics: trusted-host execution requires the explicit capability, and confirmation is required when overriding a mode that otherwise mandates OS isolation.
+- Fixed relative mutation paths so they resolve against the configured workspace instead of the process working directory.
+- Removed the `Production/Stable` package classifier while this build remains a release candidate.
+- Added regression coverage for semantic negation, exact/raw responses, policy failure, browser value extraction, mutation scope, launch reliability, and concurrent-run locking.
+
 ## [3.8.5-rc2] - 2026-08-08
 
 ### Fixed

@@ -3,6 +3,7 @@ import pytest
 import time
 import os
 import signal
+import sys
 from pathlib import Path
 from nexus.sandbox import SandboxRunner, CommandSpec
 
@@ -61,7 +62,7 @@ async def test_sandbox_stdout_saturation(tmp_path):
     
     def run_dd():
         spec = CommandSpec.create(
-            argv=["dd", "if=/dev/zero", "bs=1m", "count=10"], # 10MB of null bytes
+            argv=[sys.executable, "-c", "import sys; sys.stdout.write('x' * 10_000_000)"], # portable 10MB stdout
             cwd=tmp_path,
             max_output_bytes=100_000, # Max 100KB allowed
             allow_unisolated_host_process=True,

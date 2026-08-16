@@ -29,6 +29,7 @@ from nexus.planner import TaskStatus, TaskType, get_task_type
 from nexus.recovery.controller import RecoveryController
 from nexus.recovery.records import FailureRecord
 from nexus.run_state import RunStatus
+from nexus.semantics import RequestSemantics, execute_deterministic
 
 if TYPE_CHECKING:
     from nexus.agent import Agent
@@ -154,6 +155,61 @@ class ExecutionPipeline:
         pipeline_start = time.monotonic()
         result = PipelineResult(user_input=user_input)
         stage_results = result.stage_results
+
+        # Deterministic, side-effect-free requests should not pay the cost or
+        # semantic risk of repository planning + hosted-model execution.
+        analysis = self._agent.planner.analyze(user_input)
+        semantics = RequestSemantics.from_dict(analysis.get("semantics"))
+        if semantics is not None:
+            try:
+                deterministic_response = execute_deterministic(
+                    semantics, working_dir=self._agent.working_dir
+                )
+            except (ArithmeticError, OSError, SyntaxError, ValueError):
+                deterministic_response = None
+            if deterministic_response is not None:
+                stage_results.extend(
+                    [
+                        StageResult(
+                            stage=PipelineStage.REPO_UNDERSTANDING,
+                            success=True,
+                            applicable=False,
+                            metadata={"reason": "deterministic_fast_path"},
+                        ),
+                        StageResult(
+                            stage=PipelineStage.PLANNING,
+                            success=True,
+                            metadata={
+                                "intent": getattr(analysis.get("intent"), "value", analysis.get("intent")),
+                                "task_type": getattr(analysis.get("task_type"), "value", analysis.get("task_type")),
+                                "deterministic": True,
+                            },
+                        ),
+                    ]
+                )
+                self._agent._begin_managed_run(user_input, analysis, None)
+                stage_results.append(
+                    StageResult(
+                        stage=PipelineStage.EXECUTION,
+                        success=True,
+                        metadata={"engine": "deterministic", "action": semantics.action.value},
+                    )
+                )
+                report = self._agent._run_finalizer.finish(deterministic_response, [])
+                result.response = deterministic_response
+                result.status = report.get("status", RunStatus.UNVERIFIED.value)
+                result.outcome = report.get("outcome", result.status)
+                result.success = result.status == RunStatus.VERIFIED.value
+                result.total_duration_ms = int((time.monotonic() - pipeline_start) * 1000)
+                stage_results.append(
+                    StageResult(
+                        stage=PipelineStage.COMPLETION,
+                        success=result.success,
+                        metadata={"status": result.status, "outcome": result.outcome},
+                        error="" if result.success else f"Run finished as {result.outcome}",
+                    )
+                )
+                return result
 
         # ── Stage 1: Repo Understanding ───────────────────────────────────────
         stage_results.append(self._stage_repo_understanding())
@@ -393,9 +449,11 @@ class ExecutionPipeline:
             plan = None
             brain_contract = None
             intent = analysis.get("intent")
-            requires_engineering_contract = (
-                intent is not None and get_task_type(intent) != TaskType.READ_ONLY
+            task_type = analysis.get("task_type") or (
+                get_task_type(intent, analysis.get("semantics")) if intent is not None else TaskType.READ_ONLY
             )
+            task_value = getattr(task_type, "value", task_type)
+            requires_engineering_contract = task_value != TaskType.READ_ONLY.value
             if requires_engineering_contract and getattr(self._agent, "engineering_brain", None):
                 brain_contract = self._agent.engineering_brain.prepare(
                     user_input,

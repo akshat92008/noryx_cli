@@ -272,6 +272,7 @@ class Agent:
         plugins_enabled: bool = False,
         tools_enabled: bool = True,
         allow_unisolated_host_process: bool = False,
+        provider: Any | None = None,
         cancel_event: Any = None,
     ):
         self.cancel_event = cancel_event
@@ -332,8 +333,8 @@ class Agent:
                 output_price_per_million=output_price_per_million,
             )
         )
-        hosted_client = None
-        if not self._is_nova_model():
+        hosted_client = provider
+        if provider is None and not self._is_nova_model():
             primary = HostedProvider(
                 api_key=api_key,
                 attempt_controller=self.budget,
@@ -341,7 +342,7 @@ class Agent:
             )
             from nexus.budget import BudgetedClient
 
-            # BudgetedClient duck-types the provider to add budget enforcement
+            # BudgetedClient duck-types the provider to add budget enforcement.
             hosted_client = BudgetedClient(primary, self.budget)
 
         # Validate provider configuration and budgets before allocating a
@@ -356,7 +357,9 @@ class Agent:
                 self.working_dir = worktree_info.path
             except WorktreeError as exc:
                 raise ValueError(f"Could not create isolated Git worktree: {exc}") from exc
-        if self._is_nova_model():
+        if provider is not None:
+            self.client = provider
+        elif self._is_nova_model():
             try:
                 self.client = NovaProvider(
                     model_name=self.model_cfg.get("ollama_model", "nova_codex"),
@@ -953,7 +956,9 @@ class Agent:
         self._resume_objective_override = None
         self._active_analysis = dict(analysis)
         self._active_plan = plan
-        if self._engineering_contract is None:
+        active_task_type = analysis.get("task_type")
+        active_task_value = getattr(active_task_type, "value", active_task_type)
+        if self._engineering_contract is None and active_task_value != "read_only":
             try:
                 self._engineering_contract = self.engineering_brain.prepare(
                     self._active_objective,

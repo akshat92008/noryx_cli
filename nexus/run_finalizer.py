@@ -98,6 +98,20 @@ class RunFinalizer:
     def __init__(self, agent: "Agent") -> None:
         self._agent = agent
 
+    def _active_task_type(self) -> TaskType:
+        raw = self._agent._active_analysis.get("task_type")
+        if isinstance(raw, TaskType):
+            return raw
+        if raw:
+            try:
+                return TaskType(str(raw))
+            except ValueError:
+                pass
+        return get_task_type(
+            self._agent._active_analysis.get("intent", IntentType.UNKNOWN),
+            self._agent._active_analysis.get("semantics"),
+        )
+
     # ──────────────────────────────────────────────────────────────────────────
     # Public interface
     # ──────────────────────────────────────────────────────────────────────────
@@ -133,7 +147,7 @@ class RunFinalizer:
 
     def _evaluate_fingerprinted_mutations(self, criterion: str, evidence: list) -> CriterionResult:
         mutation_records = [item for item in evidence if item.get("kind") == "file_mutation"]
-        task_type = get_task_type(self._agent._active_analysis.get("intent", IntentType.UNKNOWN))
+        task_type = self._active_task_type()
         satisfied = (
             (not mutation_records and task_type == TaskType.READ_ONLY)
             or bool(mutation_records)
@@ -165,7 +179,7 @@ class RunFinalizer:
             *passing_behavioral,
             *approved_reviews,
         ]
-        task_type = get_task_type(self._agent._active_analysis.get("intent", IntentType.UNKNOWN))
+        task_type = self._active_task_type()
 
         if task_type == TaskType.READ_ONLY:
             objective_satisfied = True
@@ -597,7 +611,7 @@ class RunFinalizer:
             run_status = RunStatus.UNVERIFIED
 
         completion_issue = ""
-        if run_status == RunStatus.VERIFIED:
+        if run_status == RunStatus.VERIFIED and self._active_task_type() != TaskType.READ_ONLY:
             brain = getattr(self._agent, "engineering_brain", None)
             if brain is not None:
                 try:

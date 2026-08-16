@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
+from nexus.path_grammar import extract_repository_paths
 from nexus.intelligence.deliberation import DeliberationCompiler, DeliberationContract
 from nexus.intelligence.engineering.constraints import ConstraintCompiler
 from nexus.intelligence.engineering.failure_learning import FailureLearningStore, FailureLesson
@@ -73,13 +74,8 @@ def _risk_level(objective: str) -> str:
 
 
 def _explicit_paths(objective: str) -> list[str]:
-    """Extract user-named repository paths, including files that do not exist yet."""
-    candidates = re.findall(
-        r"(?<![A-Za-z0-9_.-])(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.(?:py|js|jsx|ts|tsx|go|rs|java|kt|rb|php|cs|cpp|c|h|hpp|json|ya?ml|toml|md|sql|sh|css|html)(?![A-Za-z0-9_.-])",
-        objective,
-        flags=re.IGNORECASE,
-    )
-    return list(dict.fromkeys(item.strip("`'\"") for item in candidates if item.strip()))
+    """Extract user-named repository paths through the canonical grammar."""
+    return extract_repository_paths(objective)
 
 
 def _extract_non_goals(objective: str) -> list[str]:

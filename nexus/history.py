@@ -24,7 +24,7 @@ class FileHistory:
     """Tracks file changes per session for undo and diff operations."""
 
     def __init__(self, session_id: str | None = None):
-        self.session_id = session_id or datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.session_id = session_id or f"session_{uuid.uuid4().hex}"
         self.session_dir = nexus_home() / "history" / self.session_id
         try:
             self.session_dir.mkdir(parents=True, exist_ok=True)

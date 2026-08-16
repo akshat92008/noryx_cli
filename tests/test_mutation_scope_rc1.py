@@ -108,8 +108,8 @@ def test_empty_repository_greenfield(tmp_path):
         working_dir=str(tmp_path),
         model_key="mock_mut/test",
         mode_policy=get_mode_policy("autonomous"),
+        provider=MockMutatingProvider(),
     )
-    agent.client = MockMutatingProvider()
     
     # "create" intent maps to BUILD (mutating)
     prompt = "Create a small Python command-line calculator application in this empty repository."
@@ -127,8 +127,8 @@ def test_readonly_request_empty_repo(tmp_path):
         working_dir=str(tmp_path),
         model_key="mock_ro/test",
         mode_policy=get_mode_policy("autonomous"),
+        provider=MockReadOnlyProvider(),
     )
-    agent.client = MockReadOnlyProvider()
     
     prompt = "Reply with exactly: HOSTED_MODEL_OK"
     content, events = agent.run_non_interactive(prompt)
@@ -147,8 +147,8 @@ def test_readonly_request_existing_repo(tmp_path):
         working_dir=str(tmp_path),
         model_key="mock_ro/test",
         mode_policy=get_mode_policy("autonomous"),
+        provider=MockReadOnlyProvider(),
     )
-    agent.client = MockReadOnlyProvider()
     
     prompt = "Reply with exactly: HOSTED_MODEL_OK"
     content, events = agent.run_non_interactive(prompt)
@@ -158,22 +158,21 @@ def test_readonly_request_existing_repo(tmp_path):
     assert "HOSTED_MODEL_OK" in content
 
 
-def test_ambiguous_mutation_fails_closed(tmp_path):
-    """An ambiguous request (UNKNOWN intent) that tries to mutate an existing repo should fail closed at the tool execution level."""
-    # Existing repo
-    (tmp_path / "existing.py").write_text("print('hello')")
-    
+def test_exact_literal_bypasses_mutating_provider(tmp_path):
+    """Exact-literal requests use the deterministic read-only fast path."""
+    existing = tmp_path / "existing.py"
+    existing.write_text("print('hello')", encoding="utf-8")
+
     agent = Agent(
         working_dir=str(tmp_path),
         model_key="mock_mut/test",
         mode_policy=get_mode_policy("autonomous"),
+        provider=MockMutatingProvider(),
     )
-    agent.client = MockMutatingProvider()
-    
-    prompt = "Reply with exactly: HOSTED_MODEL_OK"  # Maps to UNKNOWN intent
-    content, events = agent.run_non_interactive(prompt)
-    
-    # The provider tries to run write_file
-    # The tool execution should fail with the exact block message
-    tool_results = [event for event in events if event.get("type") == "tool_call"]
-    assert any("BLOCKED: repository intelligence could not establish a safe mutation scope" in str(r) for r in tool_results)
+
+    content, events = agent.run_non_interactive("Reply with exactly: HOSTED_MODEL_OK")
+
+    assert content == "HOSTED_MODEL_OK"
+    assert existing.read_text(encoding="utf-8") == "print('hello')"
+    assert not (tmp_path / "new_app.py").exists()
+    assert not [event for event in events if event.get("type") == "tool_call"]

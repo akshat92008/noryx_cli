@@ -136,9 +136,19 @@ class ApiVerifier:
         )
 
 
+class BrowserAction(str, Enum):
+    CLICK = "click"
+    FILL = "fill"
+    EXPECT_TEXT = "expect_text"
+    WAIT = "wait"
+    GET_TEXT = "get_text"
+    GET_VALUE = "get_value"
+    GET_ATTRIBUTE = "get_attribute"
+
+
 @dataclass(frozen=True)
 class BrowserStep:
-    action: str
+    action: str | BrowserAction
     selector: str = ""
     value: str = ""
 
@@ -181,6 +191,7 @@ class BrowserVerifier:
         failed_requests: list[str] = []
         final_url = spec.url
         title = ""
+        observations: list[dict[str, Any]] = []
         try:
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch(headless=True)
@@ -200,18 +211,44 @@ class BrowserVerifier:
                 )
                 page.goto(spec.url, wait_until="networkidle")
                 for step in spec.steps:
-                    action = step.action.lower()
-                    if action == "click":
+                    action = (
+                        step.action.value
+                        if isinstance(step.action, BrowserAction)
+                        else str(step.action).lower()
+                    )
+                    if action == BrowserAction.CLICK.value:
                         page.locator(step.selector).click()
-                    elif action == "fill":
+                    elif action == BrowserAction.FILL.value:
                         page.locator(step.selector).fill(step.value)
-                    elif action == "expect_text":
+                    elif action == BrowserAction.EXPECT_TEXT.value:
                         if step.value not in page.locator(step.selector or "body").inner_text():
                             raise AssertionError(
                                 f"{step.selector or 'body'} did not contain {step.value!r}"
                             )
-                    elif action == "wait":
+                    elif action == BrowserAction.WAIT.value:
                         page.wait_for_timeout(float(step.value) * 1000)
+                    elif action == BrowserAction.GET_TEXT.value:
+                        observed = page.locator(step.selector or "body").inner_text()
+                        observations.append(
+                            {"action": action, "selector": step.selector or "body", "value": observed}
+                        )
+                    elif action == BrowserAction.GET_VALUE.value:
+                        observed = page.locator(step.selector).input_value()
+                        observations.append(
+                            {"action": action, "selector": step.selector, "value": observed}
+                        )
+                    elif action == BrowserAction.GET_ATTRIBUTE.value:
+                        if not step.value:
+                            raise ValueError("get_attribute requires the attribute name in BrowserStep.value")
+                        observed = page.locator(step.selector).get_attribute(step.value)
+                        observations.append(
+                            {
+                                "action": action,
+                                "selector": step.selector,
+                                "attribute": step.value,
+                                "value": observed,
+                            }
+                        )
                     else:
                         raise ValueError(f"Unsupported browser action: {step.action}")
                 if spec.screenshot_path:
@@ -221,7 +258,7 @@ class BrowserVerifier:
                 final_url = page.url
                 title = page.title()
                 browser.close()
-        except (OSError, TypeError, ValueError) as exc:
+        except (OSError, TypeError, ValueError, AssertionError) as exc:
             return ProbeResult(
                 "browser",
                 ProbeStatus.FAILED,
@@ -231,6 +268,7 @@ class BrowserVerifier:
                     "url": final_url,
                     "console_errors": console_errors,
                     "failed_requests": failed_requests,
+                    "observations": observations,
                 },
             )
 
@@ -250,6 +288,7 @@ class BrowserVerifier:
                 "console_errors": console_errors,
                 "failed_requests": failed_requests,
                 "screenshot": spec.screenshot_path,
+                "observations": observations,
             },
         )
 
