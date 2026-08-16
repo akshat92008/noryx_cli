@@ -1,0 +1,211 @@
+s.to_dict(),
++            "task_type": task_type,
+         }
+ 
+     def create_canonical_bundle(self, goal: str, repo_summary: dict | None = None) -> dict:
+@@ -1487,25 +1548,8 @@ class PlanningEngine:
+ 
+     @staticmethod
+     def _extract_permitted_files(goal: str) -> list[str]:
+-        """Extract explicit repository paths without treating framework names as files."""
+-        candidates = re.findall(
+-            r"(?:^|\s|`|'|\")([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\.[A-Za-z0-9]{1,8})"
+-            r"(?=$|\s|`|'|\"|[),:;])",
+-            goal,
+-        )
+-        technology_names = {
+-            "next.js",
+-            "node.js",
+-            "react.js",
+-            "vue.js",
+-            "angular.js",
+-            "three.js",
+-        }
+-        return list(
+-            dict.fromkeys(
+-                item.lstrip("./") for item in candidates if item.lower() not in technology_names
+-            )
+-        )
++        """Extract explicit repository paths through the canonical grammar."""
++        return extract_repository_paths(goal)
+ 
+     @staticmethod
+     def _step_risk(step: PlanStep, intent: IntentType) -> str:
+diff --git a/nexus/run_finalizer.py b/nexus/run_finalizer.py
+index ad05934..5e44970 100644
+--- a/nexus/run_finalizer.py
++++ b/nexus/run_finalizer.py
+@@ -98,6 +98,20 @@ class RunFinalizer:
+     def __init__(self, agent: "Agent") -> None:
+         self._agent = agent
+ 
++    def _active_task_type(self) -> TaskType:
++        raw = self._agent._active_analysis.get("task_type")
++        if isinstance(raw, TaskType):
++            return raw
++        if raw:
++            try:
++                return TaskType(str(raw))
++            except ValueError:
++                pass
++        return get_task_type(
++            self._agent._active_analysis.get("intent", IntentType.UNKNOWN),
++            self._agent._active_analysis.get("semantics"),
++        )
++
+     # ──────────────────────────────────────────────────────────────────────────
+     # Public interface
+     # ──────────────────────────────────────────────────────────────────────────
+@@ -133,7 +147,7 @@ class RunFinalizer:
+ 
+     def _evaluate_fingerprinted_mutations(self, criterion: str, evidence: list) -> CriterionResult:
+         mutation_records = [item for item in evidence if item.get("kind") == "file_mutation"]
+-        task_type = get_task_type(self._agent._active_analysis.get("intent", IntentType.UNKNOWN))
++        task_type = self._active_task_type()
+         satisfied = (
+             (not mutation_records and task_type == TaskType.READ_ONLY)
+             or bool(mutation_records)
+@@ -165,7 +179,7 @@ class RunFinalizer:
+             *passing_behavioral,
+             *approved_reviews,
+         ]
+-        task_type = get_task_type(self._agent._active_analysis.get("intent", IntentType.UNKNOWN))
++        task_type = self._active_task_type()
+ 
+         if task_type == TaskType.READ_ONLY:
+             objective_satisfied = True
+@@ -597,7 +611,7 @@ class RunFinalizer:
+             run_status = RunStatus.UNVERIFIED
+ 
+         completion_issue = ""
+-        if run_status == RunStatus.VERIFIED:
++        if run_status == RunStatus.VERIFIED and self._active_task_type() != TaskType.READ_ONLY:
+             brain = getattr(self._agent, "engineering_brain", None)
+             if brain is not None:
+                 try:
+diff --git a/mnt/data/noryx_work/noryx_cli-main/nexus/semantics.py b/nexus/semantics.py
+new file mode 100644
+index 0000000..52da76c
+--- /dev/null
++++ b/nexus/semantics.py
+@@ -0,0 +1,398 @@
++"""Deterministic request-semantics compiler and safe fast-path primitives.
++
++This module separates *what action the user requested* from *how the response
++must be rendered*.  That distinction prevents exact/raw response requests and
++read-only negation from being misclassified as repository mutations.
++"""
++
++from __future__ import annotations
++
++import ast
++import operator
++import re
++from dataclasses import asdict, dataclass
++from enum import Enum
++from pathlib import Path
++from typing import Any
++
++from nexus.path_grammar import extract_repository_paths
++
++
++class Action(str, Enum):
++    CHAT = "chat"
++    RESPOND = "respond"
++    READ_FILE = "read_file"
++    SEARCH_REPO = "search_repo"
++    WRITE_FILE = "write_file"
++    EDIT_FILE = "edit_file"
++    RUN_COMMAND = "run_command"
++    BROWSER_READ = "browser_read"
++    BROWSER_INTERACT = "browser_interact"
++    CALCULATE = "calculate"
++    TRANSFORM = "transform"
++    MEMORY_READ = "memory_read"
++    MEMORY_WRITE = "memory_write"
++    SCREENSHOT = "screenshot"
++    ENGINEERING_TASK = "engineering_task"
++
++
++class ResponseMode(str, Enum):
++    NORMAL = "normal"
++    EXACT_LITERAL = "exact_literal"
++    RAW_VALUE = "raw_value"
++    JSON_ONLY = "json_only"
++    LIST_ONLY = "list_only"
++    NUMBER_ONLY = "number_only"
++    SILENT = "silent"
++    SUMMARY = "summary"
++
++
++class SideEffectPolicy(str, Enum):
++    READ_ONLY = "read_only"
++    NO_FILE_WRITE = "no_file_write"
++    ALLOW_FILE_WRITE = "allow_file_write"
++    REQUIRE_CONFIRMATION = "require_confirmation"
++    ALLOW_OPERATION = "allow_operation"
++
++
++@dataclass(frozen=True)
++class RequestSemantics:
++    action: Action
++    response_mode: ResponseMode = ResponseMode.NORMAL
++    side_effect_policy: SideEffectPolicy = SideEffectPolicy.READ_ONLY
++    targets: tuple[str, ...] = ()
++    payload: str = ""
++    constraints: tuple[str, ...] = ()
++    deterministic: bool = False
++
++    def to_dict(self) -> dict[str, Any]:
++        data = asdict(self)
++        data["action"] = self.action.value
++        data["response_mode"] = self.response_mode.value
++        data["side_effect_policy"] = self.side_effect_policy.value
++        data["targets"] = list(self.targets)
++        data["constraints"] = list(self.constraints)
++        return data
++
++    @classmethod
++    def from_dict(cls, data: dict[str, Any] | None) -> "RequestSemantics | None":
++        if not data:
++            return None
++        return cls(
++            action=Action(str(data.get("action", Action.CHAT.value))),
++            response_mode=ResponseMode(str(data.get("response_mode", ResponseMode.NORMAL.value))),
++            side_effect_policy=SideEffectPolicy(
++                str(data.get("side_effect_policy", SideEffectPolicy.READ_ONLY.value))
++            ),
++            targets=tuple(str(item) for item in data.get("targets", ()) or ()),
++            payload=str(data.get("payload", "") or ""),
++            constraints=tuple(str(item) for item in data.get("constraints", ()) or ()),
++            deterministic=bool(data.get("deterministic", False)),
++        )
++
++
++_NO_WRITE_RE = re.compile(
++    r"\b(?:do\s+not|don't|dont|never|without|avoid)\s+"
++    r"(?:writing|write|creating|create|editing|edit|modifying|modify|changing|change|"
++    r"touching|touch|altering|alter|rewriting|rewrite|updating|update|deleting|delete)\b"
++    r"(?:\s+anything\b|(?:[^.;\n]*)\b(?:any\s+)?files?\b)",
++    re.IGNORECASE,
++)
++
++_EXACT_RE = re.compile(
++    r"\b(?:reply|respond|return|output)\s+(?:with\s+)?exactly\s*:?[ \t]*(?P<payload>[^\n]+)",
++    re.IGNORECASE,
++)
++
++_RAW_RE = re.compile(
++    r"\b(?:return|reply|output|show|give)(?:\s+me)?\s+(?:only\s+)?(?:the\s+)?raw\s+(?:value|text|content)\b|"
++    r"\b(?:return|reply|output)\s+(?:only\s+)?(?:the\s+)?value\b",
++    re.IGNORECASE,
++)
++
++_NUMBER_ONLY_RE = re.compile(
++    r"\b(?:return|reply|output)\s+(?:only\s+)?(?:the\s+)?number\b",
++    re.IGNORECASE,
++)
++
++_JSON_ONLY_RE = re.compile(r"\b(?:return|output|reply)\s+(?:only\s+)?json\b|\bjson\s+only\b", re.I)
++_LIST_ONLY_RE = re.compile(r"\b(?:return|output|reply)\s+(?:only\s+)?(?:the\s+)?list\b", re.I)
++_SILENT_RE = re.compile(r"\b(?:do not|don't|dont)\s+(?:repl
