@@ -9,10 +9,10 @@ permissions:
   contents: read
 
 jobs:
-  full-suite:
-    name: full suite (ubuntu, py3.12)
+  qualification:
+    name: qualification and package build
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,22 +37,72 @@ jobs:
           nexus/semantics.py
           nexus/qualification_environment.py
           nexus/intelligence/engineering/integrity.py
+          scripts/ci_test_shard.py
           tests/test_locking.py
       - name: Truth-integrity and installed CLI boundaries
+        env:
+          NEXUS_STATE_HMAC_KEY: ci-qualification
+          NEXUS_DISABLE_NETWORK: "1"
+          NEXUS_OFFLINE: "1"
         run: >-
           python -m pytest -q -p no:randomly
           tests/test_truth_integrity_p0.py
           tests/test_offline_reliability_benchmark.py
           tests/test_e2e_installed_wheel.py
-          tests/test_sandbox_stress.py
-      - name: Complete deterministic test suite
-        env:
-          NEXUS_STATE_HMAC_KEY: ci-full-suite
-          NEXUS_DISABLE_NETWORK: "1"
-          NEXUS_OFFLINE: "1"
-        run: python -m pytest -q -p no:randomly
+          tests/test_request_semantics_rc3.py
+          tests/test_locking.py
       - name: Build distributable artifacts
         run: python -m build
+
+  regression:
+    name: regression shard ${{ matrix.shard }}/4
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install pinned qualification environment
+        run: python -m pip install -c release-constraints.txt -e '.[dev]'
+      - name: Run deterministic regression shard
+        env:
+          NEXUS_STATE_HMAC_KEY: ci-regression-${{ matrix.shard }}
+          NEXUS_DISABLE_NETWORK: "1"
+          NEXUS_OFFLINE: "1"
+        run: python scripts/ci_test_shard.py --index ${{ matrix.shard - 1 }} --count 4
+
+  endurance:
+    name: isolated stress and endurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install pinned qualification environment
+        run: python -m pip install -c release-constraints.txt -e '.[dev]'
+      - name: Run resource-intensive qualification tests
+        env:
+          NEXUS_STATE_HMAC_KEY: ci-endurance
+          NEXUS_DISABLE_NETWORK: "1"
+          NEXUS_OFFLINE: "1"
+        run: >-
+          python -m pytest -q -p no:randomly
+          tests/security_adversarial/test_phase3_ledger_stress.py
+          tests/security_adversarial/test_phase3_sandbox_stress.py
+          tests/security_adversarial/test_phase7_repeated_sessions.py
+          tests/security_adversarial/test_phase7_subprocess_endurance.py
+          tests/security_adversarial/test_phase7_tool_endurance.py
+          tests/test_sandbox_stress.py
+          tests/test_stress_concurrent.py
 
   platform-smoke:
     name: smoke (${{ matrix.os }}, py${{ matrix.python }})
